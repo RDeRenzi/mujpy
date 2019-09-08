@@ -1893,7 +1893,7 @@ class mugui(object):
                         change['owner'].value=str(returnedtup[0],self.histoLength) if len(returnedtup)==2 else str(returnedtup[0],self.histoLength,returnedtup[2])         
 
         def on_start_stop(change):
-            if anim_check.value: 
+            if anim_check.value and not self._single_: 
                 if change['new']:
                     self.anim_fit.event_source.start()
                 else:
@@ -3461,9 +3461,14 @@ class mugui(object):
                 kk = 0
                 for run in runs: # use original to iterate
                     if not tlog_exists(self.paths[1].value,run,self._output_): # loading tlogs is optional
-                        options.pop(key) # pop runs that do not have a tlog file
+                        options.pop(run) # pop runs that do not have a tlog file
                 self.choose_tlogrun.options = options
-                self.choose_tlogrun.value = str((sorted(list(options.keys())))[0])
+                try:
+                    self.choose_tlogrun.value = str((sorted(list(options.keys())))[0])
+                except:
+                    with self._output_:
+                        print('No tlog!')
+
                 get_totals() # sets totalcounts, groupcounts and nsbin
                 
             if self._single_:
