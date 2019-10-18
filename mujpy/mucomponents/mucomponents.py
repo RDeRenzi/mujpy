@@ -3,9 +3,13 @@ from scipy.special import dawsn,erf, j0
 from scipy.constants import physical_constants as C
 
 class mumodel(object):
+    '''
+    Defines the possible components of the fitting model. Provides a chi_square function for Minuit.
+
+    '''
     def __init__(self):
         ''' 
-        defines few constants and _help_ dictionary
+        Defines few constants and _help_ dictionary
         '''
         self._radeg_ = pi/180.
         self._gamma_Mu_MHzperT = 3.183345142*C['proton gyromag. ratio over 2 pi'][0]  # numbers are from Particle Data Group 2017
@@ -28,23 +32,30 @@ class mumodel(object):
 
     def _add_(self,x,*argv):
         '''
-        e.g. a blmg global model with 
-        argv will be a list parameter values (val1,val2.val3,val4,val5,val6, ...) at this iteration 
-        _add_ DISTRIBUTES THESE PARAMETER VALUES
+        e.g. a blmg global model
+
+        * argv will be a list parameter values (val1,val2.val3,val4,val5,val6, ...) at this iteration 
+
+        _add_ DISTRIBUTES THESE PARAMETER VALUES::
+
               SINGLE OR SUITE OF RUNS WITH self._global_==False
               order driven by model e.g. blml
               see mugui int2_int, _add_ replicates the same loops
                 loop over model components (bl & ml)
                     loop over pars (component parameters, two and four, respectively)
                         eval(pars) # pars is a string set by int2_int as keys
-        use to plot as follows: 
+
+        use to plot as follows::
+ 
           j = -1
           yoffset = 0.05
           for y,e in zip(self.asymm,self.asyme)
               j += 1
               plt.errorbar(x,y+j*yoffset,yerr=e)
-              plt.plot(x,mumodel()._add_global(x,val1,val2.val3,val4,val5,val6,run=j)+j*yoffset)
-        UNIFIED WITH FFT, where, for each component f adds it   
+              plt.plotcompare two branches(x,mumodel()._add_global(x,val1,val2.val3,val4,val5,val6,run=j)+j*yoffset)
+
+        UNIFIED WITH FFT, where, for each component f adds it::
+   
             if self._fft_include_components[j] else 0. 
             if if self._fft_include_da else f
 
@@ -55,11 +66,12 @@ class mumodel(object):
                  loop over model components (bl & ml)  
                      loop over global pars
                          eval(pars) 
-                loop over runs
-                    loop over local pars
-                    loop over model components (bl & ml)
-                        loop over local pars
-                            eval(pars)  
+                 loop over runs
+                     loop over local pars
+                     loop over model components (bl & ml)
+                         loop over local pars
+                             eval(pars)  
+
         FINAL COMMMENT: eval implies both a python time overhead and a security break
                         is there a way to avoid it, implementing free parameter functions?    
         '''      
@@ -147,19 +159,19 @@ class mumodel(object):
 
     def _load_data_(self,x,y,_components_,_alpha_,e=1,_nglobals_=None,_locals_=None):
         ''' ,
-        _load_data_(x,y,_components_,_alpha_,e,_nglobals_,_locals_,_ntruecomponents_)
-        x, y, e are numpy arrays
-        e = 1 yields unitary errors 
-        _components_ is a list [[method,[key,...,key]],...,[method,[key,...,key]]], 
-                                where method is an instantiation of a component, e.g. self.ml 
-                                and value = eval(key) produces the parameter value
-        _alpha_ is ditto
-        _nglobals_ = index of global parameter in iminuit parameter list (only for global fits)
-        _locals_ = values of local constants (e.g. B, T extrated form data file by musr2py), a 2D array for global fits
+        use as        _load_data_(x,y,_components_,_alpha_,e,_nglobals_,_locals_,_ntruecomponents_)
+        * x, y, e are numpy arrays
+        * e = 1 yields unitary errors 
+        * _components_ is a list [[method,[key,...,key]],...,[method,[key,...,key]]], where
+        ** method is an instantiation of a component, e.g. self.ml 
+        ** value = eval(key) produces the parameter value
+        * _alpha_ is ditto
+        * _nglobals_ = index of global parameter in iminuit parameter list (only for global fits)
+        * _locals_ = values of local constants (e.g. B, T extrated form data file by musr2py), a 2D array for global fits
 
-        Strategy to accommodate single runs, multi run suites and global:
-        for global y is 2D array self._global_ = True
-        for single and multi y is 1D 
+        Strategy to accommodate single runs, multi run suites and global fits:
+        for global fit y is a 2D array and self._global_ = True
+        for single and multi fit y is a 1D array 
         '''
         # self._components_ = [[method,[key,...,key]],...,[method,[key,...,key]]], and eval(key) produces the parmeter value
         # self._alpha_, self._da_index_ (index of dalpha or [])
@@ -374,13 +386,18 @@ class mumodel(object):
     def _chisquare_(self,*argv,axis=None):
         '''
         Signature provided at Minuit invocation by 
-           optional argument forced_parameters=parnames
-           where parnames is a tuple of parameter names 
+        optional argument forced_parameters=parnames
+        where parnames is a tuple of parameter names::
+
            e.g. parnames = ('asym','field','phase','rate') 
-        Works also for global fits 
-        where sum (...,axis=None) yields the sum over all indices
-        Provides partial chisquares over individual runs if invoked as
-            self._chisquare_(*argv,axis=1):
+
+        Works also for global fits, 
+        where sum (...,axis=None) yields the sum over all indices.
+
+        Provides partial chisquares over individual runs if invoked as::
+
+            self._chisquare_(*argv,axis=1)
+
         '''
         return sum(  ( (self._add_(self._x_,*argv) - self._y_) /self._e_)**2 ,axis=axis )
 

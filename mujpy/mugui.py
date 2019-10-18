@@ -27,17 +27,36 @@
 
 
 class mugui(object):
+    '''
+    The main method is gui, that designs a tabbed gui. Planned to be run in a Jupyter notebook. 
+
+    Public methods correspond to the main tabs (fft, fit, setup, suite, ...). 
+    Other public methods produce the fundamental data structure (asymmetry) 
+    or common functions (plot). Their nested methods are not documented by sphynx.
+    One tab handles (badly) the text output, mixing error messages and fit results.
+
+    function __init__(self)
+
+      * initiates an instance and a few attributes, 
+      * launches the gui.
+      * Use as follows::
+
+             from mugui import mugui as MG
+             MuJPy = MG() # instance is MuJPy
+
+    '''
 
 ##########################
 # INIT
 ##########################
     def __init__(self):
         '''
-        initiates an instance and a few attributes, 
-        launches the gui.
-        Use as follows
-         from mugui import mugui as MG
-         MuJPy = MG() # instance is MuJPy
+        * Initiates an instance and a few attributes, 
+        * launches the gui.
+        * Use a template notebook, basically as follows::
+
+             from mugui import mugui as MG
+             MuJPy = MG() # instance is MuJPy
 
         '''
         import numpy as np
@@ -59,7 +78,7 @@ class mugui(object):
         self.firstbin = 0
         self.second_plateau = 100
         self.peakheight = 100000.
-        self.peakwidth = 1.   # broad guesses for default
+        self.peakwidth = 1.   # rough guesses for default
         self.histoLength = 7900 # initialize
         self.bin_range0 = '0,500' # initialize (for plots, counter inspection)
         self.nt0_run = []
@@ -79,6 +98,7 @@ class mugui(object):
 # mujpy layout
         self.button_color = 'lightgreen'
         self.button_color_off = 'gray'
+        self.newtlogdir = True
 
         #####################################
         # actually produces the gui interface
@@ -126,7 +146,7 @@ class mugui(object):
             yes, I know eval is evil, but
             mujpy users with jupyter have already full control
             of the machine, hence I do not care!
-            **** (UNUSED!) *****
+            **** (UNUSED! should go) *****
             BTW exec is used even by python for good: see input!
             '''
             try: 
@@ -140,7 +160,9 @@ class mugui(object):
     def about(self):
         '''
         about tab:
-        a few infos (version and authors)
+
+        - a few infos (version and authors)
+
         '''
         from ipywidgets import Textarea, Layout
 
@@ -165,17 +187,20 @@ class mugui(object):
 ##########################
     def asymmetry(self):   
         """
-        defines self.time
-        generates asymmetry end error without rebinning
-        all are 2D numpy arrays, 
-        shape of time is (1,nbins), of asymm, asyme are (nruns, nbins)
+        * defines self.time, generates asymmetry end error without rebinning, 
 
-        * self._the_runs_ is a list of lists of musr2py instances *
-        inner list is for adding runs
-        outer list is suites of runs
+        * all are 2D numpy arrays, shape of self.time is (1,nbins), of self.asymm, self.asyme are (nruns, nbins)
+
+        * self._the_runs_ is a list of lists of musr2py (psi loading routine) instances 
+
+        * inner list is for adding runs
+
+        * outer list is suites of runs
 
         may be treated equally by a double for loop (single, no addition implies that k,j=0,0)
-        returns 0 for ok and -1 for error 
+        
+        - returns 0 if ok and -1 if an error is encountered 
+
         """ 
         import numpy as np
 
@@ -245,13 +270,59 @@ class mugui(object):
                 #         write_csv (first item is run number)
                 #         animate (multiplot) 
                 ######################################################
+        # self.console('1st, last = {},{} bin for bckg subtraction'.format(self.firstbin,self.lastbin)) #dbg
+
+#########
+# CONSOLE
+#########
+
+    def console(self,string,end = '\n'):
+        '''
+        printed output method::
+
+            if self._output_ == self._outputtab_ prints on tab 
+                   and sets self.mainwindow.selected_index = 3
+            otherwise writes on terminal 
+
+        ''' 
+        if self._output_ == self._outputtab_:
+            with self._output_:
+                print(string)
+                self.mainwindow.selected_index = 3
+        else:
+            p = open(self._output_,'w') 
+            p.write(''.join([string,end]))
+            p.close()
+
+###################
+# CONSOLE TRACEBACK
+###################
+
+    def console_trcbk(self):
+        '''
+        method to print traceback in console
+
+        ''' 
+        import sys, traceback
+        if self._output_ == self._outputtab_:
+            with self._output_:
+                raise 
+                self.mainwindow.selected_index = 3
+        else:
+            p = open(self._output_,'w') 
+            formatted_lines = traceback.format_exc().splitlines()
+            for string in formatted_lines:
+                p.write(''.join([string,'\n']))
+            p.close()
+        
 ##########################
 # CREATE_RUNDICT
 ##########################
     def create_rundict(self,k=0):
         '''
-        creates a dictionary to identify and compare runs
+        creates a dictionary rundict to identify and compare runs;
         refactored for adding runs
+
         '''
         rundict={}
         instrument = self.filespecs[0].value.split('_')[2] # valid for psi with standard names 'deltat_tdc_gpd_xxxx.bin'
@@ -275,14 +346,19 @@ class mugui(object):
 ##########################
     def gui(self):
         '''
-        gui layout
-        Executed only once
-        It designs an external frame, 
-                the logo and title header
-                the tab structure.
-        At the end (Araba.Phoenix) the method redefines self.gui 
-        as a Vbox named 'whole', 
-        that contains the entire gui structure
+        Main gui layout. Based on ipywidgets.
+        Executed only once,
+        it designs 
+        
+        * an external frame
+        
+        * the logo and title header
+        
+        * the tab structure. Tabs mostly correspond to public mugui methods. Their nested methods cannot be documented by spynx so they are replicated under each public method
+
+        At the end (Araba.Phoenix) the gui method redefines self.gui 
+        as a Vbox named 'whole', containing the entire gui structure
+
         '''
         from ipywidgets import Image, Text, Layout, HBox, Output, VBox, Tab
         import os                      
@@ -331,20 +407,28 @@ class mugui(object):
 ##########################
     def fft(self): 
         '''
-        fft tab of mugui
+        fft tab of mugui.
+
+        on_fft_request(b) performs fft and plot (WARNING)
+        * two options: (partial) residues or full asymmetry
+        * two modes: real amplitude or power
+        * vectorized: range(len(self.fitargs)) is (0,1) or (0,n>1) for single or suite  
+
         '''
         def on_fft_request(b):
             '''
             perform fft and plot 
-            two options: (partial) residues or full asymmetry
-            two modes: real amplitude or power
-            vectorized: range(len(self.fitargs)) is (0,1) or (0,n>1) for single or suite  
+            * two options: (partial) residues or full asymmetry
+            * two modes: real amplitude or power
+            * vectorized: range(len(self.fitargs)) is (0,1) or (0,n>1) for single or suite  
+
             WARNING: relies on self._the_model_._add_ or self._the_model_._fft_add_
-                     to produce the right function for each tun (never checke yet)
-                     insert expected noise level (see bottom comment)
+            to produce the right function for each run (never checked yet)
+            insert expected noise level (see bottom comment)
+
             '''
             import numpy as np
-            from mujpy.aux.aux import derange, derange_int, autops, ps, _ps_acme_score, _ps_peak_minima_score, plotile, get_title
+            from mujpy.aux.aux import derange, autops, ps, _ps_acme_score, _ps_peak_minima_score, plotile, get_title
             from copy import deepcopy
             import matplotlib.pyplot as P
             from matplotlib.path import Path
@@ -358,6 +442,7 @@ class mugui(object):
                 '''
                 anim function
                 update fft data, fit fft and their color 
+
                 '''
                 # color = next(ax_fft._get_lines.prop_cycler)['color']
                 self.ax_fft.set_title(str(self._the_runs_[i][0].get_runNumber_int())+': '+get_title(self._the_runs_[i][0]))
@@ -375,6 +460,7 @@ class mugui(object):
                 anim init function
                 blitting (see wikipedia)
                 to give a clean slate 
+
                 '''
                 self.ax_fft.set_title(str(self._the_runs_[0][0].get_runNumber_int())+': '+get_title(self._the_runs_[0][0]))
                 marks.set_ydata(ap[0])
@@ -389,18 +475,27 @@ class mugui(object):
                 '''
                 Returns fft_e, array, one fft std per bin value per run index k  
                 using time std ey[k] and filter filter_apo.
-                    The data slice is equivalent (not equal!) to 
-                       y[k] = yf[k] + ey[k]*np.random.randn(ey.shape[1])
-                    It is composed of l data plus l zero padding (n=2*l)
-                    Here we deal only with the first l data bins (no padding) 
-                    Assuming that the frequency noise is uniform, 
-                    the f=0 value of the filtered fft(y) is
-                          ap[k] = (y[k]*filter_apo).sum()
-                    and the j-th sample of the corresponding noise is
-                          eapj[k] = ey[k]*np.random.randn(ey.shape[1])*filter_apo).sum()
-                    Repeat n times to average the variance, 
-                          eapvar[k] = [(eapj[k]**2 for j in range(n)]
-                          fft_e = np.sqrt(eapvar.sum()/n)
+                The data slice is equivalent (not equal!) to 
+                *       y[k] = yf[k] + ey[k]*np.random.randn(ey.shape[1])
+                
+                It is composed of l data plus l zero padding (n=2*l).
+
+                Here we deal only with the first l data bins (no padding). 
+                Assuming that the frequency noise is uniform, 
+                the f=0 value of the filtered fft(y) is
+
+                *      ap[k] = (y[k]*filter_apo).sum()
+
+                and the j-th sample of the corresponding noise is
+
+                *      eapj[k] = ey[k]*np.random.randn(ey.shape[1])*filter_apo).sum()
+
+                Repeat n times to average the variance, 
+
+                *  eapvar[k] = [(eapj[k]**2 for j in range(n)]
+
+                *  fft_e = np.sqrt(eapvar.sum()/n)
+
                 '''
                 n = 10
                 fft_e = np.empty(ey.shape[0])
@@ -412,13 +507,13 @@ class mugui(object):
             # ON_FFT_REQUEST STARTS HERE
             #################################
             # retrieve self._the_model_, pars, 
-            #          fit_start,fit_stop=rangetup[0],
-            #          with rangetup[1]rangetup = derange(self.fit_range.value), 
+            #          fit_start,fit_stop=rangetup[0], rangetup[1]
+            #          with rangetup = derange(self.fit_range.value), 
 
             if not self._the_model_._alpha_:
-                with self._output_:
-                    self.mainwindow.selected_index = 3
-                    print('No fit yet. Please first produce a fit attempt.')
+                # this is used as a check that an appropriate fit was performed
+                # so we can assume that fit_range.value has already been checked
+                self.console('No fit yet. Please first produce a fit attempt.')
                 return
             if self._global_:
                 print('not yet!')
@@ -427,7 +522,9 @@ class mugui(object):
                 # setup fft
                 ####################
                 dt = self.time[0,1]-self.time[0,0]
-                rangetup = derange_int(self.fit_range.value)
+                fmax = 0.5/dt  # max frequancy available
+                rangetup = derange(self.fit_range.value,self.histoLength)
+                # no checks, it has already been used in fit
                 fit_start, fit_stop = int(rangetup[0]), int(rangetup[1]) # = self.time[fit_start]/dt, self.time[fit_stop]/dt
                 # print('fit_start, fit_stop = {}, {}'.format(fit_start, fit_stop))
                 l = fit_stop-fit_start # dimension of data
@@ -491,12 +588,10 @@ class mugui(object):
                 #################
                 nf = np.hstack((np.linspace(0,l,l+1,dtype=int), np.linspace(-l+1,-1,l-2,dtype=int)))
                 f = nf*dfa  # all frequencies, l+1 >=0 followed by l-1 <0
-                rangetup = derange(fft_range.value) # translate freq range into bins
+                rangetup = derange(fft_range.value,fmax,int_or_float='float') # translate freq range into bins
                 fstart, fstop = float(rangetup[0]), float(rangetup[1]) 
                 start, stop = int(round(fstart/dfa)), int(round(fstop/dfa))
                 f = deepcopy(f[start:stop]) # selected slice
-                # with self._output_:
-                #    print("start={},stop={},f={}".format(start, stop, f))
                 
                 ########################
                 # build or recall Figure
@@ -517,7 +612,7 @@ class mugui(object):
                     # APPLY PHASE CORRECTION
                     # try acme
                     ########################
-                    with self._output_:
+                    with self._outputtab_:
                         fftf_amplitude[0], p0, p1 = autops(fftf_amplitude[0],'acme') # fix phase on theory 
                     fft_amplitude[0] = ps(fft_amplitude[0], p0=p0 , p1=p1).real # apply it to data
                     for k in range(1,fft_amplitude.shape[0]):
@@ -623,7 +718,8 @@ class mugui(object):
         def on_filter_changed(change):
             '''
             observe response of fit tab widgets:
-            validate float        
+            validate float   
+     
             '''
             string = change['owner'].value # description is three chars ('val','fun','flg') followed by an integer nint
                                                # iterable in range(ntot), total number of internal parameters
@@ -636,10 +732,12 @@ class mugui(object):
             '''
             observe response of FFT range widgets:
             check for validity of function syntax
+
             '''
             from mujpy.aux.aux import derange
 
-            returnedtup = derange(fft_range.value) # errors return (-1,-1),(-1,0),(0,-1), good values are all positive
+            fmax = 0.5/(self.time[0,1]-self.time[0,0])
+            returnedtup = derange(fft_range.value,fmax,int_or_float='float') # errors return (-1,-1),(-1,0),(0,-1), good values are all positive
             if sum(returnedtup)<0:
                 fft_range.background_color = "mistyrose"
                 fft_range.value = fft_range0
@@ -695,7 +793,7 @@ class mugui(object):
                              layout=Layout(width='15%'))
         autophase.style.description_width='10%'
 
-        anim_check = Checkbox(description='Animate',value=True, layout=Layout(width='12%'))
+        anim_check = Checkbox(description='Animate',value=False, layout=Layout(width='12%'))
         anim_check.style.description_width = '1%'
 
         anim_delay = IntText(description='Delay (ms)',value=1000, layout=Layout(width='20%'))
@@ -720,33 +818,37 @@ class mugui(object):
 ##########################
     def fit(self, model_in = 'daml'): # self.fit(model_in = 'mgmgbl') produces a different layout
         '''
-        fit tab of mugui
-        used to set: self.alpha.value, self.offset.value, forw and backw groups
-                     fit and plot ranges, model version                    
-             to display: model name 
-             to activate: fit, plot and update buttons
-             to select and load model (load from folder missing)
-             to select parameters value, fix, function, fft subtract check
+        fit tab of mugui, used 
+
+        - to set: self.alpha.value, self.offset.value, forw and backw groups fit and plot ranges, model version           
+        - to display: model name 
+        - to activate: fit, plot and update buttons
+        - to select and load model (load from folder is missing/deprecated in python)
+        - to select parameters value, fix, function, fft subtract
+
+        ::
+
+        # the calculation is performed in independent class mucomponents
+        # the methods are "inherited" by mugui 
+        # via the reference instance self._the_model_, initialized in steps: 
+        #     __init__ share initial attributes (constants) 
+        #     _available_components_ automagical list of mucomponents 
+        #     clear_asymmetry: includes reset check when suite is implemented
+        #     create_model: lay out self._the_model_
+        #     delete_model: for a clean start
+        #     functions use eval, evil but needed, checked by muvalid, 
+        #     iminuit requires them to be formatted as fitarg by int2min
+        #     help  
+        #     load 
+        #     save_fit/load_ft save results in mujpy format (dill)
+        #     write_csv produces a qtiplot/origin loadable summary
+        # 
+        # Three fit types: single, suite no global, suite global.
+        # Suite non global iterates a single fit over several runs
+        # Suite global performs a single fit over many runs,
+        # with common (global) and run dependent (local) parameters
+
         '''
-# the calculation is performed in independent class mucomponents
-# the methods are "inherited" by mugui 
-# via the reference instance self._the_model_, initialized in steps: 
-#     __init__ share initial attributes (constants) 
-#     _available_components_ automagical list of mucomponents 
-#     clear_asymmetry: includes reset check when suite is implemented
-#     create_model: lay out self._the_model_
-#     delete_model: for a clean start
-#     functions use eval, evil but needed, checked by muvalid, safetry
-#     iminuit requires them to be formatted as fitarg by int2min
-#     help  
-#     load 
-#     save_fit/load_ft save results in mujpy format (dill)
-#     write_csv produces a qtiplot/origin loadable summary
-# 
-# Three fit types: single, suite no global, suite global.
-# Suite non global iterates a single fit over several runs
-# Suite global performs a single fit over many runs,
-# with common (global) and run dependent (local) parameters
 
 
         from mujpy.mucomponents.mucomponents import mumodel
@@ -756,12 +858,17 @@ class mugui(object):
             from iminuit import describe
             '''
             Method, returns a template tuple of dictionaries (one per fit component):
+
             Each dictionary contains 'name' and 'pars', 
             the latter in turns is a list of dictionaries, one per parameter, 'name','error,'limits'
-            ({'name':'bl','pars':[{'name':'asymmetry','error':0.01,'limits'[0,0]},
-                                  {'name':'Lor_rate','error':0.01,'limits'[0,0]}}, 
-             ...)
-            retreived magically from the mucompon....ents class.
+
+            ::  ({'name':'bl','pars':[{'name':'asymmetry','error':0.01,'limits'[0,0]},
+
+                                      {'name':'Lor_rate','error':0.01,'limits'[0,0]}}, 
+                                      ...)
+
+            retreived magically from the mucomponents class.
+
             '''
             _available_components = [] # is a list, mutable
             # generates a template of available components.
@@ -795,6 +902,7 @@ class mugui(object):
             addcomponent('ml') # adds e.g. a mu precessing, lorentzian decay, component
             this method adds a component selected from self.available_component, tuple of directories
             with zeroed values, stepbounds from available_components, flags set to '~' and empty functions
+
             '''
             from copy import deepcopy
             if name in self.component_names:
@@ -813,9 +921,7 @@ class mugui(object):
                 self.model_components.append({'name':name,'pars':pars})
                 return True # OK code
             else:
-                self.mainwindow.selected_index = 3
-                with self._output_:
-                    print ('\nWarning: '+name+' is not a known component. Not added.\n'+
+                self.console('\nWarning: '+name+' is not a known component. Not added.\n'+
                            'With myfit = mufit(), type myfit.help to see the available components')
                 return False # error code
 
@@ -823,8 +929,11 @@ class mugui(object):
             '''
             myfit = MuFit()       
             myfit.create_model('daml') # adds e.g. the two component 'da' 'ml' model
-            this method adds a model of components selected from the available_component tuple of directories
+            this method adds a model of components selected from the available_component tuple of  
+            directories
+
             with zeroed values, stepbounds from available_components, flags set to '~' and empty functions
+
             '''
             import string
     # name 2_0_mlml_blbl for 2 global parameters (A0 R), 0 kocal parameters (B end T) and two models 
@@ -847,14 +956,14 @@ class mugui(object):
         def checkvalidmodel(name):
             '''
             checkvalidmodel(name) checks that name is a 
-                                  2*component string of valid component names, e.g.
+            ::      2*component string of valid component names, e.g.
                                   'daml' or 'mgmgbl'
+            
             '''
             components = [name[i:i+2] for i in range(0, len(name), 2)]
             for component in components:            
                 if component not in self.component_names:
-                    with self._output_:
-                        print ('Warning: '+component+' is not a known component. Not added.\n'+
+                    self.console('Warning: '+component+' is not a known component. Not added.\n'+
                                'With myfit = mufit(), type myfit.help to see the available components')
                     return [] # error code
             return components
@@ -862,6 +971,7 @@ class mugui(object):
         def chi(t,y,ey,pars):
             '''
             stats for the right side of the plot 
+
             '''
             nu = len(t) - self.freepars # degrees of freedom in plot
             # self.freepars is calculated in int2min
@@ -879,7 +989,7 @@ class mugui(object):
             plot=True do not
             
             This is a complex routine that allows for
-                - single, multiple or global fits
+            ::  - single, multiple or global fits
                 - fit range different form plot range
                 - either
                     one plot range, the figure is a subplots((2,2))
@@ -888,17 +998,22 @@ class mugui(object):
                     two plot ranges, early and late, the figure is a subplots((3,2))
                         plot_early ax_fit[(0,0)], plot_late ax_fit[(0,1)], chi2_prints ax_fit[(0,-1)]
                         residues_early ax_fit[(1,0)], residues_late ax_fit[(1,1)], chi2_histograms ax_fit[(1,-1)]
+
             If multi/globalfit, it also allows for either
-                - anim display 
+            ::  - anim display 
                 - offset display 
+
             '''  
             import matplotlib.pyplot as P
-            from mujpy.aux.aux import derange_int, rebin, get_title, plotile, set_bar
+            from mujpy.aux.aux import derange, rebin, get_title, plotile, set_bar
             from scipy.stats import norm
             from scipy.special import gammainc
             import matplotlib.path as path
             import matplotlib.patches as patches
             import matplotlib.animation as animation
+
+            font = {'family':'Ubuntu','size':10}
+            P.rc('font', **font)
 
             ###################
             # PYPLOT ANIMATIONS
@@ -908,6 +1023,7 @@ class mugui(object):
                 anim function
                 update errorbar data, fit, residues and their color,
                        chisquares, their histograms 
+
                 '''
                 # from mujpy.aux.aux import get_title
                 # print('animate')
@@ -974,6 +1090,7 @@ class mugui(object):
                 anim init function
                 blitting (see wikipedia)
                 to give a clean slate 
+
                 '''
                 from mujpy.aux.aux import get_title
                 # nufit,ffit,chi2fit = chi(tfit[0],yfit[0],eyfit[0],pars[0])
@@ -1040,15 +1157,16 @@ class mugui(object):
             # plot according to plot_range
             ##############################
             
-            returntup = derange_int(self.plot_range.value) 
-            if sum(n<0 for n in returntup)>0:
-                    tmp = self.plot_range.value
-                    self.plot_range.value = self.plot_range0
-                    self.plot_range.background_color = "mistyrose"
-                    self.mainwindow.selected_index = 3
-                    with self._output_:
-                        print('Wrong plot range: {}'.format(tmp))
-                    return
+            # must provide maximum available bins = self.histoLength 
+            returntup = derange(self.plot_range.value,self.histoLength) 
+            if sum(n<0 for n in returntup)>0:  # illegal values self.plot_range.value
+                                               # signalled by returntup = (-1,-1);
+                                               # restore defaults
+                tmp = self.plot_range.value
+                self.plot_range.value = self.plot_range0
+                self.plot_range.background_color = "mistyrose"
+                self.console('Wrong plot range: {}'.format(tmp))
+                return
             self.asymmetry() # prepare asymmetry, 
             ############################################
             #  choose pars for first/single fit function
@@ -1063,13 +1181,16 @@ class mugui(object):
                 ###############################################################
                 if not self._the_model_._alpha_:  # False if no _load_data_ yet 
                     if self._global_:
-                        # print('global, mumodel load_data') 
+                        self.console('global, mumodel load_data') 
                         self._the_model_._load_data_(self.time[0],self.asymm,int2_int(),
                                                      self.alpha.value,e=self.asyme,
-                                                     _nglobal_=self.nglobals,_locals_=self.locals)                
+                                                     _nglobal_=self.nglobals,
+                                                     _locals_=self.locals)                
                     else:
-                        # print('no global, mumodel load_data') 
-                        self._the_model_._load_data_(self.time[0],self.asymm[0],int2_int(),self.alpha.value,e=self.asyme[0]) 
+                        # self.console('no global, mumodel load_data') # debug
+                        self._the_model_._load_data_(self.time[0],self.asymm[0],int2_int(),self.alpha.value,e=self.asyme[0]) # pok = is debug
+                        # string = 'Load data iok = {} [0=fine]. Time last = {:.2e}, A[0] = {:.2f}, alpha = {:.3f}'.format(pok,self._the_model_._x_[-1],self._themodel_._y_[0],self._the_model_._alpha_) # debug
+                        # self.console(string)
             else:  # from lastfit, for best fit and plot best fit
                 pars = [[self.fitargs[k][name] for name in self.minuit_parameter_names] for k in range(len(self.fitargs))]
             ##########################################
@@ -1109,7 +1230,7 @@ class mugui(object):
             #############################
             # rebinning of data as in fit
             #############################
-            fittup = derange_int(self.fit_range.value) # range as tuple
+            fittup = derange(self.fit_range.value,self.histoLength) # range as tuple
             fit_pack =1
             if len(fittup)==3: # plot start stop pack
                 fit_start, fit_stop, fit_pack = fittup[0], fittup[1], fittup[2]
@@ -1137,7 +1258,8 @@ class mugui(object):
             if self.fig_fit: # has been set to a handle once
                 self.fig_fit.clf()
                 self.fig_fit,self.ax_fit = P.subplots(2,ncols,sharex = 'col', 
-                             gridspec_kw = {'height_ratios':[3, 1],'width_ratios':width_ratios},num=self.fig_fit.number)
+                             gridspec_kw = {'height_ratios':[3,1],'width_ratios':width_ratios},
+                                            num=self.fig_fit.number)
                 self.fig_fit.subplots_adjust(hspace=0.05,top=0.90,bottom=0.12,right=0.97,wspace=0.03)
             else: # handle does not exist, make one
                 self.fig_fit,self.ax_fit = P.subplots(2,ncols,figsize=(6,4),sharex = 'col',
@@ -1252,14 +1374,16 @@ class mugui(object):
                 cc = gammainc((hb+nufit)/2,nufit/2) # muchi2cdf(x,nu) = gammainc(x/2, nu/2);
                 lc = 1+hb[min(list(np.where((cc<norm.cdf(1))&(cc>norm.cdf(-1))))[0])]/nufit
                 hc = 1+hb[max(list(np.where((cc<norm.cdf(1))&(cc>norm.cdf(-1))))[0])]/nufit
-                string = '$\chi^2_f=$ {:.4f}\n ({:.2f}-{:.2f})\n$\chi^2_c=$ {:.4f}\n{} dof\n'.format(chi2fit,
+                string = 'F-B: {} - {}\n'.format(self.group[0].value,self.group[1].value)
+                string += r'$\alpha=$ {}'.format(self.alpha.value)
+                string += '\n$\chi^2_f=$ {:.4f}\n ({:.2f}-{:.2f})\n$\chi^2_c=$ {:.4f}\n{} dof\n'.format(chi2fit,
                                                                             lc,hc,gammainc(chi2fit,nufit),nufit)
                 if  len(returntup)==5: 
                     nulate,dum,chi2late = chi(tlate[0],ylate[0],eylate[0],pars[0])
                     string += '$\chi^2_e=$ {:.4f}\n$\chi^2_l=$ {:.4f}'.format(chi2plot,chi2late)
                 else:
                     string += '$\chi^2_p=$ {:.4f}'.format(chi2plot)
-                text = self.ax_fit[(0,-1)].text(-4,0.2,string)
+                text = self.ax_fit[(0,-1)].text(-4,0.3,string)
 
                 self.fig_fit.canvas.manager.window.tkraise()
                 # save all chi2 values now
@@ -1279,14 +1403,13 @@ class mugui(object):
                 if not plot:
                     for k in range(len(self.fitargs)):
                         write_csv(chi2fit[k],lc[k],hc[k],k)  # writes csv file
-                        with self._output_:
-                            path = save_fit(k)  # saves .fit file
-                            if path.__len__ != 2:
-                                # assume path is a path string, whose length will be definitely > 2
-                                print('chi2r = {:.4f} ({:.4f} - {:.4f}), saved in  {}'.format(chi2fit[k],lc[k],hc[k],path))
-                            else:
-                                # assume path is a tuple containing (path, exception)
-                                print('Could not save results in  {}, error: {}'.format(path[0],path[1]))
+                        path = save_fit(k)  # saves .fit file
+                        if path.__len__ != 2:
+                            # assume path is a path string, whose length will be definitely > 2
+                            self.console('chi2r = {:.4f} ({:.4f} - {:.4f}), saved in  {}'.format(chi2fit[k],lc[k],hc[k],path))
+                        else:
+                            # assume path is a tuple containing (path, exception)
+                            self.console('Could not save results in  {}, error: {}'.format(path[0],path[1]))
 
                 # print('len(self.fitargs)) = {}'.format(len(self.fitargs)))
                 #########################################################
@@ -1353,9 +1476,9 @@ class mugui(object):
                 # plot second window, if any
                 ############################
                 if len(returntup)==5:
-                    tltile, yltile, ylres  = plotile(tlate,xdim=ylate.shape[0],offset=xoffset), plotile(ylate,xoffset=xoffset), plotile(ylate-freslate,offset=rmax)  # plot arrays, full suite
-                    tfltile, fltile  = plotile(tfl,fl,fl,fl,
-                                                          yoffset=foffset,xoffset=xoffset)  # res offset is 0.03 = 0.1-0.07
+                    tltile, yltile, ylres  = plotile(tlate,xdim=ylate.shape[0],offset=xoffset), plotile(ylate,offset=xoffset), plotile(ylate-flres,offset=rmax)  # plot arrays, full suite
+                    tfltile, fltile  = plotile(tfl,offset=xoffset),plotile(fl,
+                                                          offset=foffset)  # res offset is 0.03 = 0.1-0.07
                     for k in range(y.shape[0]):
                         color = next(self.ax_fit[0,1]._get_lines.prop_cycler)['color']
                         self.ax_fit[(0,1)].errorbar(tltile[k],yltile[k],yerr=eylate[k],
@@ -1406,27 +1529,27 @@ class mugui(object):
                     hc = 1+hb[max(list(np.where((cc<norm.cdf(1))&(cc>norm.cdf(-1))))[0])]/nufit
                     if not plot:
                         write_csv(chi2fit,lc,hc,0)  # writes csv file
-                        with self._output_:
-                            path = save_fit(0)  # saves .fit file
-                            if path.__len__ != 2:
-                                # assume path is a path string, whose length will be definitely > 2
-                                print('chi2r = {:.4f} ({:.4f} - {:.4f}), saved in  {}'.format(chi2fit,lc,hc,path))
-                            else:
-                                # assume path is a tuple containing (path, exception)
-                                print('Could not save results in  {}, error: {}'.format(path[0],path[1]))
-                    string = '$\chi^2_f=$ {:.4f}\n ({:.2f}-{:.2f})\n$\chi^2_c=$ {:.4f}\n{} dof\n'.format(chi2fit,
-                                                                            lc,hc,gammainc(chi2fit,nufit),nufit)
+                        path = save_fit(0)  # saves .fit file
+                        if path.__len__ != 2:
+                            # assume path is a path string, whose length will be definitely > 2
+                            self.console('chi2r = {:.4f} ({:.4f} - {:.4f}), saved in  {}'.format(chi2fit,lc,hc,path))
+                        else:
+                            # assume path is a tuple containing (path, exception)
+                            self.console('Could not save results in  {}, error: {}'.format(path[0],path[1]))
+                    string = 'F-B: {} - {}\n'.format(self.group[0].value,self.group[1].value)
+                    string += r'$\alpha=$ {}'.format(self.alpha.value)
+                    string += '\n$\chi^2_f=$ {:.4f}\n ({:.2f}-{:.2f})\n$\chi^2_c=$ {:.4f}\n{} dof\n'.format(chi2fit,lc,hc,gammainc(chi2fit,nufit),nufit)
                     if  len(returntup)==5: 
                         string += '$\chi^2_e=$ {:.4f}\n$\chi^2_l=$ {:.4f}'.format(chi2plot,chi2late)
                     else:
                         string += '$\chi^2_p=$ {:.4f}'.format(chi2plot)
-                    self.ax_fit[(0,-1)].text(-4.,0.2,string)
+                    self.ax_fit[(0,-1)].text(-4.,0.3,string)
                 else:
                     self.ax_fit[(0,0)].set_title(self.title.value)
                     ########################
                     # chi2 distribution: fit
                     ########################
-                    fittup = derange_int(self.fit_range.value) # range as tuple
+                    fittup = derange(self.fit_range.value,self.histoLength) # range as tuple
                     fit_pack =1
                     if len(fittup)==3: # plot start stop pack
                         fit_start, fit_stop, fit_pack = fittup[0], fittup[1], fittup[2]
@@ -1448,22 +1571,23 @@ class mugui(object):
                         hc = 1+hb[max(list(np.where((cc<norm.cdf(1))&(cc>norm.cdf(-1))))[0])]/nufit
                         if not plot:
                             write_csv(chi2fit,lc,hc,k)  # writes csv file
-                            with self._output_:
-                                path = save_fit(k)  # saves .fit file
-                                if path.__len__ != 2:
-                                    # assume path is a path string, whose length will be definitely > 2
-                                    print('chi2r = {:.4f} ({:.4f} - {:.4f}), saved in  {}'.format(chi2fit,lc,hc,path))
-                                else:
-                                    # assume path is a tuple containing (path, exception)
-                                    print('Could not save results in  {}, error: {}'.format(path[0],path[1]))
+                            path = save_fit(k)  # saves .fit file
+                            if path.__len__ != 2:
+                                # assume path is a path string, whose length will be definitely > 2
+                                self.console('chi2r = {:.4f} ({:.4f} - {:.4f}), saved in  {}'.format(chi2fit,lc,hc,path))
+                            else:
+                                # assume path is a tuple containing (path, exception)
+                                self.console('Could not save results in  {}, error: {}'.format(path[0],path[1]))
                         pedice = '_{'+str(self.nrun[k])+'}'
-                        string = '$\chi^2'+pedice+'=$ {:.3f}'.format(chi2fit)
-                        self.ax_fit[(0,-1)].text(0.02,ychi,string)
+                        string = 'F-B: {} - {}\n'.format(self.group[0].value,self.group[1].value)
+                        string += r'$\alpha=$ {}'.format(self.alpha.value)
+                        string += '\n$\chi^2'+pedice+'=$ {:.3f}'.format(chi2fit)
+                        self.ax_fit[(0,-1)].text(0.03,ychi,string)
                         ychi += ymax
                     self.ax_fit[(1,-1)].axis('off')
                     self.ax_fit[(0,-1)].set_ylim(self.ax_fit[(0,0)].get_ylim())
                 self.ax_fit[(0,-1)].axis('off')
-                self.mainwindow.selected_index = 3  # focus on output tab
+                # self.mainwindow.selected_index = 3  # focus on output tab
 
             self.fig_fit.canvas.manager.window.tkraise()
             P.draw()
@@ -1473,6 +1597,7 @@ class mugui(object):
             From internal parameters to the minimal representation 
             for the use of mucomponents._add_.
             Invoked just before submitting minuit 
+
             '''
             from mujpy.aux.aux import translate
 
@@ -1527,6 +1652,7 @@ class mugui(object):
 
             New version for suite of runs
                 fitarg becomes a list of dictionaries
+
             '''
             ntot = sum([len(self.model_components[k]['pars']) for k in range(len(self.model_components))])
             ntot -= sum([1 for k in range(ntot) if self.flag[k]=='=']) # ntot minus number of functions 
@@ -1595,6 +1721,7 @@ class mugui(object):
         def load_fit(b):
             '''
             loads fit values such that the same fit can be reproduced on the same data
+
             '''
             import dill as pickle
             import os
@@ -1602,8 +1729,6 @@ class mugui(object):
             path_and_filename = path_file_dialog(self.paths[2].value) # returns the full path and filename
             if path_and_filename == '':
                 return
-            #with self._output_:
-            #    print('Loaded fit results from: {}'.format( path_and_filename))
             try:            
                 with open(path_and_filename,'rb') as f:
                     fit_dict = pickle.load(f)
@@ -1612,8 +1737,6 @@ class mugui(object):
                     self.fitargs = []
                 except:
                     pass
-                #with self._output_:
-                #    print(fit_dict)
                 model.value = fit_dict['model.value']
                 self.fit(model.value) # re-initialize the tab with a new model
                 self.version.value = fit_dict['version']
@@ -1634,9 +1757,7 @@ class mugui(object):
                 self.load_handle[0].value = fit_dict['self.load_handle[0].value']
 
             except Exception as e:
-                with self._output_:
-                    print('Problems with reading {} file\n\nException: {}'.format(path_and_filename,e))
-                self.mainwindow.selected_index = 3
+                self.console('Problems with reading {} file\n\nException: {}'.format(path_and_filename,e))
 
         def min2int(fitargs):
             '''
@@ -1669,6 +1790,43 @@ class mugui(object):
                         _parvalue.append('{:4f}'.format(eval(string))) # _parvalue item is a string
             return _parvalue
             
+        def min2print(fitargs):
+            '''
+            From minuit parameters to plain print in xterminal ,
+            see int2min for a description   
+            Invoked just after minuit convergence for output 
+            '''
+            # refactor : this routine has much in common with int2_int
+            # initialize
+            from mujpy.aux.aux import translate, value_error
+
+            ntot = sum([len(self.model_components[k]['pars']) for k in range(len(self.model_components))])
+            _parvalue =  []
+            lmin = [-1]*ntot 
+            p = [0.0]*ntot 
+            e = [0.0]*ntot 
+            nint = -1
+            nmin = -1
+            for k in range(len(self.model_components)):  # scan the model
+                keys = []
+                for j, par in enumerate(self.model_components[k]['pars']): # list of dictionaries, par is a dictionary
+                    nint += 1  # internal parameter incremented always   
+                    if self.flag[nint].value != '=': #  skip functions, they are not new minuit parameter
+                        nmin += 1
+                        string = ' {}-{} = {}'.format(nmin,par['name'],value_error(fitargs[par['name']],fitargs['error_'+par['name']]))
+                        self.console(string,end='') # needed also by functions
+                        p[nmin] = fitargs[par['name']] # needed also by functions
+                        lmin[nint] = nmin # number of minuit parameter
+                        e[nmin] = fitargs['error_'+par['name']]
+                    else: # functions, calculate as such
+                        # nint must be translated into nmin 
+                        string = translate(nint,lmin,self.function) # 
+                        stringe =string.replace('p','e')
+                        stringa = '  -{} = {}'.format(par['name'],value_error(eval(string),eval(stringe)))
+                        self.console(stringa,end='') # needed also by functions
+                self.console('')
+            return
+
         def on_alpha_changed(change):
             '''
             observe response of fit tab widgets:
@@ -1692,16 +1850,17 @@ class mugui(object):
             call fit_plot
             save fit file in save_fit
             write summary in write_csv 
+
             '''
             from iminuit import Minuit as M
-            from mujpy.aux.aux import derange_int, rebin, norun_msg, get_title
+            from mujpy.aux.aux import derange, rebin, get_title
+            # from time import localtime, strftime
 
     ###################
     # error: no run yet
     ###################
             if not self._the_runs_:
-                norun_msg(self._output_)  # writes a message in self._output
-                self.mainwindow.selected_index = 3
+                self.console('No run loaded yet! Load one first (select suite tab).')
             else:
     ###################
     # run loaded
@@ -1709,17 +1868,16 @@ class mugui(object):
                 self.asymmetry() # prepare asymmetry
                 # self.time is 1D asymm, asyme can 
                 pack = 1 # initialize default
-                returntup = derange_int(eval('self.fit_range.value')) 
+                returntup = derange(eval('self.fit_range.value'),self.histoLength) 
+                # self.console('values  = {}'.format(returntup)) # debug
                 if len(returntup)==3: # 
                     start, stop, pack = returntup
                 elif len(returntup)==0:
-                    with self._output_:
-                        print('Empty ranges. Choose fit/plot range')
-                    self.mainwindow.selected_index = 3
+                    self.console('Empty ranges. Choose fit/plot range')
                 else:
                     start, stop = returntup
                 time,asymm,asyme = rebin(self.time,self.asymm,[start,stop],pack,e=self.asyme)
-                level = 1
+                level = 0
                 self.fitargs = []
                 fitarg = int2min(return_names=True) # from dash
                 if self._global_:
@@ -1728,46 +1886,59 @@ class mugui(object):
                                                  _nglobal_=self.nglobals,_locals_=self.locals) # pass all data to model                    
                     ##############################
                     # actual global migrad call
-                    with self._output_:
+                    lastfit = M(self._the_model_._chisquare_,
+                                     pedantic=False,
+                                     forced_parameters=self.minuit_parameter_names,
+                                     print_level=level,**fitarg[0])
+                    # self.console('{} *****'.format([self.nrun[k] for k in range(len(self.nrun))]))
+                    lastfit.migrad()
+                    self.fitargs.append(lastfit.fitarg)
+                    min2print(lastfit.fitarg) 
+                    #    lastfit[0].hesse()
+                    ##############################
+                else:
+                    # self.console('_single is {}'.format(self._single_)) # debug
+                    if self._single_:
+                        self._the_model_._load_data_(time[0],asymm[0],int2_int(),self.alpha.value,e=asyme[0]) # pass data to model, one at a time
+                        ##############################
+                        # actual single migrad calls
                         lastfit = M(self._the_model_._chisquare_,
                                          pedantic=False,
                                          forced_parameters=self.minuit_parameter_names,
                                          print_level=level,**fitarg[0])
-                        print('{} *****'.format([self.nrun[k] for k in range(len(self.nrun))]))
                         lastfit.migrad()
-                        self.fitargs.append(lastfit.fitarg)
-                    #    lastfit[0].hesse()
-                    ##############################
-                else:
-                    if self._single_:
-                        # print('time.shape = {}, asymm.shape = {}'.format(time.shape,asymm.shape))
-                        self._the_model_._load_data_(time[0],asymm[0],int2_int(),self.alpha.value,e=asyme[0]) # pass data to model, one at a time
-                        ##############################
-                        # actual single migrad calls
-                        with self._output_:
-                            lastfit = M(self._the_model_._chisquare_,
-                                             pedantic=False,
-                                             forced_parameters=self.minuit_parameter_names,
-                                             print_level=level,**fitarg[0])
-                            print('{}: {} *******************'.format(self.nrun[0],get_title(self._the_runs_[0][0])))
-                            lastfit.migrad()
-                            self.fitargs.append(lastfit.fitarg)
+                        # if lastfit.migrad_ok():
+                        self.fitargs.append(lastfit.fitarg)                            
+                        nu = len(time[0]) - self.freepars # degrees of freedom in plot
+                        # self.freepars is calculated in int2min
+                        chi2 = lastfit.fval/nu  
+                        # self.console('{}: {} ***** chi2 = {:.3f} ***** {}'.format(self.nrun[0],get_title(self._the_runs_[0][0]),chi2,strftime("%d %b %Y %H:%M:%S", localtime())))
+                        min2print(lastfit.fitarg)
                     else:
                         for k in range(len(self._the_runs_)): 
                             self._the_model_._load_data_(time[0],asymm[k],int2_int(),self.alpha.value,e=asyme[k]) # pass data to model, one at a time
                             ##############################
                             # actual single migrad calls
-                            with self._output_:
-                                lastfit = M(self._the_model_._chisquare_,
-                                                 pedantic=False,
-                                                 forced_parameters=self.minuit_parameter_names,
-                                                 print_level=level,**fitarg[k])
-                                print('{}: {} *******************'.format(self.nrun[k],get_title(self._the_runs_[k][0])))
-                                lastfit.migrad()
-                                self.fitargs.append(lastfit.fitarg)
+                            lastfit = M(self._the_model_._chisquare_,
+                                             pedantic=False,
+                                             forced_parameters=self.minuit_parameter_names,
+                                             print_level=level,**fitarg[k])
+                            lastfit.migrad()
+                            # if lastfit.migrad_ok():
+                            self.fitargs.append(lastfit.fitarg)
+                            nu = len(time[0]) - self.freepars # degrees of freedom in plot
+                            # self.freepars is calculated in int2min
+                            chi2 = lastfit.fval/nu  
+                            # self.console('{}: {} ***** chi2 = {:.3f} ***** {}'.format(self.nrun[k],get_title(self._the_runs_[k][0]),chi2,strftime("%d %b %Y %H:%M:%S", localtime())))
+                            min2print(lastfit.fitarg)
                             #    lastfit.hesse()
                             ##############################
-                fitplot() # plot the best fit results 
+                    if lastfit.migrad_ok():
+                        fitplot() # plot the best fit results 
+                    else:
+                        self.console('Fit not converged')
+#                        string = 'Time last = {:.2e}, A[0] = {:.2f}, alpha = {:.3f}'.format(self._the_model_._x_[-1],self._themodel_._y_[0],self._the_model_._alpha_) # debug
+#                        self.console(string)
          
         def on_flag_changed(change):
             '''
@@ -1783,32 +1954,35 @@ class mugui(object):
             '''
             observe response of fit tab widgets:
             check for validity of function syntax
+
             '''
             from mujpy.aux.aux import muvalid
 
             dscr = change['owner'].description # description is three chars ('val','fun','flg') followed by an integer nint
                                                # iterable in range(ntot), total number of internal parameters
             n = int(dscr[4:]) # description='func'+str(nint), skip 'func'
-            if not muvalid(change['new'],self._output_,self.mainwindow.selected_index):
-                self.function[n].value = ''     
+            error_message = muvalid(change['new'])
+            if error_message!='':
+                self.function[n].value = ''
+                self.console(error_message) 
   
         def on_group_changed(change):
             '''
             observe response of setup tab widgets:
+
             '''
             from mujpy.aux.aux import get_grouping
             name = change['owner'].description
             groups = ['forward','backward']
     #       now parse groupcsv shorthand
-            self.grouping[name] = get_grouping(self.group[groups.index(name)].value) # stores self.group shorthand in self.grouping dict
+            self.grouping[name] = get_grouping(self.group[groups.index(name)].value) # stores self.group shorthand in self.grouping dict, grouping is the python based address of the counters
+            # self.console('Group {} -> grouping {}'.format(self.group[groups.index(name)].value, get_grouping(self.group[groups.index(name)].value))) # debug
             if self.grouping[name][0]==-1:
-                with self._output_:
-                    print('Wrong group syntax: {}'.format(self.group[groups.index(name)].value))
+                self.console('Wrong group syntax: {}'.format(self.group[groups.index(name)].value))
                 self.group[groups.index(name)].value = ''
                 self.grouping[name] = np.array([])
-                self.mainwindow.selected_index = 3
-
-
+            else:
+                self.get_totals()
         def on_integer(change):
             name = change['owner'].description
             if name == 'offset':
@@ -1852,9 +2026,8 @@ class mugui(object):
             plot wrapper
             '''
             if not guesscheck.value and not self._the_model_._alpha_:
-                with self._output_:
-                    print('No best fit yet, to plot the guess function tick the checkbox')
-                    self.mainwindow.selected_index = 3  
+                self.console('No best fit yet, to plot the guess function tick the checkbox')
+
             else:
                 fitplot(guess=guesscheck.value,plot=True) # 
 
@@ -1863,16 +2036,17 @@ class mugui(object):
             observe response of FIT, PLOT range widgets:
             check for validity of function syntax
             '''
-            from mujpy.aux.aux import derange_int
+            from mujpy.aux.aux import derange
 
             fit_or_plot = change['owner'].description[0] # description is a long sentence starting with 'fit range' or 'plot range'
             if fit_or_plot=='f':
                 name = 'fit'
             else:
                 name = 'plot'
-            returnedtup = derange_int(change['owner'].value) 
+            returnedtup = derange(change['owner'].value,self.histoLength) 
             # print('sum = {}'.format(sum(returnedtup)))
             if sum(returnedtup)<0: # errors return (-1,-1), good values are all positive
+                                   # go back to defaults
                 if name == 'fit':
                     self.fit_range.value = '0,'+str(self.histoLength)
                     self.fit_range.background_color = "mistyrose"
@@ -1893,7 +2067,7 @@ class mugui(object):
                         change['owner'].value=str(returnedtup[0],self.histoLength) if len(returnedtup)==2 else str(returnedtup[0],self.histoLength,returnedtup[2])         
 
         def on_start_stop(change):
-            if anim_check.value and not self._single_: 
+            if anim_check.value: 
                 if change['new']:
                     self.anim_fit.event_source.start()
                 else:
@@ -1978,25 +2152,33 @@ class mugui(object):
             for k, name in enumerate(groups):
                 s = ''
                 aux = np.split(self.grouping[name],np.where(np.diff(self.grouping[name]) != 1)[0]+1)
+                # this finds the gaps in the array, 
+                # e.g. 1,2,0,3 yields [array([1,2]),array([0]),array([3])]  
                 for j in aux:                    
-                    s += str(j[0]+1) # convention is from 1 python is from 
+                    s += str(j[0]+1) # e.g '2', convention is from 1, python is from 0
                     if len(j)>1:
-                        s += ':'+str(j[-1]+1)
+                        s += ':'+str(j[-1]+1) # e.g. '2:3'
                     s += ','
-                s = s[:-1]
+                s = s[:-1] # remove last ','
                 self.group[k].value = s
 
         def write_csv(chi2,lowchi2,hichi2,k):
             '''
-            writes a csv file of best fit parameters 
+            writes a csv-like file of best fit parameters 
             that can be imported by qtiplot
-            or read by python to produce figures
-            refactored for adding runs 
-            and for writing one line per run
-            in run suite, both local and global
+            or read by python to produce figures::
+
+                refactored for adding runs 
+                and for writing one line per run
+                in run suite, both local and global
+                do not use csv, in order to control format (precision)
+
             '''
             import os
-            import csv
+            #import csv
+            from mujpy.aux.aux import get_title, spec_prec
+            from time import localtime, strftime
+
             # print('k = {}, self.nrun = {}'.format(k,[j for j in self.nrun]))
             version = str(self.version.value)
             strgrp = self.group[0].value.replace(',','_')+'-'+self.group[1].value.replace(',','_')
@@ -2004,20 +2186,48 @@ class mugui(object):
 
             TsTc, eTsTc = self._the_runs_[k][0].get_temperatures_vector(), self._the_runs_[k][0].get_devTemperatures_vector()
             Bstr = self._the_runs_[k][0].get_field()
-            row = [self.nrun[k], TsTc[0],eTsTc[0],TsTc[1],eTsTc[1],float(Bstr[:Bstr.find('G')])]
+            n1,n2 = spec_prec(eTsTc[0]),spec_prec(eTsTc[1]) # calculates format specifier precision
+            form = '{} {:.'
+            form += '{}'.format(n1)
+            form += 'f}  {:.'
+            form += '{}'.format(n1)
+            form += 'f}  {:.'
+            form += '{}'.format(n2)
+            form += 'f}  {:.'
+            form += '{}'.format(n2)
+            form += 'f} {}' #".format(value,most_significant)'
+            # string = "{} {:.1f} {:.1f} {:.1f} {:.1f} {}".format(self.nrun[k], TsTc[0],eTsTc[0],TsTc[1],eTsTc[1], Bstr[:Bstr.find('G')]) #debug
+            # self.console(string) # debug
+            # self.console(form) #debug
+            row = form.format(self.nrun[k], TsTc[0],eTsTc[0],TsTc[1],eTsTc[1], Bstr[:Bstr.find('G')])
+
             for name in self.minuit_parameter_names:
                 value, error = self.fitargs[k][name], self.fitargs[k]['error_'+name]
-                row.append(value)
-                row.append(error) 
-            row.append(chi2)
-            row.append(chi2-lowchi2)
-            row.append(hichi2-chi2)
-            row.append(self.alpha.value)
-            row.append(self.offset.value)
+                n1 = spec_prec(error) # calculates format specifier precision
+                form = ' {:.'
+                form += '{}'.format(n1)
+                form += 'f}  {:.'
+                form += '{}'.format(n1)
+                form += 'f}'
+                row += form.format(value,error)
+            echi = max(chi2-lowchi2,hichi2-chi2)
+            n1 = spec_prec(echi) # calculates format specifier precision
+            form = ' {:.'
+            form += '{}'.format(n1)
+            form += 'f}  {:.'
+            form += '{}'.format(n1)
+            form += 'f}  {:.'
+            form += '{}'.format(n1)
+            form += 'f} {:.3f} {}'
+            row += form.format(chi2,chi2-lowchi2,hichi2-chi2,self.alpha.value,self.offset.value)
+            row += ' {}'.format(strftime("%d %b %Y %H:%M:%S", localtime()))
+            form =' {} {:.2f}'
             for j in range(len(self.nt0)):
-                row.append(self.nt0[j])
-                row.append(self.dt0[j])
-            header = ['Run','T_cryo[K]','e_T_cryo[K]','T_sample[K}','e_T_sample[K]','B[G]']
+                row += form.format(self.nt0[j],self.dt0[j])
+            row += '\n'
+            # row is fromatted with appropriate rounding, write directly
+            # self.console(row)
+            header = ['Run','T_cryo[K]','e_T_cryo[K]','T_sample[K]','e_T_sample[K]','B[G]']
             for j,name in enumerate(self.minuit_parameter_names):
                 header.append(name)
                 header.append('e_'+name)
@@ -2025,34 +2235,46 @@ class mugui(object):
             header.append('e_chi2_low')
             header.append('e_chi2_hi')
             header.append('alpha')
-            header.append('offset')
-            header.append('nt0')
-            header.append('dt0')
+            header.append('offset time')
+            for j in range(len(self.nt0)):
+                header.append('nt0{}'.format(j))
+                header.append('dt0{}'.format(j))
+            header = ' '.join(header)+'\n'
 
             try: # the file exists
+                lineout = [] # is equivalent to False
                 with open(path_csv,'r') as f_in:
-                    reader=csv.reader(f_in,dialect='excel',delimiter=' ',quotechar='"')
-                    headerold = next(reader) 
-                    assert header==headerold                    
-                    with open(path_csv,'w') as f_out:                   
-                        writer=csv.writer(f_out,dialect='excel',delimiter=' ',quotechar='"')
-                        writer.writerow(header)
-                        for line in reader:
-                            if int(line[0]) < self.nrun[k]: # rewrite previous runs
-                                writer.writerow(line)
-                            elif int(line[0]) == self.nrun[k]: # if it exists, skip it
+                    notexistent = True
+                    for nline,line in enumerate(f_in.readlines()):
+                        if nline==0:
+                            if header!=line: # different headers
                                 break
-                            writer.writerow(row) # overwrite or write a new run
-                            writer.writerows(reader) # rewrite the rest
-                with self._output_:
-                    print('Run {} best fit inserted in existing log {}'.format(self.nrun[k],path_csv))
+                            lineout = [header]
+                        elif int(line.split(" ")[0]) < self.nrun[k]:
+                            lineout.append(line)
+                        elif int(line.split(" ")[0]) == self.nrun[k]:
+                            lineout.append(row) # substitute an existing fit
+                            notexistent = False
+                        else:
+                            if notexistent:
+                                lineout.append(row) # insert before last existing fit
+                                notexistent = False
+                            lineout.append(line)
+                    if notexistent:
+                        lineout.append(row) # append at the end
+                        notexistent = False
+
+                if not lineout:
+                    raise # if headers were different this is an exception
+                with open(path_csv,'w') as f_out:                 
+                    for line in lineout:
+                        f_out.write(line)
+                self.console('Run {}: {} *** {}\nbest fit logged in {}'.format(self.nrun[k],get_title(self._the_runs_[k][0]),strftime("%d %b %Y %H:%M:%S", localtime()),path_csv))
             except: # write a new file
                 with open(path_csv,'w') as f:
-                    writer=csv.writer(f,dialect='excel',delimiter=' ',quotechar='"')
-                    writer.writerow(header)
-                    writer.writerow(row)
-                with self._output_:
-                    print('Run {} best fit written in NEW log {}'.format(self.nrun[k],path_csv))
+                    f.write(header)
+                    f.write(row)
+                self.console('Run {}: {} *** {}\nbest fit logged in NEW {}'.format(self.nrun[k],get_title(self._the_runs_[k][0]),strftime("%d %b %Y %H:%M:%S", localtime()),path_csv))
 
         ######### here starts the fit method of MuGui
         # no need to observe parvalue, since their value is a perfect storage point for the latest value
@@ -2060,7 +2282,7 @@ class mugui(object):
         from ipywidgets import FloatText, Text, IntText, Layout, Button, HBox, \
                                Checkbox, VBox, Dropdown, ToggleButton, Label
         _available_components_() # creates tuple self.available_components automagically from mucomponents
-        self._the_model_ = mumodel() # local instance, need a new one each time a fit tab is reloaded (on_loadmodel)
+        self._the_model_ = mumodel() # local instance, need a new one each time a fit tab is reloaded (on_load_model)
         try:
             alpha0 = self.alpha.value
         except:
@@ -2092,7 +2314,7 @@ class mugui(object):
         self.group[1].style.description_width='40%'
         self.group[1].observe(on_group_changed,'value')
         guesscheck = Checkbox(description='guess',value=False, layout=Layout(width='8%'))
-        guesscheck.style.description_width='1%'
+        guesscheck.style.description_width='2%'
         # end moved
 
         model = Text(description = '', layout=Layout(width='10%'), disabled = True) # this is static, empty description, next to loadmodel
@@ -2148,15 +2370,16 @@ class mugui(object):
         label_delay = Label(value='Delay (ms)', layout=Layout(width='8%'))
         anim_delay = IntText(value=1000, layout=Layout(width='8%'))
 
-        anim_check = Checkbox(description='Animate',value=True, layout=Layout(width='10%'))
+        anim_check = Checkbox(description='Animate',value=False, layout=Layout(width='10%'))
         anim_check.style.description_width = '1%'
         
         topframe_handle = HBox(description = 'Model', children=[update_button,loadmodel,self.offset,
                                                                 fit_button,self.group[1],
                                                                 self.fit_range,anim_check,anim_delay])  #
-        alphaframe_handle = HBox(description = 'Alpha', children=[loadbutton,guesscheck,self.alpha,self.version,
-                                                                  plot_button,self.group[0],
-                                                                  self.plot_range,anim_stop_start,label_delay])  # 
+        alphaframe_handle = HBox(description = 'Alpha', children=[loadbutton,guesscheck,self.alpha,
+                                                                self.version,plot_button,self.group[0],
+                                                                self.plot_range,anim_stop_start,
+                                                                label_delay]) # 
         bottomframe_handle = HBox(description = 'Components', layout=Layout(width='100%',border='solid')) #
 
         try: 
@@ -2260,12 +2483,41 @@ class mugui(object):
         select by 
         self.mainwindow.selected_index = 3
         '''
+        import os
+        import platform
+        from shutil import which
+        from subprocess import Popen, PIPE
         from ipywidgets import Output, HBox, Layout 
                      # Output(layout={'height': '100px', 'overflow_y': 'auto', 'overflow_x': 'auto'})
-        self._output_ = Output(layout={'height': '300px','width':'100%','overflow_y':'auto','overflow_x':'auto'})
-        _output_box = HBox([self._output_],layout=Layout(width='100%')) # x works y does scroll
+
+
+        self._outputtab_ = Output(layout={'height': '300px','width':'100%','overflow_y':'auto','overflow_x':'auto'})
+        _output_box = HBox([self._outputtab_],layout=Layout(width='100%')) # x works y does scroll
         self.mainwindow.children[3].children = [_output_box] 
                              # add the list of widget handles as the fourth tab, output
+        if platform.system()=='Linux':
+            if which('gnome-terminal') is not None:
+                self._output_ = "/tmp/mujpy_pipe"
+                if not os.path.exists(self._output_):
+                    os.mkfifo(self._output_)
+                terminal = 'gnome-terminal'
+                settitle = "PROMPT_COMMAND='echo -ne \"\033]0;mujpy console\007\"'"
+                # this is to open the xterm mujpy console on linux
+                self._xterm_ = Popen([terminal,'shell=False',settitle,'-e', 'tail -f %s' % self._output_])
+            else:
+               self._output_ = self._outputtab_ # all in the tab
+        elif platform.system()=='Windows': # put here also a cmd output option
+            # this Windows and the Mac part bust be still checked
+            self._xterm_ = Popen(["cmd.exe","/k"],stdout=PIPE,stderr=PIPE)
+#            self._output_ = self._outputtab_ # all in the tab
+        elif platform.system()=='Darwin':  # put here also a xterm option
+            self._xterm_ = Popen(['open', '-a', 'Terminal', '-n'],stdout=PIPE,stderr=PIPE)
+#            self._output_ = self._outputtab_ # all in the tab
+        self.console(''.join(['***************************************************\n',
+                              '* This is where the output and the error messages *\n'
+                              '* will be displayed. Keep an eye. DO NOT KILL!    *\n',
+                              '***************************************************\n']))
+            
 
 ################
 # PLOTS
@@ -2292,9 +2544,8 @@ class mugui(object):
                     # print('k = {}, counters[k] = {}, numberHisto = {}'.format(k,counters[k],self._the_runs_[0][0].get_numberHisto_int()))
                     ok = -1
             if counters[0] == -1 or ok == -1:
-                with self._output_:
-                    print('Wrong counter syntax or counters out of range: {}'.format(counter_range.value))
-                self.mainwindow.selected_index =3
+                    #print('Wrong counter syntax or counters out of range: {}'.format(counter_range.value))
+                self.console('Wrong counter syntax or counters out of range: {}'.format(counter_range.value))
                 counter_range.value = ''
                 counters = array([])
 
@@ -2304,7 +2555,7 @@ class mugui(object):
             produce plot
             '''
             from numpy import zeros, arange
-            from mujpy.aux.aux import get_grouping, norun_msg, derange_int 
+            from mujpy.aux.aux import get_grouping, derange
             import matplotlib.pyplot as P
 
             font = {'family':'Ubuntu','size':8}
@@ -2312,14 +2563,12 @@ class mugui(object):
             dpi = 100.
 
             if not self._the_runs_:
-                norun_msg(self._output_)
-                self.mainwindow.selected_index = 3 
-                return
+                self.console('No run loaded yet! Load one first (select suite tab).')
 
             ############
             #  bin range
             ############
-            returntup = derange_int(self.counterplot_range.value) # 
+            returntup = derange(self.counterplot_range.value,self.histoLength) # 
             start, stop = returntup
             # abuse of get_grouping: same syntax here
             counters = get_grouping(counter_range.value) # already tested
@@ -2364,12 +2613,12 @@ class mugui(object):
                 self.fig_counters.canvas.set_window_title('Counters')
 
             nplots = nrows*ncols    
-            for k,nrun in enumerate(self.nrun):
+            for kk,nrun in enumerate(self.nrun):
                 if nrun==int(self.choose_nrun.value):
-                    this_run = k
+                    this_run = kk # if not single selects which run to plot counters for 
             for k in range(nplots):
 
-                if k <= counters.shape[0]:
+                if k < counters.shape[0]: 
                     counter = counters[k] # already an index 0:n-1
                     for run in self._the_runs_[this_run]: # allow for add runs 
                         histo[counter] += run.get_histo_array_int(counter)[start:stop]
@@ -2380,6 +2629,7 @@ class mugui(object):
                         self.ax_counters[divmod(counter,ncols)].plot(bins,histo[counter,:],'k-',lw=0.7)
                     if divmod(counter,ncols)[0]==counters.shape[0]/ncols-1:
                         self.ax_counters[divmod(counter,ncols)].set_xlabel('bins')
+                        # does not print
                     if divmod(counter,ncols)[1]==0:
                         self.ax_counters[divmod(counter,ncols)].set_ylabel('counts')
                     self.ax_counters[divmod(counter,ncols)].text(start+(stop-start)*0.9, ymax*0.9,'# '+str(counter+1)) # from index to label
@@ -2395,7 +2645,7 @@ class mugui(object):
             '''
             import matplotlib.pyplot as P
             from numpy import array
-            from mujpy.aux.aux import derange_int, rebin, get_title
+            from mujpy.aux.aux import derange, rebin, get_title
             import matplotlib.animation as animation
 
             ###################
@@ -2426,7 +2676,7 @@ class mugui(object):
             ############
             #  bin range
             ############
-            returntup = derange_int(self.multiplot_range.value) # 
+            returntup = derange(self.multiplot_range.value,self.histoLength) # 
             pack = 1
             if len(returntup)==3: # plot start stop packearly last packlate
                 start, stop, pack = returntup
@@ -2528,7 +2778,11 @@ class mugui(object):
             from mujpy.aux.aux import derange
 
             # change['owner'].description
-            returnedtup = derange(change['owner'].value) # errors return (-1,-1),(-1,0),(0,-1), good values are all positive
+            if change['owner'].description[0:2] == 'fft':
+                fmax = 0.5/(self.time[0,1]-self.time[0,0])
+                returnedtup = derange(change['owner'].value,fmax,int_or_float='float')
+            else:
+                returnedtup = derange(change['owner'].value,self.histoLength) # errors return (-1,-1),(-1,0),(0,-1), good values are all positive
             if sum(returnedtup)<0:
                 change['owner'].background_color = "mistyrose"
                 if change['owner'].description[0:3] == 'plot':
@@ -2596,7 +2850,7 @@ class mugui(object):
             ################
             # load tlog file
             ################
-            pathfile = os.path.join(self.paths[1].value,'run_'+muzeropad(self.choose_tlogrun.value,'')+'.mon')
+            pathfile = os.path.join(self.paths[1].value,'run_'+muzeropad(self.choose_tlogrun.value)+'.mon')
             with open(pathfile,'r') as f:
                 reader=csv.reader(f)
                 header, t, T1,T2,pause,go = [],[],[],[],[],[]
@@ -2664,7 +2918,7 @@ class mugui(object):
         multiplot_button = Button(description='Multiplot',layout=Layout(width='10%'))
         multiplot_button.on_click(on_multiplot)
         multiplot_button.style.button_color = self.button_color
-        anim_check = Checkbox(description='Animate',value=True, layout=Layout(width='10%'))
+        anim_check = Checkbox(description='Animate',value=False, layout=Layout(width='10%'))
         anim_check.style.description_width = '1%'
         anim_delay = IntText(description='Delay (ms)',value=1000, layout=Layout(width='20%'))
         anim_delay.style.description_width = '45%'
@@ -2692,7 +2946,7 @@ class mugui(object):
         ###################
         # counters inspect
         ###################
-        counterlabel = Label(value='Inspect',layout=Layout(width='7%'))
+        counterlabel = Label(value='Inspect',layout=Layout(width='7%'))# count
         counterplot_button = Button(description='counters',layout=Layout(width='10%'))
         counterplot_button.on_click(on_counterplot)
         counterplot_button.style.button_color = self.button_color
@@ -2745,15 +2999,21 @@ class mugui(object):
     def setup(self):
         '''
         setup tab of mugui
-        used to set: paths, fileprefix and extension
-                     prepeak, postpeak (for prompt peak fit)
-                     prompt plot check, 
-             to activate: fit, save and load setup buttons
+        used to set: 
+
+            paths, fileprefix and extension
+            prepeak, postpeak (for prompt peak fit)
+            prompt plot check, 
+
+        to activate: 
+
+            fit, save and load setup buttons
+
         '''
 
         def load_setup(b):
             """
-            when user presses this setup tab widget:
+            when user presses this setup tab widget: mugui
             loads mujpy_setup.pkl with saved attributes
             and replaces them in setup tab Text widgets
             """
@@ -2766,9 +3026,7 @@ class mugui(object):
                 with open(path,'rb') as f:
                     mujpy_setup = pickle.load(f) 
             except:
-                with self._output_:
-                    print('File {} not found'.format(path))
-                self.mainwindow.selected_index = 3
+                self.console('File {} not found'.format(path))
             # _paths_content = [ self.paths[k].value for k in range(3) ] # should be 3 ('data','tlag','analysis')
             # _filespecs_content = [ self.filespecs[k].value for k in range(2) ] # should be 2 ('fileprefix','extension')
             # _prepostpk = [self.prepostpk[k].value for k in range(2)] # 'pre-prompt bin','post-prompt bin' len(bkg_content)
@@ -2787,9 +3045,7 @@ class mugui(object):
                 self.nt0_run = mujpy_setup['self.nt0_run'] # dictionary to identify runs belonging to the same setup
                 return 0
             except Exception as e:
-                with self._output_:
-                    print('Error in load_setup: {}'.format(e)) 
-                self.mainwindow.selected_index = 3
+                self.console('Error in load_setup: {}'.format(e)) 
                 return -1   
  
 
@@ -2801,13 +3057,15 @@ class mugui(object):
 
         def on_paths_changed(change):
             '''
-            when user changes this setup tab widget:
-            check that paths exist, in case creates analysis path
+            when user changes this setup tab widget mugui
+            checks that paths exist, in case it creates log path
             '''
             import os
 
             path = change['owner'].description # description is paths[k] for k in range(len(paths)) () 
             k = paths_content.index(path) # paths_content.index(path) is 0,1,2 for paths_content = 'data','tlog','analysis'
+            if k==1: # tlog
+                self.newtlogdir = True
             directory = self.paths[k].value # self.paths[k] = handles of the corresponding Text
             if not os.path.isdir(directory):
                 if k==2: # analysis, if it does not exist mkdir
@@ -2822,41 +3080,32 @@ class mugui(object):
                     try:
                         os.stat(prepath)
                         os.mkdir(dire+os.path.sep)
-                        with self._output_:
-                            print ('Analysis path {} created'.format(directory))
-                        # self.paths[k].value = dire+os.path.sep # not needed if path is made with os.path.join 
-                        self.mainwindow.selected_index = 3                
+                        self.console('Analysis path {} created\n'.format(directory)) 
                     except:
                         self.paths[k].value = os.path.curdir
-                        with self._output_:
-                            print ('Analysis path {} does not exist and cannot be created'.format(directory))
-                        # self.paths[k].value = dire+os.path.sep # not needed if path is made with os.path.join 
-                        self.mainwindow.selected_index = 3                
+                        self.console('Analysis path {} does not exist and cannot be created\n'.format(directory))
                 else:
                     self.paths[k].value = os.path.curdir
-                    with self._output_:
-                        print ('Path {} does not exist, reset to .'.format(directory))
-                    # self.paths[k].value = dire+os.path.sep # not needed if path is made with os.path.join 
-                    self.mainwindow.selected_index = 3                
+                    self.console('Path {} does not exist, reset to .\n'.format(directory)) 
  
         def on_prompt_fit_click(b):
             '''
-            when user presses this setup tab widget:
-            execute prompt fits
+            when user presses this setup tab widget mugui
+            executes prompt fits
             '''
             promptfit(mplot=self.plot_check.value) # mprint we leave always False
 
         def promptfit(mplot = False, mprint = False):
             '''
-            launches t0 prompts fit
+            launches t0 prompts fit::
 
-            fits peak positions 
-            prints migrad results
-            plots prompts and their fit (if plot checked)
-            stores bins for background and t0
+                fits peak positions 
+                prints migrad results
+                plots prompts and their fit (if plot checked)
+                stores bins for background and t0
 
             refactored for run addition and
-                           suite of runs
+            suite of runs
 
             WARNING: this module is for PSI only        
             '''
@@ -2864,15 +3113,13 @@ class mugui(object):
             from iminuit import Minuit, describe
             import matplotlib.pyplot as P
             from mujpy.mucomponents.muprompt import muprompt
-            from mujpy.aux.aux import norun_msg
 
             font = {'family' : 'Ubuntu','size'   : 8}
             P.rc('font', **font)
             dpi = 100.
 
             if not self._the_runs_:
-                norun_msg(self._output_)
-                self.mainwindow.selected_index = 3 
+                self.console('No run loaded yet! Load one first (select suite tab).')
             else:
                 ###################################################
                 # fit a peak with different left and right plateaus
@@ -2929,7 +3176,8 @@ class mugui(object):
                     ##############
                     # guess values
                     ##############
-                    pars = dict(a=p[0],error_a=p[0]/100,x0=p[1]+0.1,error_x0=p[1]/100,dx=1.1,error_dx=0.01,    
+                    pars = dict(a=p[0],error_a=p[0]/100,x0=p[1]+0.1,error_x0=p[1]/100,
+                         dx=1.1,error_dx=0.01,    
                          ak1=p[3],error_ak1=p[3]/100,ak2=p[4],error_ak2=p[4]/100)
                     level = 1 if mprint else 0
                     mm = muprompt()
@@ -2969,8 +3217,8 @@ class mugui(object):
             self.lastbin = self.nt0.min() - self.prepostpk[0].value # nd.array of shape run.get_numberHisto_int() 
             
             self.nt0_run = self.create_rundict()
-            nt0_dt0.children[0].children[0].value = ' '.join(map(str,self.nt0.astype(int)))
-            nt0_dt0.children[0].children[1].value = ' '.join(map('{:.2f}'.format,self.dt0))
+            nt0.children[0].children[0].value = ' '.join(map(str,self.nt0.astype(int)))
+            dt0.children[0].children[0].value = ' '.join(map('{:.2f}'.format,self.dt0))
                                                    # refresh, they may be slightly adjusted by the fit
             # self.t0plot_results.clear_output()
 
@@ -2986,7 +3234,7 @@ class mugui(object):
 
         def save_log(b):
             """
-            when user presses this setup tab buttont:
+            when user presses this setup tab button mugui
             saves ascii file .log with run list in data directory
             """
             import os
@@ -3019,13 +3267,11 @@ class mugui(object):
                     f.write('{}\t{}/{}\t{:.1f}\t{:.1f}\t{}\t{}\t{}\t{}\n'.format(run.get_runNumber_int(),
                                       run.get_temp(), TdT, BmT, Mev, run.get_timeStart_vector(),
                                       run.get_sample().strip(), run.get_orient().strip(), run.get_comment().strip() ))
-            with self._output_:
-                print('Saved logbook {}'.format(path_file))
-            self.mainwindow.selected_index = 3
+            self.console('Saved logbook {}'.format(path_file)) 
 
         def save_setup(b):
             """
-            when user presses this setup tab button:
+            when user presses this setup tab button mugui
             saves mujpy_setup.pkl with setup tab values
             """
             import dill as pickle
@@ -3043,9 +3289,7 @@ class mugui(object):
                setup_dict[names[k]] = eval(key) # key:value
             with open(path,'wb') as f:
                 pickle.dump(setup_dict, f) # according to __getstate__()
-            self.mainwindow.selected_index = 3
-            with self._output_:
-                print('Saved {}'.format(os.path.join(self.__startuppath__,'mujpy_setup.pkl')))
+            self.console('Saved {}'.format(os.path.join(self.__startuppath__,'mujpy_setup.pkl'))) 
 
         from ipywidgets import HBox, Layout, VBox, Text, Textarea, IntText, Checkbox, Button, Output, Accordion   
         from numpy import array 
@@ -3094,20 +3338,23 @@ class mugui(object):
         # fit bin range is [self.binrange[0].value:self.binrange[1].value]
         save_button.on_click(save_setup)
         load_button.on_click(load_setup)
-        nt0_dt0 = Accordion(font_size=10,children=[VBox(children=[Text(description='t0 [bins]',layout={'width':'99%'}), Text(description='dt0 [bins]',layout={'width':'99%'})])],layout={'width':'35%'})#,layout={'height':'22px'})
-        nt0_dt0.children[0].children[0].style.description_width='20%'
-        nt0_dt0.children[0].children[1].style.description_width='20%'
-        nt0_dt0.set_title(0,'t0 bins and remainders')
-        nt0_dt0.selected_index =  None
-        self.tots_all = Textarea(description='All',layout={'width':'100%','height':'200px',
-                                                 'overflow_y':'auto','overflow_x':'auto'},disabled=True)
-        self.tots_all.style.description_width='15%'
-        self.tots_group = Textarea(description='Group',layout={'width':'100%','height':'200px',
-                                                 'overflow_y':'auto','overflow_x':'auto'},disabled=True)
-        self.tots_group.style.description_width='30%'
-        tots = Accordion(font_size=10,children=[HBox(children=[self.tots_all, self.tots_group])],layout={'width':'35%'})
-        tots.set_title(0,'Total counts')
-        tots.selected_index =  None
+        nt0 = Accordion(font_size=10,children=[VBox(children=[Text(description='t0 [bins]',layout={'width':'99%'})])],layout={'width':'35%'})#,layout={'height':'22px'})
+        dt0 = Accordion(font_size=10,children=[VBox(children=[Text(description='dt0 [bins]',layout={'width':'99%'})])],layout={'width':'35%'})#,layout={'height':'22px'})
+        nt0.children[0].children[0].style.description_width='20%'
+        nt0.set_title(0,'t0 bins')
+        nt0.selected_index =  None
+        dt0.children[0].children[0].style.description_width='20%'
+        dt0.set_title(0,'t0 remainders')
+        dt0.selected_index =  None
+        # self.tots_all = Textarea(description='All',layout={'width':'100%','height':'200px',
+        #                                         'overflow_y':'auto','overflow_x':'auto'},disabled=True)
+        # self.tots_all.style.description_width='15%'
+        # self.tots_group = Textarea(description='Group',layout={'width':'100%','height':'200px',
+        #                                         'overflow_y':'auto','overflow_x':'auto'},disabled=True)
+        # self.tots_group.style.description_width='30%'
+        # tots = Accordion(font_size=10,children=[HBox(children=[self.tots_all, self.tots_group])],layout={'width':'35%'})
+        # tots.set_title(0,'Total counts')
+        # tots.selected_index =  None
 
         introspect_button = Button(description='Introspect',layout=Layout(width='15%'))
         introspect_button.on_click(on_introspect)
@@ -3120,16 +3367,69 @@ class mugui(object):
         self.t0plot_results = Output(layout=Layout(width='15%')) 
         setup_hbox[0].children = [paths_box, filespecs_box]
         setup_hbox[1].children = prompt_fit
-        setup_hbox[2].children = [nt0_dt0,tots,introspect_button,log_button]
+        setup_hbox[2].children = [nt0, dt0,introspect_button,log_button]
         #setup_hbox[3].children = [self.t0plot_container,self.t0plot_results]
         self.nt0,self.dt0 = array([0.]),array([0.])
         load_setup([])
-        nt0_dt0.children[0].children[0].value = ' '.join(map(str,self.nt0.astype(int)))
-        nt0_dt0.children[0].children[1].value = ' '.join(map('{:.2f}'.format,self.dt0))
+        nt0.children[0].children[0].value = ' '.join(map(str,self.nt0.astype(int)))
+        dt0.children[0].children[0].value = ' '.join(map('{:.2f}'.format,self.dt0))
         if not self.nt0_run:
-            self.mainwindow.selected_index=3
-            with self._output_:
-                print('WARNING: you must fix t0 = 0, please do a prompt fit from the setup tab')
+            self.console('WARNING: you must fix t0 = 0, please do a prompt fit from the setup tab')
+
+######################
+# GET_TOTALS
+######################
+    def get_totals(self):
+        '''
+        calculates the grand totals and group totals 
+        after a single run 
+        or a run suite are read
+
+        '''
+        import numpy as np
+        # called only by self.suite after having loaded a run or a run suite
+
+        ###################
+        # grouping set 
+        # initialize totals
+        ###################
+        gr = set(np.concatenate((self.grouping['forward'],self.grouping['backward'])))
+        ts,gs =  [],[]
+
+        if self.offset:  # True if self.offset is already created by self.fit()
+            offset_bin = self.offset.value # self.offset.value is int
+        else:     # should be False if self.offset = [], as set in self.__init__()
+            offset_bin = self.offset0  # temporary parking
+
+        for k,runs in enumerate(self._the_runs_):
+            tsum, gsum = 0, 0
+            for j,run in enumerate(runs): # add values for runs to add
+                for counter in range(run.get_numberHisto_int()):
+                    n1 = offset_bin+self.nt0[counter] 
+                    # if self.nt0 not yet read it is False and totals include prompt
+                    histo = run.get_histo_array_int(counter)[n1:].sum()
+                    tsum += histo
+                    if counter in gr:
+                        gsum += histo
+            ts.append(tsum)
+            gs.append(gsum)
+            # print('In get totals inside loop,k {}, runs {}'.format(k,runs))
+
+        #######################
+        # strings containing 
+        # individual run totals
+        #######################
+        # self.tots_all.value = '\n'.join(map(str,np.array(ts)))
+        # self.tots_group.value = '       '.join(map(str,np.array(gs)))
+
+        # print('In get totals outside loop, ts {},gs {}'.format(ts,gs))
+        #####################
+        # display values for self._the_runs_[0][0] 
+        self.totalcounts.value = str(ts[0])
+        self.groupcounts.value = str(gs[0])
+        # self.console('Updated Group Total for group including counters {}'.format(gr)) # debug 
+        self.nsbin.value = '{:.3}'.format(self._the_runs_[0][0].get_binWidth_ns())
+        self.maxbin.value = str(self.histoLength)
 
 
 ##########################
@@ -3138,65 +3438,18 @@ class mugui(object):
     def suite(self):
         '''
         suite tab of mugui
-        used to select: run (single/suite)
-                        load next previous, add next previous
-             to print: run number, title, 
-                       total counts, group counts, ns/bin
-                       comment, start stop date, next run, last add                           
+        used to select: 
+
+            run (single/suite)
+            load next previous, add next previous
+             
+        and to print: 
+
+            run number, title, 
+            total counts, group counts, ns/bin
+            comment, start stop date, next run, last add                           
+
         '''
-
-        def get_totals():
-            '''
-            calculates the grand totals and group totals 
-                after a single run 
-                or a run suite are read
-            '''
-            import numpy as np
-            # called only by self.suite after having loaded a run or a run suite
-
-            ###################
-            # grouping set 
-            # initialize totals
-            ###################
-            gr = set(np.concatenate((self.grouping['forward'],self.grouping['backward'])))
-            ts,gs =  [],[]
-
-            if self.offset:  # True if self.offset is already created by self.fit()
-                offset_bin = self.offset.value # self.offset.value is int
-            else:     # should be False if self.offset = [], as set in self.__init__()
-                offset_bin = self.offset0  # temporary parking
-           #       self.nt0 roughly set by suite model on_loads_changed
-           #       with self._output_:
-           #            print('offset = {}, nt0 = {}'.format(offset_bin,self.nt0))
-
-            for k,runs in enumerate(self._the_runs_):
-                tsum, gsum = 0, 0
-                for j,run in enumerate(runs): # add values for runs to add
-                    for counter in range(run.get_numberHisto_int()):
-                        n1 = offset_bin+self.nt0[counter] 
-                        # if self.nt0 not yet read it is False and totals include prompt
-                        histo = run.get_histo_array_int(counter)[n1:].sum()
-                        tsum += histo
-                        if counter in gr:
-                            gsum += histo
-                ts.append(tsum)
-                gs.append(gsum)
-                # print('In get totals inside loop,k {}, runs {}'.format(k,runs))
-
-            #######################
-            # strings containing 
-            # individual run totals
-            #######################
-            self.tots_all.value = '\n'.join(map(str,np.array(ts)))
-            self.tots_group.value = '       '.join(map(str,np.array(gs)))
-
-            # print('In get totals outside loop, ts {},gs {}'.format(ts,gs))
-            #####################
-            # display values for self._the_runs_[0][0] 
-            self.totalcounts.value = str(ts[0])
-            self.groupcounts.value = str(gs[0])
-            self.nsbin.value = '{:.3}'.format(self._the_runs_[0][0].get_binWidth_ns())
-            self.maxbin.value = str(self.histoLength)
 
         def run_headers(k):
             '''
@@ -3229,9 +3482,7 @@ class mugui(object):
                     for j in range(self._the_runs_[0][0].get_numberHisto_int()):
                         self.nt0[j] = np.where(self._the_runs_[0][0].get_histo_array_int(j)==
                                                self._the_runs_[0][0].get_histo_array_int(j).max())[0][0]
-                    with self._output_:
-                        print('WARNING! Run {} mismatch in number of counters, rerun prompt fit'.format(self._the_runs_[0][0].get_runNumber_int())) 
-                    self.mainwindow.selected_index = 3
+                    self.console('WARNING! Run {} mismatch in number of counters, rerun prompt fit'.format(self._the_runs_[0][0].get_runNumber_int())) 
 
                 # store max available bins on all histos
                 self.histoLength = self._the_runs_[0][0].get_histoLength_bin() - self.nt0.max() - self.offset.value 
@@ -3252,11 +3503,8 @@ class mugui(object):
                 if not all(ok): 
                     self._the_runs_=[self._the_runs_[0]] # leave just the first one
                     # self.load_handle[1].value=''  # just loaded a single run, incompatible with suite
-                    self.mainwindow.selected_index = 3
-                    with self._output_:
-                        print ('\nFile {} has wrong histoNumber or binWidth'.
-                                format(path_and_filename))
-                        return -1  # this leaves the first run of the suite
+                    self.console('\nFile {} has wrong histoNumber or binWidth'.format(path_and_filename))
+                    return -1  # this leaves the first run of the suite
             TdT = value_error(*t_value_error(k))
             self.tlog_accordion.children[0].value += '{}: '.format(self._the_runs_[k][0].get_runNumber_int())+TdT+' K\n'
             # print('3-run_headers')
@@ -3271,17 +3519,21 @@ class mugui(object):
             from mujpy.aux.aux import muzeropad
 
             runstr = str(self.nrun[0] +1)
-            filename = ''
-            filename = filename.join([self.filespecs[0].value,
-                                  muzeropad(runstr,self._output_),
-                                  '.',self.filespecs[1].value]) # needed in muzeropad to write data filename
+            if len(runstr)>4:
+                self.console('Too long run number!')
+                next_label.value = ''
+            else:
+                filename = ''
+                filename = filename.join([self.filespecs[0].value,
+                                  muzeropad(runstr),
+                                  '.',self.filespecs[1].value]) 
                             # data path + filespec + padded run rumber + extension)
-            next_label.value=runstr if os.path.exists(os.path.join(self.paths[0].value,filename)) else ''
+                next_label.value = runstr if os.path.exists(os.path.join(self.paths[0].value,filename)) else ''
                         
         def check_runs(k):
             '''
             Checks nt0, etc.
-            Returns -1 with warnings (printed in self._output_) 
+            Returns -1 with warnings  
             for severe incompatibility
             Otherwise calls run_headers to store and display 
             title, comments, T, dT, histoLength [,self._single]
@@ -3299,18 +3551,13 @@ class mugui(object):
                     # print('check - {}'.format(self._the_runs_[k][0].get_runNumber_int()))
                     rn = this_experiment.pop('nrun') # if there was an error with files to add in create_rundict this will fail
                 except:
-                    self.mainwindow.selected_index = 3
-                    with self._output_:
-                        print ('\nRun {} not added. Non existent or incompatible'.
-                                    format(this_experiment('errmsg')))
+                    self.console('\nRun {} not added. Non existent or incompatible'.format(this_experiment('errmsg')))
                     return -1 # this leaves the previous loaded runs n the suite 
                 
                 this_date = this_experiment.pop('date') # no errors with add, pop date then
                 dday = abs((dparse(this_date)-nt0_days).total_seconds())
                 if nt0_experiment != this_experiment or abs(dday) > datetime.timedelta(7,0).total_seconds(): # runs must have same binwidth etc. and must be within a week
-                    self.mainwindow.selected_index=3
-                    with self._output_:		
-                        print('Warning: mismatch in histo length/time bin/instrument/date\nConsider refitting prompt peaks (in setup)')
+                    self.console('Warning: mismatch in histo length/time bin/instrument/date\nConsider refitting prompt peaks (in setup)')
             # print('2-check_runs, {} loaded '.format(rn))            
             return run_headers(k)
 
@@ -3318,7 +3565,7 @@ class mugui(object):
             '''
             Tries to load one or more runs to be added together
             by means of murs2py. 
-            runs is a list of strings containing integer run numbers (provided by aux.derange)
+            runs is a list of strings containing integer run numbers provided by aux.derun
             Returns -1 and quits if musr2py complains
             If not invokes check_runs an returns its code   
             '''
@@ -3329,27 +3576,30 @@ class mugui(object):
             runadd = []
             options = self.choose_tlogrun.options.copy()
             for j,run in enumerate(runs): # run is a string containing a single run number
-                filename = ''
-                filename = filename.join([self.filespecs[0].value,
-                                      muzeropad(str(run),self._output_),
-                                      '.',self.filespecs[1].value]) # needed in muzeropad to write data filename
-                path_and_filename = os.path.join(self.paths[0].value,filename)
-                                # data path + filespec + padded run rumber + extension)
-                runadd.append(muload())  # this adds to the list in j-th position a new instance of muload()
-                read_ok += runadd[j].read(path_and_filename) # THE RUN DATA FILE IS LOADED HERE
-                if read_ok==0:
-                    # print('tlog dropdown position {} run {}'.format(str(j),str(run)))
-                    options.update({str(run):str(run)}) # adds this run to the tlog display dropdown, on_loads_changed checks that tlog exists before value selection
-            if read_ok==0: # error condition, set by musr2py.cpp 
-                self.choose_tlogrun.options=options
+                if len(run)>4:
+                    self.console('Too long run number!')
+                    read_ok = 99
+                    break
+                else:
+                    filename = ''
+                    filename = filename.join([self.filespecs[0].value,
+                                          muzeropad(str(run)),
+                                          '.',self.filespecs[1].value]) 
+                    path_and_filename = os.path.join(self.paths[0].value,filename)
+                                    # data path + filespec + padded run rumber + extension)
+                    if os.path.exists(os.path.join(self.paths[0].value,filename)):
+                        runadd.append(muload())  # this adds to the list in j-th position a new instance of muload()
+                        read_ok += runadd[j].read(path_and_filename) # THE RUN DATA FILE IS LOADED HERE
+                        if read_ok==0:
+                        # print('tlog dropdown position {} run {}'.format(str(j),str(run)))
+                            options.update({str(run):str(run)}) # adds this run to the tlog display dropdown, on_loads_changed checks that tlog exists before value selection
+            if read_ok==0: # no error condition, set by musr2py.cpp or
+                self.choose_tlogrun.options = options
                 # ('self.choose_tlogrun.options = {}'.format(options))
                 self._the_runs_.append(runadd) # 
                 self.nrun.append(runadd[0].get_runNumber_int())
             else:
-                self.mainwindow.selected_index = 3
-                with self._output_:
-                    #  ('\nFile {} not read. Check paths, filespecs and run rumber on setup tab'.
-                            format(path_and_filename)
+                self.console('\nFile {} not read. Check paths, filespecs and run rumber on setup tab'.format(path_and_filename))
                 return -1 # this leaves the previous loaded runs n the suite 
             return check_runs(k)
 
@@ -3362,10 +3612,8 @@ class mugui(object):
                 self.load_handle[0].value=str(self.nrun[0]+1)
                 # print('self.nrun[0] = {}'.format(self.nrun[0]))
             else:
-                self.mainwindow.selected_index = 3
-                with self._output_:
-                    print ('Cannot load next run (no single run loaded)')
-                return -1 # this leaves the previous loaded runs n the suite 
+                self.console('Cannot load next run (multiple runs loaded)')
+                return -1 # this leaves the multiple runs of the suite 
                 
         def on_load_prv(b):
             '''
@@ -3374,10 +3622,8 @@ class mugui(object):
             if self._single_:
                 self.load_handle[0].value=str(self.nrun[0]-1)
             else:
-                self.mainwindow.selected_index = 3
-                with self._output_:
-                    print ('Cannot load next run (no single run loaded)')
-                return -1 # this leaves the previous loaded runs n the suite 
+                self.console('Cannot load previous run (multiple runs loaded)')
+                return -1 # this leaves the multple runs of the suite 
                 
         def on_add_nxt(b):
             '''
@@ -3385,12 +3631,10 @@ class mugui(object):
             '''
             if self._single_:
                 load_single(self.nrun[0]+1)
-                get_totals()
+                self.get_totals()
             else:
-                self.mainwindow.selected_index = 3
-                with self._output_:
-                    print ('Cannot load next run (no single run loaded)')
-                return -1 # this leaves the previous loaded runs n the suite 
+                self.console('Cannot add next run (multiple runs loaded)')
+                return -1 # this leaves the multiple loaded runs of the suite 
                 
         def on_add_prv(b):
             '''
@@ -3398,12 +3642,10 @@ class mugui(object):
             '''
             if self._single_:
                 load_single(self.nrun[0]-1)
-                get_totals()
+                self.get_totals()
             else:
-                self.mainwindow.selected_index = 3
-                with self._output_:
-                    print ('Cannot load next run (no single run loaded)')
-                return -1 # this leaves the previous loaded runs n the suite 
+                self.console('Cannot add previous run (multiple runs loaded)')
+                return -1 # this leaves the multiple loaded runs of the suite 
                 
 
         def on_loads_changed(change):
@@ -3439,10 +3681,8 @@ class mugui(object):
             #######################           
             runs, errormessage = derun(self.load_handle[0].value) # runs is a list of lists of run numbers (string)
             if errormessage is not None: # derun error
-                with self._output_:
-                   print('Run syntax error: {}. You typed: {}'.format(errormessage,self.load_handle[0].value))
+                self.console('Run syntax error: {}. You typed: {}'.format(errormessage,self.load_handle[0].value))
                 self.load_handle[0].value=''
-                self.mainwindow.selected_index=3
                 return
 
             ##################################
@@ -3460,23 +3700,21 @@ class mugui(object):
                 # scheme for popping items from list without altering index count
                 kk = 0
                 for run in runs: # use original to iterate
-                    if not tlog_exists(self.paths[1].value,run,self._output_): # loading tlogs is optional
+                    if not tlog_exists(self.paths[1].value,run): # loading tlogs is optional
                         options.pop(run) # pop runs that do not have a tlog file
                 self.choose_tlogrun.options = options
-                try:
+                try: 
                     self.choose_tlogrun.value = str((sorted(list(options.keys())))[0])
                 except:
-                    with self._output_:
-                        print('No tlog!')
-
-                get_totals() # sets totalcounts, groupcounts and nsbin
+                    if self.newtlogdir:
+                        self.console("No tlogs")
+                        self.newtlogdir = False
+                self.get_totals() # sets totalcounts, groupcounts and nsbin
                 
             if self._single_:
                 check_next()
             if not self.nt0_run:
-                self.mainwindow.selected_index=3
-                with self._output_:
-                    print('WARNING: you must fix t0 = 0, please do a prompt fit from the setup tab')
+                self.console('WARNING: you must fix t0 = 0, please do a prompt fit from the setup tab')
 
         def t_value_error(k):
             '''

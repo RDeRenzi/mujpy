@@ -5,24 +5,37 @@ def autops(data, fn, p0=0.0, p1=0.0):
     """
     Automated phase correction from NMRglue by https://github.com/jjhelmus
     These functions provide support for automatic phasing of NMR data. 
-    ----------
+
+
     Automatic linear phase correction
+
     Parameters
-    ----------
-    data : ndarray
-        Array of NMR data.
-    fn : str or function
-        Algorithm to use for phase scoring. Built in functions can be
-        specified by one of the following strings: "acme", "peak_minima"
-    p0 : float
-        Initial zero order phase in degrees.
-    p1 : float
-        Initial first order phase in degrees.
+
+        data : ndarray
+
+             Array of NMR data.
+
+        fn : str or function
+
+             Algorithm to use for phase scoring. Built in functions can be
+             specified by one of the following strings: "acme", "peak_minima"
+
+        p0 : float
+
+            Initial zero order phase in degrees.
+
+        p1 : float
+
+            Initial first order phase in degrees.
+
     Returns
-    -------
-    ndata : ndarray
-        Phased NMR data.
+
+        ndata : ndarray
+
+            Phased NMR data.
+
     """
+
     import numpy as np
     import scipy.optimize
 
@@ -40,16 +53,14 @@ def _ps_acme_score(ph, data):
     """
     Phase correction using ACME algorithm by Chen Li et al.
     Journal of Magnetic Resonance 158 (2002) 164-168
+
     Parameters
-    ----------
-    pd : tuple
-        Current p0 and p1 values
-    data : ndarray
-        Array of NMR data.
+    * pd : tuple, current p0 and p1 values
+    * data : ndarray, array of NMR data.
+
     Returns
-    -------
-    score : float
-        Value of the objective function (phase score)
+    * score : float, value of the objective function (phase score)
+
     """
     import numpy as np
 
@@ -90,15 +101,12 @@ def _ps_peak_minima_score(ph, data):
     results.  The optimisation is performed by finding the highest peak in the
     spectra (e.g. TMSP) and then attempting to reduce minima surrounding it.
     Parameters
-    ----------
-    pd : tuple
-        Current p0 and p1 values
-    data : ndarray
-        Array of NMR data.
+    * pd : tuple, current p0 and p1 values
+    * data : ndarray, array of NMR data.
+
     Returns
-    -------
-    score : float
-        Value of the objective function (phase score)
+    * score : float, value of the objective function (phase score)
+
     """
 
     phc0, phc1 = ph
@@ -115,20 +123,31 @@ def _ps_peak_minima_score(ph, data):
 def ps(data, p0=0.0, p1=0.0, inv=False):
     """
     Linear phase correction
+
     Parameters
-    ----------
-    data : ndarray
-        Array of NMR data.
-    p0 : float
-        Zero order phase in degrees.
-    p1 : float
-        First order phase in degrees.
-    inv : bool, optional
-        True for inverse phase correction
+
+        data : ndarray
+
+            Array of NMR data.
+
+        p0 : float
+
+            Zero order phase in degrees.
+
+        p1 : float
+
+            First order phase in degrees.
+
+        inv : bool, optional
+
+            True for inverse phase correction
+
     Returns
-    -------
-    ndata : ndarray
-        Phased NMR data.
+
+        ndata : ndarray
+
+            Phased NMR data.
+
     """
     import numpy as np
 
@@ -144,73 +163,65 @@ def ps(data, p0=0.0, p1=0.0, inv=False):
 # MUGUI AUX
 ##############
 
-def derange(string):
+def derange(string,vmax,int_or_float='int'):
     '''
     derange(string) 
+
     reads string 
-    assuming 2, 3 or 4 csv values, integers or floats,
-    or 2, 3 or 4 space separated values, integers or floats
-    returns 2, 3 or 4 floats, or 
-    two negative values, if the string does not 
-    contain commas or spaces
+    assuming 2, 3, 4 or 5 csv or space separated values, either int (default) or floats (specify type='float')::
+
+        5: start, stop, packe, last, packl
+        4: start, stop, last, packl (packe is 1)
+        3: start, stop, pack
+        2: start, stop
+
+    returns 2, 3, 4 or 5 floats or int, or 
+    two negative values, if fails either::
+
+        validity check (stop>start and bin <stop-start) 
+        check for sanity (last value less then a vmax)
+
     '''
 #    print('In derange')
     try:  
         try:
-            values = [float(x) for x in string.split(',')]
+            if int_or_float=='float':
+                values = [float(x) for x in string.split(',')]
+            else:
+                values = [int(x) for x in string.split(',')]
         except:
-            values = [float(x) for x in string.split('')]
-        if len(values)==5:
-            if values[3]<values[1] or values[4]>values[3] or values[2]>values[1] or values[1]<values[0] or sum(n<0 for n in values)>0:
-                return -1,-1
+            print(string)
+        if len(values)==5: # start, stop, packe, last, packl
+            if values[3]<values[1] or values[4]>values[3]-values[1] or values[2]>values[1]-values[0] or values[1]<values[0] or sum(n<0 for n in values)>0 or values[3]>vmax:
+                
+                return -5,-5
             return values[0],values[1],values[2],values[3],values[4] # start, stop, packe, last, packl
-        if len(values)==4:
-            return values[0],values[1],1,values[2],values[3] # start, stop,packe, last, packl
-        elif len(values)==3:
-            return values[0],values[1],values[2] # start, stop, pack
-        elif len(values)==2:
-            return values[0],values[1] # start, stop
-    except:
-        return -1,-1 
-
-def derange_int(string):
-    '''
-    derange(string) 
-    reads string 
-    assuming 2, 3 or 4 csv values, integers or floats,
-    or 2, 3 or 4 space separated values, integers or floats
-    returns 2, 3 or 4 floats, or 
-    two negative values, if the string does not 
-    contain commas or spaces
-    '''
-#    print('In derange_int')
-    try:  
-        try:
-            values = [int(x) for x in string.split(',')]
-        except:
-            values = [int(x) for x in string.split('')]
-        if len(values)==5:
-            if values[3]<values[1] or values[4]>values[3] or values[2]>values[1] or values[1]<values[0] or sum(n<0 for n in values)>0:
-                return -1,-1
-            return values[0],values[1],values[2],values[3],values[4] # start, stop, packe, last, packl
-        if len(values)==4:
-            if values[3]<values[1] or values[2]>values[1] or values[1]<values[0] or sum(n<0 for n in values)>0:
-                return -1,-1
+        elif len(values)==4: # start, stop, last, packl
+            if values[2]<values[1] or values[3]>values[2]-values[1] or values[1]<values[0] or sum(n<0 for n in values)>0 or values[2]>vmax:
+                return -4,-4
             return values[0],values[1],1,values[2],values[3] # start, stop, packe, last, packl
-        elif len(values)==3:
+        elif len(values)==3: # start, stop, packe
+            if values[2]>values[1] or values[1]<values[0] or sum(n<0 for n in values)>0 or values[1]>vmax:
+                return -3,-3
             return values[0],values[1],values[2] # start, stop, pack
-        elif len(values)==2:
+        elif len(values)==2: # start, stop
+            if values[1]<values[0] or sum(n<0 for n in values)>0 or values[1]>vmax:
+                return -2,-2
             return values[0],values[1] # start, stop
     except:
-        return -1,-1 
+        # print(string,vmax,int_or_float)
+        return -10,-10
 
 def derun(string):
     '''
     parses string, producing a list of runs; 
     expects comma separated items
+
     looks for 'l','l:m','l+n+m' 
     where l, m, n are integers
+
     rejects all other characters
+
     returns a list of lists of integer
     '''
     s = []
@@ -245,29 +256,43 @@ def derun(string):
 
 def findall(p, s):
     '''Yields all the positions of
-    the pattern p in the string s.'''
+    the pattern p in the string s.
+    
+    Used by translate.
+    '''
     i = s.find(p)
     while i != -1:
         yield i
         i = s.find(p, i+1)
 
 def find_nth(haystack, needle, n):
-           start = haystack.rfind(needle)
-           while start >= 0 and n > 1:
-               start = haystack.rfind(needle, 1, start-1)
-               n -= 1
-           return start
+    '''
+    Finds nth needle in haystack 
+
+    Returns its first occurrence (0 if not present)
+
+    Used by ?
+    '''
+    start = haystack.rfind(needle)
+    while start >= 0 and n > 1:
+        start = haystack.rfind(needle, 1, start-1)
+        n -= 1
+    return start
 
 def get_grouping(groupcsv):
     """
     name = 'forward' or 'backward'
-    grouping(name) is an np.array wth detector indices
-    group.value[k] for k=0,1 is a shorthand csv like '1:3,5' or '1,3,5' etc.
-    index is present mugui.mainwindow.selected_index
-    out is mugui._output_ for error messages
+
+    * grouping(name) is an np.array wth detector indices
+    * group.value[k] for k=0,1 is a shorthand csv like '1:3,5' or '1,3,5' etc.
+    * index is present mugui.mainwindow.selected_index
+    * out is mugui._output_ for error messages
+
     returns
-      grouping, group, index
-         group and index are changed only in case of errors
+
+    * grouping, group, index
+         
+    group and index are changed only in case of errors
     """
     import numpy as np
 
@@ -275,36 +300,37 @@ def get_grouping(groupcsv):
     # or a pair of integers, separated by a colon, such as 1:3 = 1,2,3 
     # only one column is allowed, but 1, 3, 5 , 7:9 = 1, 3, 5, 7, 8, 9 
     # or 1:3,5,7 = 1,2,3,5,7  are also valid
+    # no more complex nesting (3:5,5,8:10 is not allowed)
     #       get the shorthand from the gui Text 
     groupcsv = groupcsv.replace('.',',') # can only be a mistake: '.' means ','
     try:
-        if groupcsv.find(':')==-1:
-            # colon not found, csv only
-            grouping = np.array([int(s) for s in groupcsv.split(',')])
-        else:
-            # colon found                 
-            if groupcsv.find(',')+groupcsv.find(':')==-2:
-                grouping = np.array([int(groupcsv)])
-            elif groupcsv.find(',')+1: # True if found, False if not found (not found yields -1)    
-                firstcomma = groupcsv.index(',')
-                lastcomma = groupcsv.rindex(',')
-                if firstcomma < groupcsv.find(':'): # first read csv then range
-                    partial = np.array([int(s) for s in groupcsv[:lastcomma].split(',')])
-                    fst = int(groupcsv[lastcomma:grouping.find(':')])
-                    lst = int(groupcsv[groupcsv.find(':')+1:])
-                    grouping[name] = np.concatenate((partial,arange(fst,lst+1,dtype=int)))
-                else: # first read range then csv
-                    partial = np.array([int(s) for s in groupcsv[:lastcomma].split(',')])
-                    fst = int(groupcsv[:groupcsv.find(':')])
-                    lst = int(groupcsv[groupcsv.find(':')+1:firstcomma])
-                    grouping = np.concatenate((np.arange(fst,lst+1,dtype=int),partial))
-            else: # only range
-                fst = int(groupcsv[:groupcsv.find(':')])
-                lst = int(groupcsv[groupcsv.find(':')+1:])
-                grouping = np.arange(fst,lst+1,dtype=int)
-            grouping -=1 # python starts at 0
+        if groupcsv.find(':')==-1: # no colon, it's a pure csv
+            grouping = np.array([int(ss) for ss in groupcsv.split(',')]) # read it
+        else:  # colon found                 
+            if groupcsv.find(',')==-1: # (no commas, only colon, must be n:m)
+                nm = [int(w) for w in groupcsv.split(':')] # read n m
+                grouping = np.array(list(range(nm[0],nm[1]+1))) # single counters
+            else: # general case, mixed csv and colon
+                p = groupcsv.split(':') # '1,2,3,4,6' '7,10,12,14' '16,20,23'
+                ncolon = len(p)-1 
+                grouping = np.array([])
+                for k in range(ncolon):
+                    q = p[k].split(',') # ['1' '2' '3' '4' '6']
+                    if k>0:
+                        last = int(q[0])
+                        grouping = np.concatenate((grouping,np.array(list(range(first,last+1)))))
+                        first = int(q[-1])
+                        grouping = np.concatenate((grouping,np.array(list(int(w) for w in q[1:-1]))))
+                    elif k==0:
+                        first = int(q[-1])
+                        grouping = np.concatenate((grouping,np.array(list(int(w) for w in q[:-1]))))
+                q = p[-1].split(',') # '22','25'
+                last = int(q[0])
+                grouping = np.concatenate((grouping,np.array(list(range(first,last+1)))))
+                grouping = np.concatenate((grouping,np.array(list(int(w) for w in q[1:]))))
+        grouping -=1 # this is counter index, remove 1 for python 0-based indexing 
     except:
-        grouping = np.array([-1])
+        grouping = np.array([-1]) # error flag
         
     return grouping
 
@@ -314,9 +340,12 @@ def get_title(run):
     '''
     return '{} {} {} {}'.format(run.get_sample(),run.get_field(),run.get_orient(),run.get_temp())    
 
-def muvalid(string,out,index):
+def muvalid(string):
     '''
-    parse function CHECK WITH MUCOMPONENT, THAT USES A DIFFERENT SCHEME
+    parse function 
+
+    CHECK WITH MUCOMPONENT, THAT USES A DIFFERENT SCHEME
+
     accepted functions are RHS of agebraic expressions of parameters p[i], i=0...ntot  
     '''
     import re
@@ -326,29 +355,27 @@ def muvalid(string,out,index):
     #           strindices = pattern.findall(string)
     #           indices = [int(strindices[k]) for k in range(len(strindices))] # in internal parameter list
     #           mindices = ... # produce the equivalent minuit indices  
-    valid = True
-    message = ''
+    error_message = ''
     try: 
         safetry(test) # should select only safe use (although such a thing does not exist!)
     except Exception as e:
-        with out:
-            print('function: {}. Tested: {}. Wrong or not allowed syntax: {}'.format(string,test,e))
-        index = 3
-        valid = False
-    return valid
+        error_message = 'Function: {}. Tested: {}. Wrong or not allowed syntax: {}'.format(string,test,e)
+    return error_message
 
 def muvaluid(string):
     '''
     Run suite fits: muvaluid returns True/False
-    checks the syntax for string function 
+    * checks the syntax for string function 
     corresponding to flag='l'. Meant for pars
     displaying large changes across the run suite,
-    requiring different migrad start guesses.
-    '''
+    requiring different migrad start guesses::
+
     # string syntax: e.g. "0.2*3,2.*4,20."
     # means that for the first 3 runs value = 0.2,
     #            for the next 4 runs value = 2.0
     #            from the 8th run on value = 20.0
+
+    '''
     try:
         value_times_list = string.split(',')
         last = value_times_list.pop()
@@ -362,11 +389,14 @@ def muvaluid(string):
 
 def muvalue(lrun,string):
     '''
-    Run suite fits: muvalue returns the value 
+    Run suite fits: 
+
+    muvalue returns the value 
     for the nint-th parameter of the lrun-th run
     according to string (corresponding flag='l').
     Large parameter change across the run suite
     requires different migrad start guesses.
+    Probably broken!
     '''
     # string syntax: e.g. "0.2*3,2.*4,20."
     # means that for the first 3 runs value = 0.2,
@@ -375,51 +405,54 @@ def muvalue(lrun,string):
 
     value = []
     for value_times in string.split(','):
-        try:
-            value,times = value_time.split('*') 
+        try:  # if value_times contains a '*' 
+            value,times = value_times.split('*') 
             for k in range(int(times)):
                 value.append(float(value))
-        except:
+        except: # if value_times is a single value
             for k in range(len(value),lrun):
-                value.append(float(value_time))
+                value.append(float(value_times))
+    # cannot work! doesn't check for syntax, can be broken; this returns a list that doesn't know about lrun
     return value[lrun]
 
-def muzeropad(runs,out):
+def muzeropad(runs):
     '''
-    muzeropad(runs,out)
-        runs is a string containing the run number
-    utility of the suite tab, not a method
-    future:
+
+    runs is a string containing the run number
+    Utility of the suite tab, not a method.
+
+    Future::
+
     1) determine how many leading zeros for padding
        read a file from data dir
        check number of digits before '.'
        count number of digits in run
        zero pad
-    now:
-    0) zeroth version pads a fixed number of zeros to 4 digits
-    out in mugui is _output_, Textarea for printing messages
+
+    now::
+
+    0) assumes no more than 4 digits 
+       left pads zeros to 4 digits
+       e.g. 32 becomes 0032
+    
     '''
     zeros='0000'
     if len(runs)<len(zeros):
         return zeros[:len(zeros)-len(runs)]+runs
     elif len(runs)==len(zeros):
         return runs
-    else:
-        with out:
-            print('Too long run number!')
-        return []
-
-def norun_msg(out):
-    with out:
-         print('No run loaded yet! Load one first (select suite tab).')
-
 
 def plotile(x,xdim=0,offset=0):
     '''
-    xt = plotile(x,xdim,xoffset=0)
-        e.g. x.shape = (1,1000) y.shape = (4,1000)
+    Produces a tiled plot, in the sense of np.tile e.g.
+
+    ::
+
+        x.shape = (1,1000) 
+        y.shape = (4,1000)
         xt = plotile(x,4)
         yt = plotile(y,offset=0.1) 
+
     '''
     # x is an array(x.shape[0],x.shape[1])
     # xoffset is a step offset
@@ -438,21 +471,32 @@ def plotile(x,xdim=0,offset=0):
 
 def rebin(x,y,strstp,pack,e=None):
     '''
-    x,y[,e] are 2D arrays to be rebinned
-    pack is the rebinning factor, e.g:
+    * x,y[,e] are 2D arrays to be rebinned
+    * pack is the rebinning factor, e.g it returns::
+
         xb = array([x[0:pack].sum()/pack])
-    strstp = [start,stop] is a list of indices
+
+    * strstp = [start,stop] is a list of indices
+
         rebinning is done on slices of x,y[,e]
         such as x[start:stop]
 
-    use either 
-    xb,yb = rebin(x,y,strstp,pack)
-    or
-    xb,yb,eyb = rebin(x,y,strstp,pack,ey) # the 5th is y error
+    use either::
+
+        xb,yb = rebin(x,y,strstp,pack)
+
+    or::
+
+       xb,yb,eyb = rebin(x,y,strstp,pack,ey) # the 5th is y error
+
     Works also with pack = 1
 
-    * Now works for 1d array x and 2d ndarrays y, ey
-    xb, yb, eb are 2D arrays, e.g. xb.shape = (1,25000), yb.shape = (nruns,25000) 
+    Works for 1d array x and 2D ndarrays y, ey returning 2D arrays
+    xb, yb, eb, e.g.::
+ 
+         xb.shape = (1,25000), 
+         yb.shape = (nruns,25000) 
+
     '''
     from numpy import floor, sqrt,empty, array
     start,stop = strstp
@@ -489,6 +533,9 @@ def rebin(x,y,strstp,pack,e=None):
             return xb,yb
 
 def safetry(string):
+    '''
+    Used by muvalid
+    '''
     from math import acos,asin,atan,atan2,ceil,cos,cosh,degrees,e,exp,floor,log,log10,pi,pow,radians,sin,sinh,sqrt,tan,tanh
     safe_list = ['a','acos', 'asin', 'atan', 'atan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 
                  'exp', 'floor', 'log', 'log10', 'pi', 'pow', 'radians', 'sin', 'sinh', 'sqrt', 'tan', 'tanh']
@@ -504,6 +551,7 @@ def set_bar(n,b):
     '''
     service to animate histograms
     e.g. in the fit tab
+
     extracted from matplotlib animate 
     histogram example
     '''
@@ -539,22 +587,50 @@ def set_bar(n,b):
     xlim = [left[0], right[-1]]
     return verts, codes, bottom, xlim
 
-def tlog_exists(path,run,out):
+def spec_prec(a):
     '''
-    check if tlog exists under various known filenames
+    format specifier precision::
+
+        0 for a > 1.0
+        1 for 1.0 > a > 0.1
+        2 for 0.1 > a > 0.01 etc.
+
+    '''
+    import numpy as np
+    return int(abs(min(0.,np.floor(np.log10(a))))) 
+
+def tlog_exists(path,run):
+    '''
+    check if tlog exists under various known filenames types
     '''
     import os
 
-    filename_psibulk = 'run_'+muzeropad(run,out)+'.mon' # add definitions for e.g. filename_isis
+    filename_psibulk = 'run_'+muzeropad(run)+'.mon' # add definitions for e.g. filename_isis
     ok = os.path.exists(os.path.join(path,filename_psibulk)) # or os.path.exists(os.path.join(paths,filename_isis))
     return ok
 
 def translate(nint,lmin,function):
+    '''
+    Used in int2_int and min2int to parse parameters contained in function[nint].value e.g.
+
+    ::
+ 
+       p[4]*2+p[7]
+
+    and translate the internal parameter indices 4 and 7 (written according to the gui parameter list order)
+    into the corresponding minuit parameter list indices, that skips shared and fixed parameters.
+
+    e.g. if parameter 6 is shared with parameter 4 and parameter 2 is fixed, the minuit parameter indices
+    will be 3 instead of 4 (skipping internal index 2) and 5 instead of 7 (skipping both 2 and 6)
+    '''
     string = function[nint].value
     # search for integers between '[' and ']'
-    start = [i+1 for i in  findall('[',string)]
+    start = [i+1 for i in  findall('[',string)]  
+    # finds index of number after all occurencies of '['
     stop = [i for i in  findall(']',string)]
-    nints = [string[i:j] for (i,j) in zip(start,stop)]
+    # same for ']'
+    nints = [string[i:j] for (i,j) in zip(start,stop)] 
+    # this is a list of strings with the numbers
     nmins = [lmin[int(string[i:j])] for (i,j) in zip(start,stop)]
     for lstr,m in zip(nints,nmins):
         string = string.replace(lstr,str(m))

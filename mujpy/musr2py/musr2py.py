@@ -20,10 +20,12 @@ lib = cdll.LoadLibrary('/usr/local/lib/MuSR2py.so')        # defines the c wrapp
 class musr2py(object):                        # defines the python class
   def __init__(self):
     """
-    typical usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    n = musr2py.get_numberTemperature_int()
-    # n is now an integer with the number of elements of the PSI monitor values
+    typical usage:: 
+
+      musr2py.read("mydata.bin")  # this is the run data file
+      n = musr2py.get_numberTemperature_int()
+      # n is now an integer with the number of elements of the PSI monitor values
+
     """
     
     # set types for all functions
@@ -117,8 +119,10 @@ class musr2py(object):                        # defines the python class
   
   def read(self, filename):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
+    usage::
+ 
+     musr2py.read("mydata.bin")  # this is the run data file
+
     """
 
     fnamePtr = ctypes.create_string_buffer(filename.encode('utf8'),120) # pointer to string  and forced conversion to utf8
@@ -127,28 +131,34 @@ class musr2py(object):                        # defines the python class
     
   def get_numberHisto_int(self):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    n = musr2py.get_numberHisto_int()
-    # n is now an integer with the number of histrograms of this run
+    usage::
+ 
+      musr2py.read("mydata.bin")  # this is the run data file
+      n = musr2py.get_numberHisto_int()
+      # n is now an integer with the number of histrograms of this run
+
     """
     return lib.get_numberHisto_int(self.obj)
      
   def get_histoLength_bin(self):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    n = musr2py.get_histoLength_bin()
-    # n is now an integer with the number of bins in the histrograms of this run
+    usage::
+
+      musr2py.read("mydata.bin")  # this is the run data file
+      n = musr2py.get_histoLength_bin()
+      # n is now an integer with the number of bins in the histrograms of this run
+
     """
     return lib.get_histoLength_bin(self.obj)
     
   def get_histo_array_int(self, histogram):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    h = musr2py.get_histo_array_int(2)
-    # h is now a numpy array of integers with the counts of the 3rd histogram
+    usage::
+
+      musr2py.read("mydata.bin")  # this is the run data file
+      h = musr2py.get_histo_array_int(2)
+      # h is now a numpy array of integers with the counts of the 3rd histogram
+
     (remember python indices starts from 0)
     """
     size = self.get_histoLength_bin()
@@ -159,19 +169,23 @@ class musr2py(object):                        # defines the python class
   
   def get_numberTemperature_int(self):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    n = musr2py.get_numberTemperature_int()
-    # n is now an integer with the number of elements of the PSI monitor values
+    usage:: 
+
+      musr2py.read("mydata.bin")  # this is the run data file
+      n = musr2py.get_numberTemperature_int()
+      # n is now an integer with the number of elements of the PSI monitor values
+
     """
     return lib.get_numberTemperature_int(self.obj)
 
   def get_temperatures_vector(self):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    T = musr2py.get_temperatures_vector()
-    # T is now a numpy array of PSI monitor values
+    usage:: 
+
+      musr2py.read("mydata.bin")  # this is the run data file
+      T = musr2py.get_temperatures_vector()
+      # T is now a numpy array of PSI monitor values
+
     """
 
     size = self.get_numberTemperature_int() # determine how many elements in vector 
@@ -188,10 +202,12 @@ class musr2py(object):                        # defines the python class
   
   def get_devTemperatures_vector(self):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    eT = musr2py.get_devTemperatures_vector()
-    # eT is now a numpy array of PSI monitor std values
+    usage::
+ 
+      musr2py.read("mydata.bin")  # this is the run data file
+      eT = musr2py.get_devTemperatures_vector()
+      # eT is now a numpy array of PSI monitor std values
+
     """
 
     size = self.get_numberTemperature_int() # determine how many elements in vector 
@@ -208,28 +224,34 @@ class musr2py(object):                        # defines the python class
   
   def get_binWidth_ns(self):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    dt = musr2py.get_binWidth_ns()
-    # dt is now a float with the time resolution in ns
+    usage:: 
+
+      musr2py.read("mydata.bin")  # this is the run data file
+      dt = musr2py.get_binWidth_ns()
+      # dt is now a float with the time resolution in ns
+
     """
     return lib.get_binWidth_ns(self.obj)
   
   def get_t0_double(self, histogram):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    t0 = musr2py.get_t0_double(0)
-    # t0 is now a float with the time of t0 in ns
+    usage::
+ 
+      musr2py.read("mydata.bin")  # this is the run data file
+      t0 = musr2py.get_t0_double(0)
+      # t0 is now a float with the time of t0 in ns
+
     """
     return lib.get_t0_double(self.obj, histogram)
 
   def get_sample(self):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    samplename = musr2py.get_sample()
-    # samplename is now a string with the sample name
+    usage:: 
+
+      musr2py.read("mydata.bin")  # this is the run data file
+      samplename = musr2py.get_sample()
+      # samplename is now a string with the sample name
+
     """
     samplePtr = ctypes.create_string_buffer(60) # pointer to the string
     ret = lib.get_sample(self.obj, samplePtr)
@@ -238,10 +260,12 @@ class musr2py(object):                        # defines the python class
 
   def get_field(self):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    fieldstr = musr2py.get_field()
-    # fieldstr is now a string with the field value 
+    usage::
+
+      musr2py.read("mydata.bin")  # this is the run data file
+      fieldstr = musr2py.get_field()
+      # fieldstr is now a string with the field value 
+
     """
     fieldPtr = ctypes.create_string_buffer(60) # pointer to the string
     ret = lib.get_field(self.obj, fieldPtr)
@@ -250,10 +274,12 @@ class musr2py(object):                        # defines the python class
 
   def get_orient(self):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    orientstr = musr2py.get_orient()
-    # orientstr is now a string with the sample orientation
+    usage::
+
+      musr2py.read("mydata.bin")  # this is the run data file
+      orientstr = musr2py.get_orient()
+      # orientstr is now a string with the sample orientation
+
     """
     orientPtr = ctypes.create_string_buffer(60) # pointer to the string
     ret = lib.get_orient(self.obj, orientPtr)
@@ -262,10 +288,12 @@ class musr2py(object):                        # defines the python class
 
   def get_temp(self):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    tempstr = musr2py.get_temp()
-    # tempstr is now a string with the nominal temperature
+    usage::
+
+      musr2py.read("mydata.bin")  # this is the run data file
+      tempstr = musr2py.get_temp()
+      # tempstr is now a string with the nominal temperature
+
     """
     tempPtr = ctypes.create_string_buffer(60) # pointer to the string
     ret = lib.get_temp(self.obj, tempPtr)
@@ -286,10 +314,12 @@ class musr2py(object):                        # defines the python class
 
   def get_eventsHisto_vector(self):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    eventsHisto = musr2py.get_eventsHisto_vector()
-    # eventsHisto is a numpy array of integers containing the number of events per histo
+    usage::
+
+      musr2py.read("mydata.bin")  # this is the run data file
+      eventsHisto = musr2py.get_eventsHisto_vector()
+      # eventsHisto is a numpy array of integers containing the number of events per histo
+
     """
     size = self.get_numberHisto_int() # determine how many elements in vector 
     eventsHistoPtr = np.empty(size, dtype=np.int64) # allocate an empty numpy array
@@ -314,10 +344,12 @@ class musr2py(object):                        # defines the python class
 
   def get_timeStart_vector(self):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    timeStart = musr2py.get_timeStart_vector()
-    # timeStart is the start run hh:mm:ss dd:mm:yyy string 
+    usage::
+
+      musr2py.read("mydata.bin")  # this is the run data file
+      timeStart = musr2py.get_timeStart_vector()
+      # timeStart is the start run hh:mm:ss dd:mm:yyy string 
+
     """
     timedatePtr = ctypes.create_string_buffer(18)
     ret = lib.get_timeStart_vector(self.obj, timedatePtr)
@@ -326,10 +358,12 @@ class musr2py(object):                        # defines the python class
 
   def get_timeStop_vector(self):
     """
-    usage: 
-    musr2py.read("mydata.bin")  # this is the run data file
-    timeStop = musr2py.get_timeStop_vector()
-    # timeStop is the stop run hh:mm:ss dd:mm:yyy string 
+    usage::
+
+      musr2py.read("mydata.bin")  # this is the run data file
+      timeStop = musr2py.get_timeStop_vector()
+      # timeStop is the stop run hh:mm:ss dd:mm:yyy string
+
     """
     timedatePtr = ctypes.create_string_buffer(18)
     ret = lib.get_timeStop_vector(self.obj, timedatePtr)
@@ -339,9 +373,11 @@ class musr2py(object):                        # defines the python class
 #  def test(self):
 if __name__ == '__main__':
     """
-    usage: 
-    musr2py.test()
-    # reads many things from a PSI data file test.bin
+    usage::
+
+      musr2py.test()
+      # reads many things from a PSI data file test.bin
+
     """
     m2p = musr2py()
     m2p.read("test.bin")
