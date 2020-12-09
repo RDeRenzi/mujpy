@@ -1,54 +1,46 @@
-.. _source
+.. _Source:
 
---------------------
+====================
 Source documentation
---------------------
-
-:mod:`mujpy` -- Main package
-****************************
-
-.. automodule:: mujpy
-
-
-:mod:`mujpy.mugui` -- Main GUI class
-++++++++++++++++++++++++++++++++++++
-
-.. automodule:: mujpy.mugui
-   :members:
-   :undoc-members:
-   :show-inheritance:
+====================
+-----
+mugui
+-----
+Main GUI class
 
 
+.. automodule:: mugui
+    :members:
+    :undoc-members:
+    :private-members:
 
-:mod:`mujpy.aux` -- Auxiliary functionalities
-+++++++++++++++++++++++++++++++++++++++++++++
+---
+aux
+---
+Utilities
 
-:mod:`mujpy.aux.aux` -- Various useful functions
-------------------------------------------------
+.. automodule:: aux.aux
+    :members:
+    :undoc-members:
+    :private-members:
 
-.. automodule:: mujpy.aux.aux
-   :members:
-   :undoc-members:
-   :show-inheritance:
+------------
+mucomponents
+------------
+Components for data fit with iminuit
 
-:mod:`mujpy.mucomponents` -- Fit functions
-++++++++++++++++++++++++++++++++++++++++++
+.. automodule:: mucomponents.mucomponents
+    :members:
+    :undoc-members:
+    :private-members:
 
-:mod:`mujpy.mucomponents.mucomponents` -- Main fit functions
-------------------------------------------------------------
+-------
+musr2py
+-------
+wrapper to the MuSR_td_PSI.cpp class
 
-.. automodule:: mujpy.mucomponents.mucomponents
-   :members:
-   :undoc-members:
-   :private-members:
-   :show-inheritance:
-
-:mod:`mujpy.mucomponents.muprompt` -- Prompt fit functions
-------------------------------------------------------------
-
-.. automodule:: mujpy.mucomponents.muprompt
-   :members:
-   :undoc-members:
-   :private-members:
-   :show-inheritance:
+.. automodule:: musr2py.musr2py
+    :members:
+    :undoc-members:
+    :private-members:
 

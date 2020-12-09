@@ -17,6 +17,7 @@ Welcome to mujpy's documentation!
    Examples
    FAQ
    Developer
+   Philostory 
    Source
 
 

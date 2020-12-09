@@ -37,23 +37,23 @@ The page has a vertical tab list on the left. Click on the first (folder) icon, 
 
 .. warning::
     Sometimes the MGI might be missing. Click on Kernel, among the top tabs, and select Restart Kernel and Run All Cells.
-    If you manage to overwrite the template notebook (it happens, with the many handy buttons of Jupyter-lab: beware the scissors!!) with an empy cell. do not worry. The text of the hidden first cell is the following:
+    If you manage to overwrite the template notebook (it happens, with the many handy buttons of Jupyter-lab: beware the scissors!!) with an empy cell. do not worry. 
+  
+The text of the hidden first cell is the following three-liner (of course # means the rest is a comment)::
     
-:jupyter notebook first cell:
-   ## Mujpy tester, for inline graphics specify: %matplotlib notebook, for interactive %matplotlib tk (or just    %matplotlib)
-   
-   # %matplotlib -l  lists all the possible options
-   
-   %matplotlib tk
-   
-   # loads the distribution when a distribution is already installed 
-   
-   from mujpy.mugui import mugui
-   
-   MuJPy = mugui()
+    ## Mujpy tester, for inline graphics specify: %matplotlib notebook, for interactive %matplotlib tk (or just    %matplotlib)
+    # %matplotlib -l  lists all the possible options
+    %matplotlib tk
+    # loads the distribution when a distribution is already installed 
+    from mujpy.mugui import mugui
+    MuJPy = mugui()
     
 
-Cut and paste it into an empty notebook cell. Click on the left blue vertical line to hide the first cell. Run it as usual 
+Cut and paste it into an empty notebook cell. Click on the left blue vertical line to toggle hide this first cell. Run it as usual 
+
+.. image:: firstcell.png
+
+Notice: the mujpy instance is called MuJPy in this cell (you can call it as you wish). This is important for developers who whant to check innards.
 
 .. hlist::
     * hovering over widgets provides *baloon* tips (true also for some widgets in mujpy);

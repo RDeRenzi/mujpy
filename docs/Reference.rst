@@ -9,9 +9,12 @@ This is the mujpy Reference Manual v. 1.00 (in its transition to v. 1.05)
 ------
 Header
 ------
-The top part of the mujpy gui contains a logo together with the information on the loaded run (in `single run mode`_) or the master loaded run (in the `suite mode`_). The information contains the run number, the run title, the total conuts, the total counts over the selected `grouping`_ of detectors.
+The top part of the mujpy gui contains a logo together with the information on the loaded run (in `single run mode`_) or the master loaded run (in the `suite`_ mode). The information contains the run number, the run title, the total conuts, the total counts over the selected `grouping`_ of detectors.
 The 1.05 version contains the loaders: load button for GUI file selection, next, previous, add buttons and the speedload text bar: legal syntax in the folloring examples
 * *Run[run suite]* is a Text area where single run numbers can be written. The data file is loaded upon hitting return
+
+suites
+------
 * more complex syntax allows storing *suites* of runs, with combination of *,:+* (only one : allowed)
 
  * ``432,433`` loads the *suite* of runs 432, 433
@@ -61,8 +64,8 @@ The second row is related to the :math:`t_0=0` bin iminuit fit, minimizing the :
 * the *prompt fit* button launches iminuit
 * the *prompt plot* checkbox to produce a plot; 
 * the *save setup* and *load setup* buttons save and load a setup file that stores the setup information in/from the  ``mujpy_setup.pkl`` file
-* the *Data log* button produces a text file listing of all data files in the data directory  
- run # T1(eT1) T2(eT2) Mev Start datetime title
+* the *Data log* button produces a text file listing of all data files in the data directory::
+   run #     T1(eT1)     T2(eT2)     Mev     Start     datetime     title
 * click on the *t0 bins and remainders* and *Total counnte* accordions to show individual counter values
 
 muprompt
@@ -89,7 +92,7 @@ The fit tab selects the
 
 fit model 
 ---------
-and its parameters. Any model is made of predefined additive components, named by two letter codes (see ``Component list`_) and the model naming scheme is based on this feature. A model made of, say, 3 components, *ab*, *ab*and *de* will be called *ababde* (or any other permutation of the three components) 
+and its parameters. Any model is made of predefined additive components, named by two letter codes (see ``Component list``_) and the model naming scheme is based on this feature. A model made of, say, 3 components, *ab*, *ab* and *de* will be called *ababde* (or any other permutation of the three components) 
 
 .. image:: daml.png
 
@@ -112,25 +115,28 @@ the ratio of count rates :math:`N_f/N_b` between initial (unpolarized) count rat
 * *model* Text area, to define new model: e.g. ```mgmgbl`` is a three component model,  ``mg``, ``mg``, ``bl``.
 * *forward*, *backward* text area define the grouping, defining groups of counters according to the following syntax
 
- * ``2,3`` or ``2:3`` means that counters 2,3 are grouped together
- * ``1:5, 10, 15:19`` means that counters 1,2,3,4,5,10,15,16,17,18,19 are grouped together
+* ``2,3`` or ``2:3`` means that counters 2,3 are grouped together
+* ``1:5, 10, 15:19`` means that counters 1,2,3,4,5,10,15,16,17,18,19 are grouped together
 * *alpha* Float Text input, see above
-* *offset* is the first good bin, counting from the center prompt peak  (*start* = k means that the fit starts from  bin *offset* + k.
+* *offset* is the first good bin, counting from the center prompt peak  (*start* = k means that the fit starts from  bin *offset* + k).
 
 * *fit range* has a *start, stop* and a *start,stop,pack* options, to define the interval and packing for the fdata minimization. 
 * *plot range* with more options
 
- * *start, stop* to plot data between *start* and *stop* bin, with no rebinning
- * *start,stop,pack* to plot data between *start* and *stop* bin, rebinned by factor *pack*
- * *start,stop,late,pack* to plot ata in two successive ranges, between *start* and *stop* bin, with no rebinning, between *stop* and *last*  bin, rebinned by factor *pack*
- * *start,stop,packe,late,packl* to plot data in two successive ranges, between *start* and *stop*,  rebinned by factor *packe*, between *stop* and *last* rebinned by factor *packl*
- * see also `graphic zoom`_
+* *start, stop* to plot data between *start* and *stop* bin, with no rebinning
+* *start,stop,pack* to plot data between *start* and *stop* bin, rebinned by factor *pack*
+* *start,stop,late,pack* to plot ata in two successive ranges, between *start* and *stop* bin, with no rebinning, between *stop* and *last*  bin, rebinned by factor *pack*
+* *start,stop,packe,late,packl* to plot data in two successive ranges, between *start* and *stop*,  rebinned by factor *packe*, between *stop* and *last* rebinned by factor *packl*
+* see also `graphic zoom`_
 * *Guess* checkbox, for ploting initial conditions instead of fit results.
 
 * *Plot* button, produces a plot with either best fit or guess values.
 
 * *Animate* checkbutton, if selected the suite of runs is plotted as frames of an animation, if unselected they are tiled with an offset in a single multirun plot.
-* *Delay* between frames [ms].   
+* *Delay* between frames [ms].  
+
+Fit Dashboard
+-------------
  
 The lower frame contains the fit components selected either by the *model* syntax or by loding a saved fit. The frame is divided in components boxes, whose first line is the component label and the :ref:`FFT-checKbox`. The other lines list their parameters, each indentified by an index, a unique name, a Text area for the starting guess value, a symbol:
 
@@ -141,6 +147,8 @@ The lower frame contains the fit components selected either by the *model* synta
 * parameter names are automatically generated and pretty obvious if you are not new to MuSR. E.g. *ml* has a (partial) *asymmetry*, a *field* value (in Tesla), a *phase* (in degrees) and a Lorentzian relaxation *Lor_rate* (in inverse microseconds); 
 * names are followed by a capital letter that uniquely identifies each component (e.g. in a *blmlml* fit the asymmetries of the three components would be *asymmetryA*, *asymmetryB*, *asymmetryC*, respectively) 
 
+At the bottom left or right (depending on space) a *Show parameter plots* appears, with two buttons.
+You must have performed at least one fit with the chosen model (displayed by the ``Fit Dashboard``_ ). Say that you have done this for a few runs, at increasing T (perhaps as a *suite fit*). This has produced a log file (daml.1.2-1.csv, in the present example). You can now display its five parameters vs temperature by selecting different numbers in their  Panel widgets  (e.g. 1 for dalphaA, 1 for asymmetryB, 2 for fieldB, 3 for phaseB and 4 for Lor_rateB, up to 6 distinct panels). Then press the *Plot vs. T* button.
 
 .. _static:
 
@@ -307,7 +315,11 @@ All graphic windows display seven icons on the bottom bar
 ------
 output
 ------
-This tab appears only if the code cannot open a terminal window to redirect the output to. If you get a terminal *do not close it* (it cannot be reopened yet). OEither the terminal or the tab display fit results, warnings, error messages, command execution completions. Code errors in jupyter lab are redirected to a log console (see second tab on the bottom bar, a square with two columsn of lines)
+This tab appears only if the code cannot open a terminal window to redirect the output to. If you get a terminal *do not close it* (it cannot be reopened yet). 
+
+.. image:: term.png
+
+Either the terminal or the tab display fit results, warnings, error messages, command execution completions. Code errors in jupyter lab are redirected to a log console (see second tab on the bottom bar, a square with two columsn of lines)
 
 .. image:: JupyterLabBottomBar.png
 
