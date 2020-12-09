@@ -9,7 +9,7 @@ Released under the MIT licence.
 Linux instructions, for the time being. 
 Valid on WIN10 that has a linux shell.
 
-* Make sure you have python, standard on linux, and jupyter. Otherwise install them (see https://docs.python.org/3/using/windows.html, https://docs.python.org/3/using/mac.html, jupyter.readthedoc.io).
+* Make sure you have python, standard on linux, and jupyter lab. Otherwise install them (see https://docs.python.org/3/using/windows.html, https://docs.python.org/3/using/mac.html, jupyter.readthedoc.io).
 * Install mujpy. Download from https://github.com/RDeRenzi/mujpy, unzip into the directory of your choice::
 
    cd mujpy/mujpy/musr2py
