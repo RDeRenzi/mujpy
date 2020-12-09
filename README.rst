@@ -21,11 +21,11 @@ Valid on WIN10 that has a linux shell.
 
 * Check dependencies, see requirements.txt. When the first mujpy release is on Pipy, pip will sort this out.
 
-* Start jupyter::
+* Start jupyter lab::
 
-   jupyter notebook
+   jupyter-lab
 
-* Use mu_test_damg.ipnb. Alternatively the first cell type::
+* Use mu_test_damg_lab.ipnb. Alternatively the first cell type::
 
   >>>%matplotlib # "%matplotlib tk"  avoids a line of output if you are using the tk backend
 
