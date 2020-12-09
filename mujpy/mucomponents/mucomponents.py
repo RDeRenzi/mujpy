@@ -4,8 +4,8 @@ from scipy.constants import physical_constants as C
 
 class mumodel(object):
     '''
-    Defines the possible components of the fitting model. Provides a chi_square function for Minuit.
-
+    Defines the components of the fitting model. Provides a chi_square function for Minuit.
+    Fields in mT after substitution of self._gamma_mu_ with self._gamma_Mu_MHzper_mT
     '''
     def __init__(self):
         ''' 
@@ -14,6 +14,7 @@ class mumodel(object):
         self._radeg_ = pi/180.
         self._gamma_Mu_MHzperT = 3.183345142*C['proton gyromag. ratio over 2 pi'][0]  # numbers are from Particle Data Group 2017
         self._gamma_mu_ = 135.5
+        self._gamma_Mu_MHzper_mT = self._gamma_Mu_MHzperT*1e-3
         self._help_ = {'bl':r'Lorentz decay: $\mbox{asymmetry}\exp(-\mbox{Lor_rate}\,t)$',
                      'bg':r'Gauss decay: $\mbox{asymmetry}\exp(-0.5(\mbox{Gau_rate}\,t)^2)$',
                      'bs':r'Gauss decay: $\mbox{asymmetry}\exp(-0.5(\mbox{rate}\,t)^\beta)$',
@@ -27,7 +28,7 @@ class mumodel(object):
                (1-1/\sqrt{3})\cos \pi\gamma_\mu\mbox{dipfield}(3-\sqrt{3})\,t + \
                (1+1/\sqrt{3})\cos\pi\gamma_\mu\mbox{dipfield}(3+\sqrt{3})\,t ]\exp(-\mbox{Lor_rate}\,t)$', 
                      'kg':r'Gauss Kubo-Toyabe: static and dynamic, in zero or longitudinal field by G. Allodi [Phys Scr 89, 115201]'}
-        self._alpha_ =  []
+        # self._alpha_ =  [] to be deleted
     # ---- end generic __init__
 
     def _add_(self,x,*argv):
@@ -255,7 +256,7 @@ class mumodel(object):
         '''
         # the returned value will not be used, correction in _add_
         # print('dalpha = {}'.format(dalpha))
-        return zero(x.shape[0])
+        return zeros(x.shape[0])
 
     def ml(self,x,asymmetry,field,phase,Lor_rate): 
         '''
@@ -263,43 +264,43 @@ class mumodel(object):
         x [mus], asymmetry, field [T], phase [degrees], Lor_rate [mus-1]
         '''
         # print('a={}, B={}, ph={}, lb={}'.format(asymmetry,field,phase,Lor_rate))
-        return asymmetry*cos(2*pi*self._gamma_mu_*field*x+phase*self._radeg_)*exp(-x*Lor_rate)
+        return asymmetry*cos(2*pi*self._gamma_Mu_MHzper_mT*field*x+phase*self._radeg_)*exp(-x*Lor_rate)
 
     def mg(self,x,asymmetry,field,phase,Gau_rate): 
         '''
         fit component for a precessing muon with Gaussian decay, 
         x [mus], asymmetry, field [T], phase [degrees], Gau_rate [mus-1]
         '''
-        return asymmetry*cos(2*pi*self._gamma_mu_*field*x+phase*self._radeg_)*exp(-0.5*(x*Gau_rate)**2)
+        return asymmetry*cos(2*pi*self._gamma_Mu_MHzper_mT*field*x+phase*self._radeg_)*exp(-0.5*(x*Gau_rate)**2)
 
     def ms(self,x,asymmetry,field,phase,rate,beta): 
         '''
         fit component for a precessing muon with stretched decay, 
         x [mus], asymmetry, field [T], phase [degrees], rate [mus-1], beta (>0)
         '''
-        return asymmetry*cos(2*pi*self._gamma_mu_*field*x+phase*self._radeg_)*exp(-(x*rate)**beta)
+        return asymmetry*cos(2*pi*self._gamma_Mu_MHzper_mT*field*x+phase*self._radeg_)*exp(-(x*rate)**beta)
 
     def fm(self,x,asymmetry,dipfield,Lor_rate):
         '''
         fit component for FmuF (powder average)
         '''
-        return asymmetry/6.0*( 3.+cos(2*pi*self._gamma_mu_*dipfield*sqrt(3.)*x)+
-               (1.-1./sqrt(3.))*cos(pi*self._gamma_mu_*dipfield*(3.-sqrt(3.))*x)+
-               (1.+1./sqrt(3.))*cos(pi*self._gamma_mu_*dipfield*(3.+sqrt(3.))*x) )*exp(-x*Lor_rate)
+        return asymmetry/6.0*( 3.+cos(2*pi*self._gamma_Mu_MHzper_mT*dipfield*sqrt(3.)*x)+
+               (1.-1./sqrt(3.))*cos(pi*self._gamma_Mu_MHzper_mT*dipfield*(3.-sqrt(3.))*x)+
+               (1.+1./sqrt(3.))*cos(pi*self._gamma_Mu_MHzper_mT*dipfield*(3.+sqrt(3.))*x) )*exp(-x*Lor_rate)
 
     def jl(self,x,asymmetry,field,phase,Lor_rate): 
         '''
         fit component for a Bessel j0 precessing muon with Lorentzian decay, 
         x [mus], asymmetry, field [T], phase [degrees], Lor_rate [mus-1]
         '''
-        return asymmetry*j0(2*pi*self._gamma_mu_*field*x+phase*self._radeg_)*exp(-x*Lor_rate)
+        return asymmetry*j0(2*pi*self._gamma_Mu_MHzper_mT*field*x+phase*self._radeg_)*exp(-x*Lor_rate)
 
     def jg(self,x,asymmetry,field,phase,Gau_rate): 
         '''
         fit component for a Bessel j0 precessing muon with Lorentzian decay, 
         x [mus], asymmetry, field [T], phase [degrees], Lor_rate [mus-1]
         '''
-        return asymmetry*j0(2*pi*self._gamma_mu_*field*x+phase*self._radeg_)*exp(-0.5*(x*Gau_rate)**2)
+        return asymmetry*j0(2*pi*self._gamma_Mu_MHzper_mT*field*x+phase*self._radeg_)*exp(-0.5*(x*Gau_rate)**2)
 
     def _kg(self,x,w,Gau_delta):
         '''
@@ -360,7 +361,7 @@ class mumodel(object):
         x [mus], asymmetry, L_field [T], Gau_delta [mus-1], jump_rate (MHz)
         '''
         N = x.shape[0]
-        w = 2*pi*L_field*self._gamma_mu_
+        w = 2*pi*L_field*self._gamma_Mu_MHzper_mT
         if jump_rate==0: # static 
            f = self._kg(x,w,Gau_delta) # normalized to 1.
         else :            # dynamic

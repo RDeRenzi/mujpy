@@ -38,15 +38,21 @@ def autops(data, fn, p0=0.0, p1=0.0):
 
     import numpy as np
     import scipy.optimize
+    from io import StringIO # Python3 use: from io import StringIO
+    from contextlib import redirect_stdout
 
+    
     if not callable(fn):
         fn = {
             'peak_minima': _ps_peak_minima_score,
             'acme': _ps_acme_score,
         }[fn]
+    
     opt = [p0, p1]
-    opt = scipy.optimize.fmin(fn, x0=opt, args=(data, ))
-    return ps(data, p0=opt[0], p1=opt[1]), opt[0], opt[1]
+    with StringIO() as buf, redirect_stdout(buf):   
+        opt = scipy.optimize.fmin(fn, x0=opt, args=(data, ))
+        mystdout = buf.getvalue()
+    return ps(data, p0=opt[0], p1=opt[1]), opt[0], opt[1], mystdout
 
 
 def _ps_acme_score(ph, data):
@@ -163,6 +169,36 @@ def ps(data, p0=0.0, p1=0.0, inv=False):
 # MUGUI AUX
 ##############
 
+def chi2std(nu):
+    '''
+    computes 1 std for least square chi2
+    '''
+    import numpy as np
+    from scipy.special import gammainc
+    from scipy.stats import norm
+    
+    mm = round(nu/4)              
+    hb = np.linspace(-mm,mm,2*mm+1)
+    cc = gammainc((hb+nu)/2,nu/2) # see mulab: muchi2cdf(x,nu) = gammainc(x/2, nu/2);
+    lc = 1+hb[min(list(np.where((cc<norm.cdf(1))&(cc>norm.cdf(-1))))[0])]/nu
+    hc = 1+hb[max(list(np.where((cc<norm.cdf(1))&(cc>norm.cdf(-1))))[0])]/nu
+    return lc, hc
+
+def component(model,kin):
+    '''
+    returns the index of the component to which parameter k belongs in
+    model = self.model_components, in mugui, a list of complex dictionaries
+        [{'name':'da', 'pars':{'name':'lpha',...},
+         {'name':'mg', 'pars':{       ...       }]
+    kin is the index of a dashboard parameter (kint)
+    '''
+    from numpy import array, cumsum, argmax
+    
+    ncomp = len(model) # number of components in model
+    npar = array([len(model[k]['pars']) for k in range(ncomp)]) # number of parameters of each component
+    npars = cumsum(npar)
+    return argmax(npars>kin)
+        
 def derange(string,vmax,int_or_float='int'):
     '''
     derange(string) 
@@ -229,11 +265,17 @@ def derun(string):
     # systematic str(int(b[])) to check that b[] ARE integers
         for b in string.split(','): # csv
             kcolon = b.find(':') # ':' and '+' are mutually exclusive
+            kminus = b.find('-') # '-' is 'equivalent to ':' but only one of the two is admitted
             kplus = b.find('+')
             if kcolon>0: # value might be a range
                 if int(b[:kcolon])>int(b[kcolon+1:]):
                     errmsg='typo!'
                 for j in range(int(b[:kcolon]),int(b[kcolon+1:])+1):
+                    s.append([str(j)]) # strings
+            elif kminus>0:
+                if int(b[:kminus])>int(b[kminus+1:]):
+                    errmsg='typo!'
+                for j in range(int(b[:kminus]),int(b[kminus+1:])+1):
                     s.append([str(j)]) # strings
             elif kplus>0:
                 ss = []
@@ -334,12 +376,27 @@ def get_grouping(groupcsv):
         
     return grouping
 
-def get_title(run):
+def get_title(run,notemp=False,nofield=False):
     '''
     form standard psi title
     '''
+    if notemp:
+        return '{} {} {}'.format(run.get_sample(),run.get_field(),run.get_orient())
+    elif nofield:
+        return '{} {} {}'.format(run.get_sample(),run.get_orient(),run.get_temp())
     return '{} {} {} {}'.format(run.get_sample(),run.get_field(),run.get_orient(),run.get_temp())    
 
+def get_run_number_from(path_filename,filespecs):
+    '''
+    strips number after filespecs[0] and before filespec[1]
+    '''
+    try:
+        string =  path_filename.split(filespecs[0],1)[1]
+        run = string.split('.'+filespecs[1],1)[0]
+    except:
+       run = '-1' 
+    return str(int(run)) # to remove leading zeros
+            
 def muvalid(string):
     '''
     parse function 
@@ -349,17 +406,17 @@ def muvalid(string):
     accepted functions are RHS of agebraic expressions of parameters p[i], i=0...ntot  
     '''
     import re
-
-    pattern = re.compile(r"\p\[(\d+)\]") # find all patterns p[*] where * is digits
-    test = pattern.sub(r"a",string) # substitute "a" to "p[*]" in s
-    #           strindices = pattern.findall(string)
-    #           indices = [int(strindices[k]) for k in range(len(strindices))] # in internal parameter list
-    #           mindices = ... # produce the equivalent minuit indices  
     error_message = ''
-    try: 
-        safetry(test) # should select only safe use (although such a thing does not exist!)
-    except Exception as e:
-        error_message = 'Function: {}. Tested: {}. Wrong or not allowed syntax: {}'.format(string,test,e)
+    if string.strip() !='': # empty and blank strings are validated 
+        pattern = re.compile(r"p\[(\d+)\]") # find all patterns p[*] where * is digits
+        test = pattern.sub(r"a",string) # substitute "a" to "p[*]" in s
+        #           strindices = pattern.findall(string)
+        #           indices = [int(strindices[k]) for k in range(len(strindices))] # in internal parameter list
+        #           mindices = ... # produce the equivalent minuit indices  
+        try: 
+            safetry(test) # should select only safe use (although such a thing does not exist!)
+        except Exception as e:
+            error_message = 'Function: {}. Tested: {}. Wrong or not allowed syntax: {}'.format(string,test,e)
     return error_message
 
 def muvaluid(string):
@@ -441,6 +498,115 @@ def muzeropad(runs):
         return zeros[:len(zeros)-len(runs)]+runs
     elif len(runs)==len(zeros):
         return runs
+
+def path_file_dialog(path,spec):
+    import tkinter
+    from tkinter import filedialog
+    import os
+    here = os.getcwd()
+    os.chdir(path)
+    tkinter.Tk().withdraw() # Close the root window
+    spc, spcdef = '.'+spec,'*.'+spec
+    in_path = filedialog.askopenfilename(filetypes=((spc,spcdef),('all','*.*')))
+    os.chdir(here)
+    return in_path
+
+
+def plot_parameters(nsub,labels,fig=None): 
+    '''
+    standard plot of fit parameters vs B,T (or X to be implemente)
+    input
+       nsub<6 is the number of subplots
+       labels is a dict of labels, e.g. {title:self.title, xlabel:'T [K]', ylabels: ['asym',r'$\lambda$',r'$\sigma$,...]}
+       fig is the standard fig e.g self.fig_pars
+    output the ax array on which to plot 
+       one dimensional, from top to bottom 
+                        and again for two columns
+    e.g. two asymmetry parameters are both plotfal=1 and are plotted in ax[0]
+         a longitudinal lambda is plotflag=2 and is plotted in ax[1]
+         ...
+         a transverse sigma is plotflag=n and is plotted in ax[n-1]
+    '''
+    import matplotlib.pyplot as P
+    nsubplots = nsub if nsub!=5 else 6 # nsub = 5 is plotted as 2x3 
+    # select layout, 1 , 2 (1,2) , 3 (1,3) , 4 (2,2) or 6 (3,2)
+    nrc = {
+            '1':(1,[]),
+            '2':(2,1),
+            '3':(3,1),
+            '4':(2,2),
+            '5':(3,2),
+            '6':(3,2)
+            }
+    figsize = {
+                '1':(5,4),
+                '2':(5,6),
+                '3':(5,8),
+                '4':(8,6),
+                '5':(8,8),
+                '6':(8,8)
+                } 
+    spaces = {
+                '1':[],
+                '2':{'hspace':0.05,'top':0.90,'bottom':0.09,'left':0.13,'right':0.97,'wspace':0.03},
+                '3':{'hspace':0.05,'top':0.90,'bottom':0.09,'left':0.08,'right':0.97,'wspace':0.03},
+                '4':{'hspace':0.,'top':0.90,'bottom':0.09,'left':0.08,'right':0.89,'wspace':0.02},
+                '5':{'hspace':0.,'top':0.90,'bottom':0.09,'left':0.08,'right':0.89,'wspace':0.02},
+                '6':{'hspace':0.,'top':0.90,'bottom':0.09,'left':0.08,'right':0.89,'wspace':0.02}
+                }
+    if fig: # has been set to a handle once
+       fig.clf()
+       if nrc[str(nsub)][1]: # not a single subplot
+           fig,ax = P.subplots(nrc[str(nsub)][0],nrc[str(nsub)][1],
+                               figsize=figsize[str(nsub)],sharex = 'col', 
+                               num=fig.number) # existed, keep the same number
+           fig.subplots_adjust(**spaces[str(nsub)]) # fine tune in dictionaries
+       else: # single subplot
+           fig,ax = P.subplots(nrc[str(nsub)][0],
+                                figsize=figsize['1'],
+                                num=fig.number) # existed, keep the same number
+    else: # handle does not exist, make one
+       if nrc[str(nsub)][1]: # not a single subplot
+           fig,ax = P.subplots(nrc[str(nsub)][0],nrc[str(nsub)][1],
+                               figsize=figsize[str(nsub)],sharex = 'col') # first creation
+           fig.subplots_adjust(**spaces[str(nsub)]) # fine tune in dictionaries
+       else: # single subplot
+           fig,ax = P.subplots(nrc[str(nsub)][0],
+                                figsize=figsize['1']) # first creation
+
+    fig.canvas.set_window_title('Fit parameters') # the title on the window bar
+    fig.suptitle(labels['title']) # the sample title
+    axout=[]
+    axright = []
+    if nsubplots>3: # two columns (nsubplots=6 for nsub=5)
+        ax[-1,0].set_xlabel(labels['xlabel']) # set right xlabel
+        ax[-1,1].set_xlabel(labels['xlabel']) # set left xlabel
+        nrows = int(nsubplots/2) # (nsubplots=6 for nsub=5), 1, 2, 3
+#        for k in range(0,nrows-1): 
+#            ax[k,0].set_xticklabels([]) # no labels on all left xaxes but the last
+#            ax[k,1].set_xticklabels([]) # no labels on all right xaxes but the last
+        for k in range(nrows):
+            axright.append(ax[k,1].twinx()) # creates replica with labels on right
+            axright[k].set_ylabel(labels['ylabels'][nrows+k]) # right ylabels
+            ax[k,0].set_ylabel(labels['ylabels'][k]) # left ylabels
+            axright[k].tick_params(left=True,direction='in') # ticks in for right subplots
+            ax[k,0].tick_params(top=True,right=True,direction='in') # ticks in for x axis, right subplots
+            ax[k,1].tick_params(top=True,left=False,right=False,direction='in') # ticks in for x axis, right subplots
+            ax[k,1].set_yticklabels([])
+            axout.append(ax[k,0])    # first column
+        for k in range(nrows):
+            axout.append(axright[k])    # second column axout is a one dimensional list of axis   
+    else: # one column
+        ax[-1].set_xlabel(labels['xlabel']) # set xlabel
+        for k in range(nsub-12): 
+            ax[k].set_xticklabels([]) # no labels on all xaxes but the last
+        for k in range(nsub):
+            ylab = labels['ylabels'][k]
+            if isinstance(ylab,str): # ylab = 1 for empty subplots
+                ax[k].set_ylabel(ylab) # ylabels
+                ax[k].tick_params(top=True,right=True,direction='in') # ticks in for right subplots
+        axout = ax    # just one column
+    return fig, axout
 
 def plotile(x,xdim=0,offset=0):
     '''
@@ -622,6 +788,7 @@ def translate(nint,lmin,function):
 
     e.g. if parameter 6 is shared with parameter 4 and parameter 2 is fixed, the minuit parameter indices
     will be 3 instead of 4 (skipping internal index 2) and 5 instead of 7 (skipping both 2 and 6)
+    Returns executable formula
     '''
     string = function[nint].value
     # search for integers between '[' and ']'
@@ -636,19 +803,48 @@ def translate(nint,lmin,function):
         string = string.replace(lstr,str(m))
     return string
 
+def translate_nint(nint,lmin,function):
+    '''
+    Used in int2_int and min2int to parse parameters contained in function[nint].value e.g.
+    ::
+ 
+       p[4]*2+p[7]
+
+    and translate the internal parameter indices 4 and 7 (written according to the gui parameter list order)
+    into the corresponding minuit parameter list indices, that skips shared and fixed parameters.
+
+    e.g. if parameter 6 is shared with parameter 4 and parameter 2 is fixed, the minuit parameter indices
+    will be 3 instead of 4 (skipping internal index 2) and 5 instead of 7 (skipping both 2 and 6)
+    Returns lmin[nint]
+    '''
+    string = function[nint].value
+    # search for integers between '[' and ']'
+    start = [i+1 for i in  findall('[',string)]  
+    # finds index of number after all occurencies of '['
+    stop = [i for i in  findall(']',string)]
+    # same for ']'
+    nints = [string[i:j] for (i,j) in zip(start,stop)] 
+    # this is a list of strings with the numbers
+    nmins = [lmin[int(string[i:j])] for (i,j) in zip(start,stop)]
+    return nmins
+
 def value_error(value,error):
     '''
     value_error(v,e)
     returns a string of the format v(e) 
     '''
-    from numpy import floor, log10
-    exponent = int(floor(log10(error)))  
-    most_significant = int(round(error/10**exponent))
-    if most_significant>9:
-        exponent += 1
-        most_significant=1
-    exponent = -exponent if exponent<0 else 0
-    form = '"{:.'
-    form += '{}'.format(exponent)
-    form += 'f}({})".format(value,most_significant)'
+    from numpy import floor, log10, seterr
+    eps = 1e-10 # minimum error
+    if error>eps: # normal error
+        exponent = int(floor(log10(error)))  
+        most_significant = int(round(error/10**exponent))
+        if most_significant>9:
+            exponent += 1
+            most_significant=1
+        exponent = -exponent if exponent<0 else 0
+        form = '"{:.'
+        form += '{}'.format(exponent)
+        form += 'f}({})".format(value,most_significant)'
+    else: # too small error
+        form = 'print("{} +- {:.1e}".format(value,error))'
     return eval(form)

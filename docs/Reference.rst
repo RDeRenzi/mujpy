@@ -4,18 +4,36 @@
 Reference
 +++++++++
 
-This is the mujpy Reference Manual
+This is the mujpy Reference Manual v. 1.00 (in its transition to v. 1.05)
 
 ------
 Header
 ------
 The top part of the mujpy gui contains a logo together with the information on the loaded run (in `single run mode`_) or the master loaded run (in the `suite mode`_). The information contains the run number, the run title, the total conuts, the total counts over the selected `grouping`_ of detectors.
+The 1.05 version contains the loaders: load button for GUI file selection, next, previous, add buttons and the speedload text bar: legal syntax in the folloring examples
+* *Run[run suite]* is a Text area where single run numbers can be written. The data file is loaded upon hitting return
+* more complex syntax allows storing *suites* of runs, with combination of *,:+* (only one : allowed)
+
+ * ``432,433`` loads the *suite* of runs 432, 433
+ * ``432:434`` loads the *suite* of runs 432, 433, 434
+ * ``432,433, 435:437`` loads the *suite* of runs 432, 433, 435, 436, 437
+ * ``432+433`` loads the sum of these two runs as a single run, etc.
+ 
+If a *single* run is loaded 
+
+* *Next run* displays the next run number, if the file exists
+* *Load nxt* loads it
+* *Load prv* loads the previous, if it exists
+* *Add nxt* adds next run
+* *Add prv* adds the previous, if it exists
+
+If a suite is loaded the buttons refer to the first run in the suite
 
 ----
 Tabs
 ----
-The lower part of the gui is divided in tabs: `setup`_, `suite`_, `fit`_, `output`_, `fft`_, `plots`_, `about`_.
-Click on the tab to see its content and methods, activated by widget controls (buttons, checkboxes, input text field, etc.)
+The lower part of the gui is divided in tabs:  `fit`_,  `fft`_, `setup`_, `plots`_, `about`_.
+Click on the tab to see its content and methods, activated by widget controls (buttons, checkboxes, input text field, etc.) [`output`_ tab is added as a fallback for the terminal output
 
 -----
 setup
@@ -24,26 +42,27 @@ The setup tab contains preliminary information and fields in three boxes.
 
 .. image:: setup.png
 
-The first box contains paths on the right: 
+The first row contains paths  
 
 * the data path (the folder where the data files are stored), 
-* the temperature log path (optional), 
-* the log path (the folder where log files will be saved). 
+* the temperature log, tlog, path (optional), 
+* the analysis path (the folder where log files will be saved). 
 
-On the left the two strings that compose the data file name, e.g. for stardard filename ``deltat_tdc_gps_0432.bin``
+in the center the two strings that compose the data file name, e.g. for stardard filename ``deltat_tdc_gps_0432.bin``
 
 * *fileprefix* is ``deltat_tdc_gps_``
 * *extension* is `bin`
-* the run number is ``433``
 
 The working directory (wd), i.e. the path from which the jupyter notebook is lauched is saved automatically. 
 
-The second box is related to the :math:`t_0=0` bin iminuit fit, minimizing the :math:`\chi^2` of the initial data slice and the best fit function  `muprompt`_.
+The second row is related to the :math:`t_0=0` bin iminuit fit, minimizing the :math:`\chi^2` of the initial data slice and the best fit function  `muprompt`_.
 
 * *prepeak*  and *postpeak* are the peak interval span (the number of bins) respectively before and after the maximum;
-* the *prompt plot* checkbox to produce a plot; 
 * the *prompt fit* button launches iminuit
+* the *prompt plot* checkbox to produce a plot; 
 * the *save setup* and *load setup* buttons save and load a setup file that stores the setup information in/from the  ``mujpy_setup.pkl`` file
+* the *Data log* button produces a text file listing of all data files in the data directory  
+ run # T1(eT1) T2(eT2) Mev Start datetime title
 * click on the *t0 bins and remainders* and *Total counnte* accordions to show individual counter values
 
 muprompt
@@ -54,29 +73,6 @@ muprompt
      \frac {A_1} {\sqrt{2\pi\sigma}}  \exp\left[-\frac 1 2 \left(\frac{t-t_0} \sigma\right)^2\right] + A_0 +\frac {A_2} 2 \left[1+\mathrm{erf} \left(\frac{t-t_0} {\sqrt 2 \sigma}\right)\right]
 
 
------
-suite
------
-The suite tab is the data load interface.
-
-.. image:: suite_single.png
-
-* *Run[run suite]* is a Text area where single run numbers can be written. The data file is loaded upon hitting return
-* more complex syntax allows storing suites of runs, with any combination of *,:+*
-
- * ``432,433`` loads the suite of runs 432, 433
- * ``432:434`` loads the suite of runs 432, 433, 434
- * ``432,433, 435:437`` loads the suite of runs 432, 433, 435, 436, 437
- * ``432+433`` loads the sum of these two runs as a single run, etc.
- 
-If a single run is loaded 
-
-* *Next run* displays the next run number, if the file exists
-* *Load nxt* loads it
-* *Load prv* loads the previous, if it exists
-* *Add nxt* adds next run
-* *Add prv* adds the previous, if it exists
-
 
 single run mode
 ---------------
@@ -86,19 +82,18 @@ suite mode
 ----------
 Individual data set are fitted to the model (defined in `fit`_) in sequence, according to the loaded run suite.
 
-Run-specific guess values can be selected with the following syntax (see first the `fit`_ description):
-
-* if the parameter symbol is ``l`` and the function Text area contains ``0.2*3, 2.0*2, 20.0`` for the first three runs in the suite this parameter will receive guess value 0.2, for the next two guess value 2.0, and for any remaining run guess value 20.0
-
-
 ---
 fit
 ---
-The fit tab selects the fit model and its parameters.
+The fit tab selects the 
+
+fit model 
+---------
+and its parameters. Any model is made of predefined additive components, named by two letter codes (see ``Component list`_) and the model naming scheme is based on this feature. A model made of, say, 3 components, *ab*, *ab*and *de* will be called *ababde* (or any other permutation of the three components) 
 
 .. image:: daml.png
 
-The top box selects the model and conditions, such as
+The top frame selects the model and conditions, namely
 
 .. _grouping:
 
@@ -108,38 +103,36 @@ the set of conters that form the Forward and Backward detectors, and
 
 alpha
 -----
-the ratio of count rates between Backward and Forward grouping.
+the ratio of count rates :math:`N_f/N_b` between initial (unpolarized) count rates for Backward and Forward grouping. Other functionalities of the top box are
 
-* The *Load* button opens a file selection widget for the ``pkl`` files containing fit results. Loading one such file  reproduces the input for obtaining again the same fit.
-* *Guess* checkbox, for ploting initial conditions instead of fit results.
-* *alpha* Float Text input, see above
-* *version* Integer, distinguishes fits of the same model, to allow for different parameter relations (fixed/variable/global/functions).
-* *Plot* button, produces a plot with either best fit or guess values.
+* *Fit* button launches iminuit migrad minimization of the model.
+* *Load fit* button opens a GUI file selection of available (past) ``pkl`` fit files containing fit results. Loading one such file  reproduces the input for obtaining again the same fit.
+* *Update* button, to transfer best fit values to parameter guess values.
+* *version* Text, distinguishes fits of the same model, to allow for different parameter relations (fixed/variable/global/functions).
+* *model* Text area, to define new model: e.g. ```mgmgbl`` is a three component model,  ``mg``, ``mg``, ``bl``.
 * *forward*, *backward* text area define the grouping, defining groups of counters according to the following syntax
 
- * ``2,3`` or ``2:3`` menas that counters 2,3 are grouped together
+ * ``2,3`` or ``2:3`` means that counters 2,3 are grouped together
  * ``1:5, 10, 15:19`` means that counters 1,2,3,4,5,10,15,16,17,18,19 are grouped together
+* *alpha* Float Text input, see above
+* *offset* is the first good bin, counting from the center prompt peak  (*start* = k means that the fit starts from  bin *offset* + k.
 
-* *plot range* 
+* *fit range* has a *start, stop* and a *start,stop,pack* options, to define the interval and packing for the fdata minimization. 
+* *plot range* with more options
 
  * *start, stop* to plot data between *start* and *stop* bin, with no rebinning
  * *start,stop,pack* to plot data between *start* and *stop* bin, rebinned by factor *pack*
  * *start,stop,late,pack* to plot ata in two successive ranges, between *start* and *stop* bin, with no rebinning, between *stop* and *last*  bin, rebinned by factor *pack*
  * *start,stop,packe,late,packl* to plot data in two successive ranges, between *start* and *stop*,  rebinned by factor *packe*, between *stop* and *last* rebinned by factor *packl*
  * see also `graphic zoom`_
+* *Guess* checkbox, for ploting initial conditions instead of fit results.
 
+* *Plot* button, produces a plot with either best fit or guess values.
 
-
-* *fit range* has only the *start, stop* and  *start,stop,pack* options, to define the interval and packing for the fdata minimization. 
-
-* *Update* button, to transfer best fit values to parameter guess values
-* *loadmodel* Text area, to define new model: e.g. ```blmgmg`` is a three component model, ``bl``, ``mg``, ``mg``
-* *offset* is the first good bin, counting from the center prompt peak  (*start* = k means that the fit starts from  bin *offest* + k.
-* *Fit* button launches iminuit migrad minimization of the model.
 * *Animate* checkbutton, if selected the suite of runs is plotted as frames of an animation, if unselected they are tiled with an offset in a single multirun plot.
 * *Delay* between frames [ms].   
  
-The lower frame contains the fit components selected either by the *loadmodel* syntax or by loding a saved fit. The frame is divided in components boxes, whose first line is the component label and the :ref:`FFT-checKbox`. The other lines list their parameters, each indentified by an index, a unique name, a Text area for the starting guess value, a symbol:
+The lower frame contains the fit components selected either by the *model* syntax or by loding a saved fit. The frame is divided in components boxes, whose first line is the component label and the :ref:`FFT-checKbox`. The other lines list their parameters, each indentified by an index, a unique name, a Text area for the starting guess value, a symbol:
 
  - *~*    free minuit parameter, 
  - *!*    fixed parameter 
@@ -151,7 +144,7 @@ The lower frame contains the fit components selected either by the *loadmodel* s
 
 .. _static:
 
-Static component list
+Component list
 ---------------------
 
 A few constants are defined: :math:`\pi`, the muon gyromagnetic ratio, :math:`\gamma_\mu`, the electron gyromagnetic ratio, :math:`\gamma_e`
@@ -242,12 +235,6 @@ A few constants are defined: :math:`\pi`, the muon gyromagnetic ratio, :math:`\g
 
 * **kg**, Gauss Kubo-Toyabe: static and dynamic, in zero or longitudinal field by `G. Allodi Phys Scr 89, 115201 <https://arxiv.org/abs/1404.1216>`_
 
-
-------
-output
-------
-This tab displays iminuit output, warnings, error messages, command execution completions.
-
 ---
 fft
 ---
@@ -316,6 +303,17 @@ All graphic windows display seven icons on the bottom bar
 * The |center| icon, next one to the left, corrects the axes position
 * the |zoom| icon, allows zooming in.
 * The first icon on the left, |home|, resets the zoom to the orginal ranges
+
+------
+output
+------
+This tab appears only if the code cannot open a terminal window to redirect the output to. If you get a terminal *do not close it* (it cannot be reopened yet). OEither the terminal or the tab display fit results, warnings, error messages, command execution completions. Code errors in jupyter lab are redirected to a log console (see second tab on the bottom bar, a square with two columsn of lines)
+
+.. image:: JupyterLabBottomBar.png
+
+If you click on it a bottom tab opens
+
+.. image:: LogConsole.png
 
 -----
 about

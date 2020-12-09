@@ -16,6 +16,7 @@ Welcome to mujpy's documentation!
    Reference
    Examples
    FAQ
+   Developer
    Source
 
 

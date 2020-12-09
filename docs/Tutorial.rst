@@ -6,13 +6,13 @@ Tutorial
 We will walk through a few basic steps, assuming you have installed the following bits (see :ref:`installation`)
 
 - python
-- jupyter
+- jupyter-lab
 - mujpy and its dependencies
 
 Starting from scratch
 ---------------------
 Navigate to the working directory of your choice
-copy or link there the mugpy notebook mujpy.ipnb file
+copy or link there the mugpy notebook mujpy_test_damg_lab.ipynb file
 
 Make a data dir, a tlog dir and a log dir.
 Copy or link your data files, e.g. ``deltat_tdc_gps_0432.bin``
@@ -23,19 +23,37 @@ Now you can launch
 
 ::
 
-    jupiter notebook
+    jupiter-lab
 
-The location from which you launch jupyter is your 
+    The location from which you launch jupyter-lab is your 
 working directory (wd) and it opens in a tab of your browser.
-Click on the mujpy notebook. 
-The mujpy Graphical User Interface (MGI) will open in another browser tab
+The page has a vertical tab list on the left. Click on the first (folder) icon, a file browser column opens. Click on the mu_test_damg_lab.ipynb notebook. 
+    The mujpy Graphical User Interface (MGI) notebook will open in another browser tab. You can now minimize the file browser clicking again on the folder icon.  Now a stand alone Ternimal should appear, move it at your convenience but *do not kill it*. In case, restart by hitting the play icon on the header bar of the tab. And the MGI should reappear in the tab. 
 
 .. note::
 
-    Jupyter itself has many important features, some obvious, some less so. Practice with its toolbars, that however compete for screen space with the MGI. Choose the best layout with view.
+    Jupyter-lab itself has many important features, some obvious, some less so. Practice with its toolbars, that however compete for screen space with the MGI. Choose the best layout with view. If you have 1920x1080 display you can reduce the browser to half screen, horizontally, and keep termial + graphisc in the other half
+
 
 .. warning::
-    Sometimes a message appears in place of the MGI: *ipywidget not found* or the like. Then click on the jupyter toolbar **Kernel** dropdown and select *Restart & Run All*; the MGI should now appear
+    Sometimes the MGI might be missing. Click on Kernel, among the top tabs, and select Restart Kernel and Run All Cells.
+    If you manage to overwrite the template notebook (it happens, with the many handy buttons of Jupyter-lab: beware the scissors!!) with an empy cell. do not worry. The text of the hidden first cell is the following:
+    
+:jupyter notebook first cell:
+   ## Mujpy tester, for inline graphics specify: %matplotlib notebook, for interactive %matplotlib tk (or just    %matplotlib)
+   
+   # %matplotlib -l  lists all the possible options
+   
+   %matplotlib tk
+   
+   # loads the distribution when a distribution is already installed 
+   
+   from mujpy.mugui import mugui
+   
+   MuJPy = mugui()
+    
+
+Cut and paste it into an empty notebook cell. Click on the left blue vertical line to hide the first cell. Run it as usual 
 
 .. hlist::
     * hovering over widgets provides *baloon* tips (true also for some widgets in mujpy);
@@ -52,9 +70,9 @@ When you have correctly set these fields you may temporarily *save setup*.
 When restarting mujpy next time these fields will be 
 automatically loaded from the default startup file `mujpy_setup.pkl`. 
 
-Suite tab
----------
-Load a single run data set. Write a run number, without leading zeros, e.g. `432`. in the Text widget space labelled *Run [run suite]*. Hovering over the label provides a tip for the syntax (see Reference). For now just load a single file. In this first example we shall produce its best fit. The file is loaded when hitting return. You may tell because the title, comments and other info appear in the header on the right of the mujpy logo.
+Top header
+----------
+Load a single run data set. Press Load and use the file selection GUI. Or write a run number, without leading zeros, e.g. `432`, in the Text widget space labelled *Run [run suite]*. Hovering over the label provides a tip for the syntax (see **Reference**). For now just load a single file. In this first example we shall produce its best fit. The file is loaded when hitting return. You may tell because the title, comments and other info appear in the header on the right of the mujpy logo.
 
 If a *next run* number appears in the label space below the -*run [run suite]* text, it means that the corresponding file is in the data directory and you can load it by pressing *Load nxt*.
 
