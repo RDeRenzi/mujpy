@@ -1,38 +1,31 @@
-# coding=utf-8
-# the above line is for python 2 compatibility
-# write suite suite [1.0] in progress: inserted suite load, asym as a matrix, fft on matrix CHECK!!!
-#
-# starts from init, the rest is operated by gui ipywidgets
-#
-# output for linux; Popen _xterm_ and tail -f /tmp/mujpy_pipe
-# then self.console(string) takes care of writing strings to pipe
-# Jupyterlab provides a way of writing stderr to console
-# description_tooltip in ipywidgets >7.3 should for all items with description
-# as of 7.5 buttons still require "tooltip" instead of "description_tooltip"
-######################################################
-# Gui tabs correspond to distinct gui methods with independes scopes and additional local methods
-# gui attributes: 
-#     entities that must be shared between tabs 
-#     including variables passed to functions  outside mugui
-###############################################################
-#             Implementation of multi fit
-#                 logical         logical        list of lists of musr2py instances
-# type of fit   | self._global_ |self._single_ | len(self._the_runs_)
-#-------------------------------------------------------
-# single        | False         | True          | 1 (e.g. [[run234]] or [[run234,run235]] (the latter adds data of two runs)
-# non global    | False         | False         | >1
-# global (TODO) | True          | False         | >1
-#-------------------------------------------------------
-# asymmetry loads 
-# single runs, both for single and for non global fit
-# run suites, both for global fit and for multiplot
-###############################################################
-            # another dialog to explore
-            #import tkinter
-            #from tkinter import simpledialog
-            #move = simpledialog.askstring("Pause","hit return when ready")
-            #simpledialog.mainloop(0)
+'''A musr analysis class
+Notes
 
+    starts from init, the rest is operated by gui ipywidgets
+    output for linux; Popen _xterm_ and tail -f /tmp/mujpy_pipe
+    then self.console(string) takes care of writing strings to pipe
+    Jupyterlab provides a way of writing stderr to console
+    description_tooltip in ipywidgets >7.3 should for all items with description
+    as of 7.5 buttons still require "tooltip" instead of "description_tooltip"
+    
+    Gui tabs correspond to distinct gui methods with independes scopes and additional local methods
+    gui attributes: 
+         entities that must be shared between tabs 
+         including variables passed to functions  outside mugui
+    
+Implementation of multi fit::
+    
+    #                 logical         logical        list of lists of musr2py instances
+    # type of fit   | self._global_ |self._single_ | len(self._the_runs_)
+    #-------------------------------------------------------
+    # single        | False         | True          | 1 (e.g. [[run234]] or [[run234,run235]] (adds data of two runs)
+    # suite         | False         | False         | >1
+    #-------------------------------------------------------
+
+asymmetry loads single runs, both for single and for suite fit
+
+        #   python2 would require # utf-8
+'''
 
 class mugui(object):
     '''

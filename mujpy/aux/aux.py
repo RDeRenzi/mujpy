@@ -187,9 +187,10 @@ def chi2std(nu):
 def component(model,kin):
     '''
     returns the index of the component to which parameter k belongs in
-    model = self.model_components, in mugui, a list of complex dictionaries
-        [{'name':'da', 'pars':{'name':'lpha',...},
-         {'name':'mg', 'pars':{       ...       }]
+    model = self.model_components, in mugui, a list of complex dictionaries::
+            [{'name':'da', 'pars':{'name':'lpha',...},
+            {'name':'mg', 'pars':{       ...       }]
+            
     kin is the index of a dashboard parameter (kint)
     '''
     from numpy import array, cumsum, argmax
@@ -478,7 +479,7 @@ def muzeropad(runs):
     runs is a string containing the run number
     Utility of the suite tab, not a method.
 
-    Future::
+    Future
 
     1) determine how many leading zeros for padding
        read a file from data dir
@@ -486,7 +487,7 @@ def muzeropad(runs):
        count number of digits in run
        zero pad
 
-    now::
+    now
 
     0) assumes no more than 4 digits 
        left pads zeros to 4 digits
@@ -517,15 +518,19 @@ def plot_parameters(nsub,labels,fig=None):
     standard plot of fit parameters vs B,T (or X to be implemente)
     input
        nsub<6 is the number of subplots
-       labels is a dict of labels, e.g. {title:self.title, xlabel:'T [K]', ylabels: ['asym',r'$\lambda$',r'$\sigma$,...]}
+       labels is a dict of labels, 
+       e.g. {title:self.title, xlabel:'T [K]', ylabels: ['asym',r'$\lambda$',r'$\sigma$,...]}
        fig is the standard fig e.g self.fig_pars
-    output the ax array on which to plot 
-       one dimensional, from top to bottom 
-                        and again for two columns
-    e.g. two asymmetry parameters are both plotfal=1 and are plotted in ax[0]
+       
+    output 
+       the ax array on which to plot 
+       one dimensional (from top to bottom and again, for two columns)
+       example 
+         two asymmetry parameters are both plotfal=1 and are plotted in ax[0]
          a longitudinal lambda is plotflag=2 and is plotted in ax[1]
          ...
          a transverse sigma is plotflag=n and is plotted in ax[n-1]
+         
     '''
     import matplotlib.pyplot as P
     nsubplots = nsub if nsub!=5 else 6 # nsub = 5 is plotted as 2x3 
