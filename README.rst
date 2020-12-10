@@ -9,7 +9,7 @@ Released under the MIT licence.
 Linux instructions, for the time being. 
 Valid on WIN10 that has a linux shell.
 
-* Make sure you have python, standard on linux, and jupyter. Otherwise install them (see https://docs.python.org/3/using/windows.html, https://docs.python.org/3/using/mac.html, jupyter.readthedoc.io).
+* Make sure you have python, standard on linux, and jupyter lab. Otherwise install them (see https://docs.python.org/3/using/windows.html, https://docs.python.org/3/using/mac.html, jupyter.readthedoc.io).
 * Install mujpy. Download from https://github.com/RDeRenzi/mujpy, unzip into the directory of your choice::
 
    cd mujpy/mujpy/musr2py
@@ -21,11 +21,11 @@ Valid on WIN10 that has a linux shell.
 
 * Check dependencies, see requirements.txt. When the first mujpy release is on Pipy, pip will sort this out.
 
-* Start jupyter::
+* Start jupyter lab::
 
-   jupyter notebook
+   jupyter-lab
 
-* Use mu_test_damg.ipnb. Alternatively the first cell type::
+* Use mu_test_damg_lab.ipnb. Alternatively the first cell type::
 
   >>>%matplotlib # "%matplotlib tk"  avoids a line of output if you are using the tk backend
 
