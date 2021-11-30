@@ -1,7 +1,7 @@
 from munxs.tree import NeXusTree
 
 class muisis2py(NeXusTree):                        # defines the python class
-    
+
   def get_numberHisto_int(self):
     """
     usage::
@@ -117,7 +117,7 @@ class muisis2py(NeXusTree):                        # defines the python class
 
     """
     self.opengrouppath(b'/run/sample')
-    return str(self.readpath(b'magnetic_field'))
+    return str(self.readpath(b'magnetic_field'))+'G '
 
   def get_orient(self):
     """
@@ -143,7 +143,7 @@ class muisis2py(NeXusTree):                        # defines the python class
 
     """
     self.opengrouppath(b'/run/sample')
-    return str(self.readpath(b'temperature'))
+    return str(self.readpath(b'temperature'))+'K '
 
   def get_comment(self):
     """
@@ -188,6 +188,23 @@ class muisis2py(NeXusTree):                        # defines the python class
     """
     self.opengrouppath(b'/run')
     return self.readpath(b'number')
+
+  def get_timeTemperature_vector(self):
+    """
+    usage::
+      from muisis2py import muisis2py as muld
+      path2file = 'path and filename'
+      run = muld(path2file,'r')  # this is the run data nexus file
+      t = run.get_timeTemperature_vector()
+      # timeStart is the start run yyyy-mm-ddThh:mm:ss string 
+      
+    """
+    from datetime import datetime as DT
+    from numpy import linspace
+    t_format = "%Y-%m-%dT%H:%M:%S"
+    delta = DT.strptime(self.get_timeStop_vector(),t_format) - DT.strptime(self.get_timeStart_vector(),t_format)
+    nlogs = self.get_numberTemperature_int()
+    return linspace(0,delta.total_seconds(),nlogs)
 
   def get_timeStart_vector(self):
     """
@@ -234,8 +251,8 @@ if __name__ == '__main__':
     print(str(m2p.get_binWidth_ns())+' ns/bin')
     print(str(m2p.get_numberTemperature_int())+' recorded temperature logs')
     np.set_printoptions(precision=3)
-    print(str(m2p.get_temperatures_vector())+' K') 
-    print(m2p.get_sample()+' '+m2p.get_temp()+' '+m2p.get_field()+' G  ')
+    print(m2p.get_temperatures_vector()) 
+    print(m2p.get_sample()+' '+m2p.get_temp()+' K'+m2p.get_field()+' G  ')
     print('Comment: '+m2p.get_comment())
     print('Start run '+m2p.get_timeStart_vector())
     print('Stop run '+m2p.get_timeStop_vector())
