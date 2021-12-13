@@ -137,7 +137,7 @@ class suite(object):
         from mujpy.musr2py.musr2py import musr2py as psiload
         from mujpy.muisis2py.muisis2py import muisis2py as isisload
         # muisis2py has the same methods as musr2py
-        from mujpy.aux.aux import get_datafilename
+        from mujpy.aux.aux import get_datafilename, get_title
  
         read_ok = True
         runadd = []
@@ -157,6 +157,7 @@ class suite(object):
             if read_ok==True:
                 self._the_runs_.append(runadd) # 
                	self.console('Run {} loaded'.format(path_and_filename))
+               	self.console(' {}'.format(get_title(self._the_runs_[-1][0])))
                 if k>0:
                     ok = [self._the_runs_[k][0].get_numberHisto_int() == 
                           self._the_runs_[0][0].get_numberHisto_int(),

@@ -141,6 +141,159 @@ The file is a binary pickle of the dill variety. To read it in python
 
 and you will find all fit parameters in dictionary fitarg. 
 
+.. _Dashboard
+Dashboard.
+----------
+Basic command line mujpy is based on three main libraries, corresponding to as many classes: musuite.py, mufit.py, mufitplot.py. Additional input libraries (classes) musr2py/musr2py.py and muisis2py/muisis2py.py provide acces respectively to the PSI bin, mdu data formats and to the ISIS nsx data format. Auxiliary libraries aus/aus.py and plot.py contain general methods.
+
+Let's analyse the simplest notebook, a single run, single group fit with predetermined :math:`\alpha`.
+All the v.2.0 notebooks start with the import cell 1::
+
+  %matplotlib tk
+  from mujpy.musuite import suite
+  import json
+  from mujpy.mufit import mufit
+  from mujpy.mufitplot import mufitplot
+
+The next cell 2 imports the data sets, performs the :math:`t = 0` bin determination, and defines the asymmetry methods. We write two json files, input.suite and 23-14.calib. They contain a dict structure and a list of dict structures, respectively. The first describes the input files and quotes the second, which contains group definition and alpha. Being a list, it could contain more groups. We write them directly from the code:: 
+
+  input_suite = {'console':'print',
+                  'datafile':'/afs/psi.ch/project/bulkmusr/data/gps/d2021/tdc/deltat_tdc_gps_0822.bin',
+                  'logpath':'log/',
+                  'runlist':'822',
+                  'groups calibration':'23-14.calib',
+                  'offset':20
+                 }  # 'console':logging, for output in Log Console, 'console':print, for output in notebook
+  with open('log/input.suite',"w") as f:
+      json.dump(input_suite,f)
+
+  grp_calib = [{'forward':'2,3', 'backward':'1,4', 'alpha':1.13}]
+  with open('log/23-14.calib',"w") as f:
+      json.dump(grp_calib,f)
+    
+  the_suite = suite('log/input.suite',mplot=False) # the_suite implements the class suite according to input.suite
+
+Notice that the suite instance needs the input.suite json file and is assigned to a variable, so that the asymmetry methods of theses data can be accessed. Let's now jump to cell 4, the fit proper::
+
+  the_fit = mufit(the_suite,'log/mgml.822.2_3-1_4.1.json')
+  
+The input is often called dashboard, a complex dict structure, and it must be pre-dumped into a json file, mgml.822.2_3-1_4.1.json here. We list it alt the bottom. The next cell 5 is the plot command::
+
+  fit_plot= mufitplot('0,20000,40',the_suite,'/home/roberto.derenzi/mujpy/log/mgml.822.2_3-1_4.1_fit.json')
+
+it requires a bin range, 0,20000, with packing, 40 and the output dashboard of the fit, that collects its results in an additional "model_result" item (the file name has been complemented with _fit just before the file specification.
+
+Open a dashboard file in a text editor to see what it contains. We list below a mgml fit with two precessing components, one with Gaussian and one with Lorentzial decays. The dict contains general information and a "model_guess" key whose value is a list of components ('mg' and 'ml' here). Each component has a name, a label and a list pardicts. Each item of this list is a parameter dictionary, with "name", "value", "flag", "error" (or initial step), "limits" and possibly other keys::
+
+    {
+      "version": "1",
+      "fit_range": "0,24000,5",
+      "offset": 20,
+      "model_guess": [
+        {
+          "name": "mg",
+          "label": "T_fast",
+          "pardicts": [
+            {
+              "name": "A",
+              "value": 0.09,
+              "flag": "~",
+              "function": "",
+              "error": 0.01,
+              "limits": [
+                null,
+                null
+              ]
+            },
+            {
+              "name": "B",
+              "value": 10.0,
+              "flag": "~",
+              "function": "",
+              "error": 0.1,
+              "limits": [
+                null,
+                null
+              ]
+            },
+            {
+              "name": "φ",
+              "value": 0.0,
+              "flag": "~",
+              "function": "",
+              "error": 1.0,
+              "limits": [
+                null,
+                null
+              ]
+            },
+            {
+              "name": "σ",
+              "value": 1.0,
+              "flag": "~",
+              "function": "",
+              "error": 0.01,
+              "limits": [
+                null,
+                null
+              ]
+            }
+          ]
+        },
+        {
+          "name": "ml",
+          "label": "T_slow",
+          "pardicts": [
+            {
+              "name": "A",
+              "value": 0.09,
+              "flag": "~",
+              "function": "",
+              "error": 0.01,
+              "limits": [
+                null,
+                null
+              ]
+            },
+            {
+              "name": "B",
+              "value": 10.0,
+              "flag": "~",
+              "function": "",
+              "error": 0.1,
+              "limits": [
+                null,
+                null
+              ]
+            },
+            {
+              "name": "φ",
+              "value": 0.0,
+              "flag": "=",
+              "function": "p[2]",
+              "error": 1.0,
+              "limits": [
+                null,
+                null
+              ]
+            },
+            {
+              "name": "λ",
+              "value": 0.1,
+              "flag": "~",
+              "function": "",
+              "error": 0.01,
+              "limits": [
+                null,
+                null
+              ]
+            }
+          ]
+        }
+      ]
+    }
+
+  
 
 
  

@@ -64,8 +64,8 @@ class mufit(object):
             C global (single cost function)   
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import add_step_limits_to_model, checkvalidmodel
-        from mujpy.aux.aux import model_name, userpars, tilde_in_components
+        from mujpy.aux.aux import derange, add_step_limits_to_model, checkvalidmodel
+        from mujpy.aux.aux import model_name, userpars, tilde_in_components, multigroup_in_components
         
         if self.nodata or self.nodash:
             return True        
@@ -91,67 +91,85 @@ class mufit(object):
                     version[:3] =''
                 else:
                     break 
-            print('choosefit mufit debug:    self.suite.single() = {}'.format(self.suite.single()))     
+            # print('choosefit mufit debug:    self.suite.single() = {}'.format(self.suite.single()))  
+               
+            returntup = derange(self.dashboard["fit_range"],self.suite.histoLength) 
+                                        # histoLength set after asymmetry_single
+            if returntup[1]>0:
+                start, stop, pack = returntup
+            else:
+                self.suite.console('fit range: {}, histoLength: {}, errmsg {},{}, check syntax!'.format(
+                                  self.dashboard["fit_range"],self.suite.histoLength,returntup[0],returntup[1]))
+                return  True # = stop here|
+                
             if not self.suite.multi_groups(): # A1, B1, C1 single group fits
+            
                 if self.suite.single():       # A1
+                
                     if self.calib():          # A1 calib DONE  (True if the first component is 'al')
-                        self.dofit_calib_singlerun_singlegroup(0)  
+                        self.dofit_calib_singlerun_singlegroup(0,returntup)  
                     else:                     # A1 DONE
-                        self.dofit_singlerun_singlegroup()
+                        self.dofit_singlerun_singlegroup(returntup)
                 else:                         # B1, C1  
                     if userpars(self.dashboard): # C1
                         self.dashboard["version"]=('gr_'+version if 
                                         self.dashboard["version"][0:3]!='gr_' else version)
-                        self.dofit_singlegroup_userpardicts() 
+                        self.dofit_singlegroup_userpardicts(returntup) 
                     else:                     # B1 DONE
-                        self.dofit_singlegroup_sequential(chain)
+                        self.dofit_singlegroup_sequential(returntup,chain)
+
             else:                             # A2, B2, C2 multi groups fits 
                 #  buffer to transfer sequential fits to save_fit_multigroups
                 self.names = []
                 self.values = []
                 self.stds = [] 
                 self.fvals = []
-                if self.suite.single():       # A2 multi group single run 
-                    if self.calib():          # A2-calib DONE multi group single run calib 
-                                                       # True if the first component is 'al'
-                        self.dofit_calib_singlerun_multigroup()           # True, True, True, False,
+                if self.suite.single():       # A2 (single run  multi group)
+                                              # can be calib 
+                                              # can be sequential or global
+                    if self.calib():          # A2-calib, True if the first component is 'al'
+                        if sum(multigroup_in_components(self.dashboard)): # single run calib 
+                                                       
+                            self.dofit_calib_singlerun_multigroup_userpardicts(returntup)  
+                                                                          # multi group global A2_01-calib
+                        else: 
+                            self.dofit_calib_singlerun_multigroup_sequential(returntup)  # DONE (?)
+                                                                          # multi group sequential A2_00-calib 
                     else:                     # A2 DONE multi group single run
                         if sum(multigroup_in_components(self.dashboard)):   # A2_1 DONE 
                                               # A2 multi group single run single chi2 global parameters
                             self.dashboard["version"]=('gg_'+version if 
                                             self.dashboard["version"][0:3]!='gg_' else version)
                             # print('choosefit mufit debug: multigroup user recognized')
-                            self.dofit_singlerun_multigroup_userpardicts() # True, True, False, True
+                            self.dofit_singlerun_multigroup_userpardicts(returntup) # True, True, False, True
                         else:                 # A2_0 DONE multi-group-sequentially single run 
-                            self.dofit_singlerun_multigroup_sequential()   # True, True, False, False, True
+                            self.dofit_singlerun_multigroup_sequential(returntup)   # True, True, False, False, True
                 else:                         # B2, C2 multi group multirun 
                     if tilde_in_components(self.dashboard): # C2 multi group multirun global 
                         # this is a fit with global parameters
                         self.dashboard["version"]=('gg_'+version if 
                                         self.dashboard["version"][0:3]!='gg_' else version)
-                        self.dofit_multirun_multigroup_userpardicts()      # False, True, False, True, False
+                        self.dofit_multirun_multigroup_userpardicts(returntup)      # False, True, False, True, False
                     else:                     # B2 multigroup, sequential multirun (sequential all does not exist)
                         self.dashboard["version"]=('gg_'+version if 
                                         self.dashboard["version"][0:3]!='gg_' else version)
-                        self.dofit_sequentialrun_multigroup_userpardicts() 
+                        self.dofit_sequentialrun_multigroup_userpardicts(returntup) 
                         # pe.g TF sequential of multigroups with shared parameters
-        return False       
+        return False
 
-    def dofit_calib_singlerun_singlegroup(self,kgroup):
+    def dofit_calib_singlerun_singlegroup(self,kgroup,returntup):
         '''
         performs calib fit on single run, single group, tested A1-calib
         input 
             kgroup is group index in suitegrouping
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import int2min, int2_method_key, derange, rebin_decay, write_csv
+        from mujpy.aux.aux import int2min, int2_method_key, rebin_decay, write_csv
         
         self.suite.console('In single calib.')      
 
         yf,yb,bf,bb,yfm,ybm = self.suite.single_for_back_counts(self.suite._the_runs_[0],self.suite.grouping[kgroup]) 
                               # the second dimension is group
-        returntup = derange(self.dashboard["fit_range"],self.suite.histoLength) 
-                                        # histoLength set after asymmetry_single
         start, stop, pack = returntup
         t,yf,yb,bf,bb,yfm,ybm = rebin_decay(self.suite.time,yf,yb,bf,bb,yfm,ybm,[start,stop],pack)
 
@@ -212,18 +230,18 @@ class mufit(object):
         else:
             self.suite.console('**** Minuit did not converge! ****')
             print(self.lastfit)
+        return True
 
-    def dofit_singlerun_singlegroup(self):  
+    def dofit_singlerun_singlegroup(self,returntup):  
         '''
         performs fit on single run, single group A1, ready
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import int2min, int2_method_key, derange, rebin, write_csv
+        from mujpy.aux.aux import int2min, int2_method_key, rebin, write_csv
           
         # self.suite.console('In single single') 
 
         a,e = self.suite.asymmetry_single(self.suite._the_runs_[0],0) # runs to be added, group index
-        returntup = derange(self.dashboard["fit_range"],self.suite.histoLength) # histoLength set after asymmetry_single
         start, stop, pack = returntup
         time,asymm,asyme = rebin(self.suite.time,a,[start,stop],pack,e=e)
 
@@ -271,20 +289,18 @@ class mufit(object):
         #self.suite.console(string2)
         krun = 0
         self.save_fit(krun,0,string2)
-        # just a check (maybe can be removed):    
-        if (self.lastfit.nfit != len(fixed)-sum(fixed)):
-            self.suite.console('Ouch! Minuit.nfit = {}, number pars = {}, number fixed = {}'.format(self.lastfit.nfit,len(fixed),sum(fixed)))
- 
-    def dofit_singlerun_multigroup_sequential(self):
+
+        return True
+                 
+    def dofit_singlerun_multigroup_sequential(self,returntup):
         '''
         performs fit on single run, multiple groups sequentially
         '''
         from iminuit import Minuit
         from mujpy.aux.aux import int2min, int2_method_key, min2int
-        from mujpy.aux.aux import derange, rebin, write_csv
+        from mujpy.aux.aux import rebin, write_csv
         
         a,e = self.suite.asymmetry_multigroup() # the second dimension is group
-        returntup = derange(self.dashboard["fit_range"],self.suite.histoLength) # histoLength set after asymmetry_single
         start, stop, pack = returntup
         time,asymm,asyme = rebin(self.suite.time,a,[start,stop],pack,e=e)
         # print('dofit_singlerun_multigroup_sequential mufit debug: {} {} {}'.format(time.shape,asymm.shape,asyme.shape))
@@ -298,11 +314,11 @@ class mufit(object):
         string = []
         for kgroup,(a,e) in enumerate(zip(asymm,asyme)):
             # print('dofit_singlerun_multigroup_sequential mufit debug in loop: parameter_names {}, values_in {}'.format(parameter_names,values_in))
-            ok, errmsg = self._the_model_._load_data_(time,a,int2_method_key(self.dashboard,self._the_model_),
-                                         self.suite.groups[kgroup]['alpha'],
-                                         e=e) 
-            # pass data to model, one group at a time
-            ### int2_method_key() returns a list of methods to calculate the components
+            ok, errmsg = self._the_model_._load_data_(
+                                        time,a,
+                                        int2_method_key(self.dashboard,self._the_model_),
+                                        self.suite.groups[kgroup]['alpha'],
+                                        e=e) 
             if not ok:
                 self.suite.console(repr(errmsg))
                 break
@@ -352,7 +368,7 @@ class mufit(object):
         # print('dofit_singlerun_multigroup_sequential mufit debug: self.values {}'.format(self.values))
         self.save_fit_multigroup(krun,string)
 
-    def dofit_singlerun_multigroup_userpardicts(self):
+    def dofit_singlerun_multigroup_userpardicts(self,returntup):
         '''
         performs fit on single run, multiple groups globally
         All minuit parameters must be predefined as user pardicts
@@ -361,18 +377,17 @@ class mufit(object):
         It could be also run sequentially (next devel)
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import derange, rebin, write_csv
-        from mujpy.aux.aux import int2min_multigroup, int2_multigroup_method_key, stringify_groups
+        from mujpy.aux.aux import rebin, derange, write_csv, stringify_groups
+        from mujpy.aux.aux import int2min_multigroup, int2_multigroup_method_key
         
         # self.suite.console('Single run, global multigroup')      
         
 
         a,e = self.suite.asymmetry_multigroup() # the first dimension  is group  the last is time bins
-        returntup = derange(self.dashboard["fit_range"],self.suite.histoLength) 
         start, stop, pack = returntup
         time,asymm,asyme = rebin(self.suite.time,a,[start,stop],pack,e=e) #  same slice for all groups
 
-        values,errors,fixed,limits,parameter_names = int2min_multigroup(self.dashboard)
+        values,errors,fixed,limits,parameter_names = int2min_multigroup(self.dashboard["userpardicts_guess"])
         # values, errors etc. corrispond to Minuit parameters, only the user defined ones
         #
         # dashboard must contain "userpardicts_guess":lstpars, a list of pardicts, one per user defined parameter
@@ -440,27 +455,21 @@ class mufit(object):
         if (self.lastfit.nfit != len(fixed)-sum(fixed)):
             self.suite.console('Ouch! Minuit.nfit = {}, number pars = {}, number fixed = {}'.format(self.lastfit.nfit,len(fixed),sum(fixed)))
 
-            
-
-    
-    def dofit_calib_singlerun_multigroup(self):
+    def dofit_calib_singlerun_multigroup_userpardicts(self,returntup):
         '''
-        performs calib fit on single run, multiple groups
+        performs calib fit on single run, multiple groups global
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import int2min, int2_method_key, derange, rebin_decay, write_csv
+        from mujpy.aux.aux import int2min, int2_method_key, rebin_decay, write_csv
         
-        self.suite.console('Multigroup calib: does not work yet')      
+        self.suite.console('Multigroup calib global: does not work yet')      
 
-        kgroup = 0 # placeholder, must loop on groups!
         yf,yb,bf,bb,yfm,ybm = self.suite.single_for_back_counts(self.suite._the_runs_[0],self.suite.grouping[0]) 
                               # the second dimension is group
-        returntup = derange(self.dashboard["fit_range"],self.suite.histoLength) 
-                                        # histoLength set after asymmetry_single
         start, stop, pack = returntup
         t,yf,yb,bf,bb,yfm,ybm = rebin_decay(self.suite.time,yf,yb,bf,bb,yfm,ybm,[start,stop],pack)
 
-        [fitvalues,fiterrors,fitfixed,fitlimits,parameter_names] = int2min(self.dashboard["model_guess"])
+        values,_,_,_,_ = int2min(self.dashboard["model_guess"])
 
         # print('dofit_calib_singlerun_singlegroup mufit debug: fitvalues = {}'.format(fitvalues))
 #        for k in range(len(fitvalues)):
@@ -513,28 +522,100 @@ class mufit(object):
             self.save_fit(krun,kgroup,string2)  # DEBUG
 
             # just a check (maybe can be removed):    
-            if (self.lastfit.nfit != len(fitfixed)-sum(fitfixed)):
-                self.suite.console('Ouch! Minuit.nfit = {}, number pars = {}, number fixed = {}'.format(self.lastfit.nfit,len(fitfixed),sum(fitfixed)))
         else:
             self.suite.console('**** Minuit did not converge! ****')
             print(self.lastfit)
+    
+    def dofit_calib_singlerun_multigroup_sequential(self,returntup):
+        '''
+        performs calib fit on single run, multiple groups sequential
+        '''
+        from iminuit import Minuit
+        from mujpy.aux.aux import int2min, int2_method_key, rebin_decay, write_csv, min2int
+        
+        # self.suite.console('Multigroup calib: does not work yet')      
+        string = []
+        for kgroup,group in enumerate(self.suite.grouping):
+            yf,yb,bf,bb,yfm,ybm = self.suite.single_for_back_counts(self.suite._the_runs_[0],group) 
+                                  # the second dimension is group
+            start, stop, pack = returntup
+            t,yf,yb,bf,bb,yfm,ybm = rebin_decay(self.suite.time,yf,yb,bf,bb,yfm,ybm,[start,stop],pack)
 
-    def dofit_singlegroup_userpardicts(self):          
+            values,errors,fixed,limits,names = int2min(self.dashboard["model_guess"])
+
+            # print('dofit_calib_singlerun_singlegroup mufit debug: fitvalues = {}'.format(fitvalues))
+    #        for k in range(len(fitvalues)):
+    #            self.suite.console('{} = {}, step = {}, fix = {}, limits ({},{})'.format(parameter_names[k], fitvalues[k],fiterrors[k],fitfixed[k],fitlimits[k][0],fitlimits[k][1]))
+
+            self._the_model_._load_calib_single_data_(t,yf,yb,bf,bb,yfm,ybm,
+                                                      int2_method_key(self.dashboard,self._the_model_))
+                                                 # int2_int() returns a list of methods to calculate the components
+
+            self.lastfit = Minuit(self._the_model_._chisquare_,
+                                  name=names,
+                                  *values) 
+            # print('dofit_calib_singlerun_singlegroup mufit debug: fitvalues = {}'.format(fitvalues))                                       
+            self.lastfit.errors = errors
+            self.lastfit.fixed = fixed
+            self.lastfit.limits = limits
+            self.number_dof = len(t) - self.lastfit.nfit
+            self.lastfit.migrad()
+            self.lastfit.hesse()
+
+            if self.lastfit.valid:
+                self.suite.groups[kgroup]["alpha"] = self.lastfit.values[0]
+
+                # write summary on console
+
+                self.summary(start, stop, t[1]-t[0],kgroup)  
+
+                # record result in csv file
+                version = self.dashboard["version"]
+                group = self.suite.groups[kgroup] # assumes only one group
+                fgroup, bgroup, alpha = group['forward'],\
+					                    group['backward'],\
+					                    group['alpha']
+                strgrp = fgroup.replace(',','_')+'-'+bgroup.replace(',','_')
+                modelname = ''.join([component["name"] for component in self.dashboard['model_guess']])
+                file_csv = self.suite.logpath+modelname+'.'+version+'.'+strgrp+'.csv'
+                the_run = self.suite._the_runs_[0][0]
+                filespec = self.suite.datafile[-3:]
+                
+                header, row = self.prepare_csv() # DEBUG
+                
+                string1, string2 = write_csv(header,row,the_run,file_csv,filespec) # DEBUG
+
+                # self.suite.console(string1)
+                #self.suite.console(string2)
+                krun = 0
+                names, values, stds = min2int(self.dashboard["model_guess"],
+							        self.lastfit.values,self.lastfit.errors)
+                self.names.append(names)
+                self.values.append(values)
+                self.stds.append(stds)
+                self.fvals.append(self.lastfit.fval)
+                string.append(string2)
+                # just a check (maybe can be removed):    
+            else:
+                self.suite.console('**** Minuit did not converge! ****')
+                print(self.lastfit)
+        self.save_fit_multigroup(krun,string)  # DEBUG
+
+    def dofit_singlegroup_userpardicts(self,returntup):          
         '''
         not yet
         '''
-    def dofit_singlegroup_sequential(self,chain):
+    def dofit_singlegroup_sequential(self,returntup,chain):
         '''
         performs sequential fit on single group B1, tested
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import int2min, int2_method_key, derange, rebin, write_csv
+        from mujpy.aux.aux import int2min, int2_method_key, rebin, write_csv
 
-        print('dofit_singlegroup_sequential mufit debug')
+        # print('dofit_singlegroup_sequential mufit debug')
         # self.suite.console('In sequential single')   
         a, e = self.suite.asymmetry_multirun(0) # runs to loaded, group index
         # a, e are 2d: (run,timebin) 
-        returntup = derange(self.dashboard["fit_range"],self.suite.histoLength) # histoLength set after asymmetry_single
         start, stop, pack = returntup
         time,asymms,asymes = rebin(self.suite.time,a,[start,stop],pack,e=e)
         # time (1d): (timebin)    asymms, asymes (2d): (run,timebin) 
@@ -583,16 +664,15 @@ class mufit(object):
             string1, string2 = write_csv(header,row,the_run,file_csv,filespec)
             #self.suite.console(string1)
             self.save_fit(krun,0,string2)
-        # just a check (maybe can be removed):    
-            if (self.lastfit.nfit != len(fixed)-sum(fixed)):
-                self.suite.console('Ouch! Minuit.nfit = {}, number pars = {}, number fixed =  {}'.format(self.lastfit.nfit,len(fixed),sum(fixed)))
+            if (chain):
+                values = self.lastfit.values
            
-    def dofit_multirun_multigroup_userpardicts(self):
+    def dofit_multirun_multigroup_userpardicts(self,returntup):
         '''
         not yet
         '''
             
-    def dofit_sequentialrun_multigroup_userpardicts(self):
+    def dofit_sequentialrun_multigroup_userpardicts(self,returntup):
         '''
         not yet
         '''

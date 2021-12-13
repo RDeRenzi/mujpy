@@ -47,12 +47,13 @@ class mufitplot(object):
             if not self.guess:
                 if "model_result" in self.dashboard[0]:
                     self.model = "model_result"
-                elif "userpardicts_guess" in self.dashboard[0]:   
-                    self.model = "model_results"      
+                elif "userpardicts_guess" in self.dashboard[0].keys():   
+                    self.model = "model_result"  
                 else:            
                     self.suite.console('Sorry no fit results yet, plotting guess instead')
                     self.guess = True
-            
+            # print('__init__ mufitplot debug: model = {}, guess = {}'.format(self.model,self.guess))    
+           
             self.chooseplot(plot_range)
 
     def get_nruns(self):
@@ -96,12 +97,13 @@ class mufitplot(object):
                         self.dashboard.append(dash) 
                         # self.suite.console('get_dashboard mufitplot debug: appended {} to dashboard list'.format(dash_file))
                 except Exception as e:
-                    self.suite.console('Exception: {}\nCannot json.load(open({}))'.format(e,dash_file))
+                    self.suite.console('Exception: {}'.format(e))
+                    self.suite.console('Cannot json.load(open({}))'.format(dash_file))
                     return False
             # print('get_dashboard mufitplot debug: first dash result {}'.format(self.dashboard[0]['model_result']))
         else:
             self.suite.console('Warning: run list {} mismatch with dashboard file {}'.format(runs,dash_file))
-        return True
+        return True	
 
     def get_run_title(self):
         '''
@@ -166,7 +168,9 @@ class mufitplot(object):
             asymm, asyme 1d        
         '''
         from mujpy.aux.aux import int2min_multigroup
-        pars,_,_,_,_ = int2min_multigroup(self.dashboard[0])
+        userpardicts = (self.dashboard[0]["userpardicts_guess"] if self.guess else 
+                        self.dashboard[0]["userpardicts_result"])
+        pars,_,_,_,_ = int2min_multigroup(userpardicts)
         # if self.calib():
         #     self.suite.grouping[kgroup]['alpha'] = pars[0] # from fit parameter to standard asymmetry mode
         asymm, asyme = self.suite.asymmetry_multigroup()
@@ -185,10 +189,10 @@ class mufitplot(object):
             reproduces the same from a single guesses            
         '''
         from mujpy.aux.aux import int2min
-        # dashboard must become a suite thing: each sequential fit has its own
-        asymm, asyme = self.suite.asymmetry_multigroup() # kroup
+        # dashboard is a multi_sequential thing: each sequential fit has its own
+        asymm, asyme = self.suite.asymmetry_multigroup() 
         pars = []
-        #self.suite.console('mufitplot: Inside sequential plot; debug mode')
+        # self.suite.console('mufitplot: Inside sequential plot; debug mode')
         for kgroup in range(asymm.shape[0]):
             if self.model == "model_result":
                 #print('single_plot_multi_sequential mufitplot debug: self model = {}',format(self.dashboard[0][self.model][kgroup]))
@@ -238,7 +242,7 @@ class mufitplot(object):
         Draws either a 2x2 or 2x3 subplots figure 
         using aux.plot functions 
         '''
-        from mujpy.aux.aux import derange, rebin, multigroup_in_components
+        from mujpy.aux.aux import derange, rebin, multigroup_in_components, userpars
         from mujpy.aux.plot import set_single_fit, set_sequence_fit
         from iminuit import Minuit
         from numpy import ones 
@@ -250,11 +254,12 @@ class mufitplot(object):
                     sum(multigroup_in_components(self.dashboard[0])) else self.chi_2)
         # print('plot_run mufitplot debug: single not multigroup {}, multigroup in comp {}'.format(self.suite.single() and not self.multigroup,bool(sum(multigroup_in_components(self.dashboard[0])))))
 
-        run_title = self.get_run_title()    # always a list, even for single   
-        if  self.guess:
-            run_title = [title + ": Guess values" for title in run_title]
+        run_title = self.get_run_title()    # always a list, even for single 
+        string = 'global ' if userpars(self.dashboard[0]) else ''            
+        if self.guess:
+            run_title = [title + ": "+string+"guess values" for title in run_title]
         else:
-            run_title = [title + ": Fit results" for title in run_title]
+            run_title = [title + ": "+string+"fit results" for title in run_title]
         plottup = derange(plot_range,self.suite.histoLength)
         #############################
         # rebinning of data as in fit 
@@ -462,11 +467,19 @@ class mufitplot(object):
             for k,(y,ey) in enumerate(zip(yin,eyin)): # single and calib have k = 0
                 kgroup = 0 if len(self.suite.grouping)==1 else k
                 # always group 0 multirun if not multigroup, sequential groups otherwise
-                ok, msg = self._the_model_._load_data_(t,y,
-                                     int2_method_key(self.dashboard[0],self._the_model_),
-                                     self.suite.grouping[kgroup]['alpha'],e=ey) 
-                                     # int2_method_key() returns a list of 
-                                     # methods and keys to calculate the components
+                # print('chi_2 mufitplot debug: group {}: t:{}-{}mus, alpha {:.4f}'.format(kgroup,t[0],t[-1],self.suite.groups[kgroup]['alpha']))
+                if self.calib():
+                    ok, msg = self._the_model_._load_data_calib_(t,y,
+                                         int2_method_key(self.dashboard[0],self._the_model_),
+                                         self.suite.groups[kgroup]['alpha'],e=ey) 
+                                         # int2_method_key() returns a list of 
+                                         # methods and keys to calculate the components
+                else:
+                    ok, msg = self._the_model_._load_data_(t,y,
+                                         int2_method_key(self.dashboard[0],self._the_model_),
+                                         self.suite.groups[kgroup]['alpha'],e=ey) 
+                                         # int2_method_key() returns a list of 
+                                         # methods and keys to calculate the components
                 if ok:
                     f = self.fstack(t,*pars)
                     chi2.append(self._the_model_._chisquare_(*pars[k])/nu) # chi2 in plot

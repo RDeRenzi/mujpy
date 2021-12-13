@@ -307,6 +307,12 @@ def _nparam(model):
     nfree = nmintot - sum([1 for k in range(ntot) if flag[k]=='!']) # ntot minus number of fixed parameters 
     return ntot, nmintot, nfree
     
+##################################################################
+# int2min methods: generate guess values of minuit parameters
+#  int2min : 
+#  int2min_multigroup : assumes all parameters are in userpardicts
+##################################################################
+
 def int2min(model):
     '''
     input: 
@@ -360,12 +366,12 @@ def int2min(model):
 
     return fitval, fiterr, fitfix, fitlim, parameter_name
 
-def int2min_multigroup(model):
+def int2min_multigroup(pardicts):
     '''
     input: 
-        model 
-            either dashboard["model_guess"] (after add_step_limits_to_model)
-            or  dashboard["model_guess"] both lists of dicts
+        pardicts 
+            either dashboard["userpardicts_guess"] if guess = True
+            or  dashboard["userpardicts_result"] if gues = False
     output: a list of lists:  
         fitvalues: minuit parameter values, either guess of result
         fiterrors: their steps
@@ -374,7 +380,7 @@ def int2min_multigroup(model):
         parameter_name: name of parameter 'x_label' for each parameter
     this works for A2 single fit, multigroup with userpardicts parameters = Minuit parameters
     '''
-    pardicts = model["userpardicts_guess"]
+    # pardicts = model["userpardicts_guess"]
     ntot  = len(pardicts)
     
     #####################################################
@@ -384,34 +390,43 @@ def int2min_multigroup(model):
                                                         
     fitval, fiterr, fitfix, fitlim = [], [], [], []           
     parameter_name = []
-
     for pardict in pardicts:  # scan the model components
+        errstd = 'error' if 'error' in pardict.keys() else 'std'
         fitval.append(float(pardict['value']))
         parameter_name.append(pardict['name']) 
-        fiterr.append(float(pardict['error']))
-        fitlim.append(pardict['limits'])
-        if pardict['flag'] == '!':
-            fitfix.append(True)
-        elif pardict['flag'] == '~':
-            fitfix.append(False)
-        else:
-            return False,_,_,_,_
-    # self.console('fitval = {}\nfiterr = {}\nfitfix = {}\nfitlim = {}\ncomp name = {},\npar name = {} '.format(fitval,fiterr,fitfix,fitlim,component_name,parameter_name)) 
+        fiterr.append(float(pardict[errstd]))
+        if 'flag' in pardict.keys():
+            if pardict['flag'] == '!':
+                fitfix.append(True)
+            elif pardict['flag'] == '~':
+                fitfix.append(False)
+            else:
+                return False,_,_,_,_
+            fitlim.append(pardict['limits'])
+        # self.console('fitval = {}\nfiterr = {}\nfitfix = {}\nfitlim = {}\ncomp name = {},\npar name = {} '.format(fitval,fiterr,fitfix,fitlim,component_name,parameter_name)) 
     return fitval, fiterr, fitfix, fitlim, parameter_name
     
+##################################
+# method and key methods: provide component methods 
+#                           and parameter key for eval(key) in _add_
+#   int2_method_key :                single run single group 
+#   int2_multigroup_method_key :     single run multi group
+
+
 def int2_method_key(dashboard,the_model):
     '''
-    input: the dashboard dict structure and the fit model instance
-    output: a list of methods, in the order of the model components 
-            for the use of mumodel._add_.
-    Invoked by the iMinuit initializing call
-             self._the_model_._load_data_, or self._the_model_._load_calib_data_
-    just before submitting migrad, 
-    self._the_model_ is an instance of mumodel 
-     
-    This function applies aux.translate to the parameter numbers in formulas
-    since on the dash each parameter of each component gets an internal number,
-    but shared or formula-determined ('=') ones are not minuit parameters  
+    input: 
+       dashboard, the dashboard dict structure 
+       the_model,  a fit model instance (not necessarily loaded)
+    output: 
+       a list of lists, the inner lists contain each
+         method,  a mumodel component method, in the order of the model components
+                   for the use of mumodel._add_.
+         keys,   a list of as many lambda functions as the parameters of teh component
+                 hard coding the translated "function" string for fast evaluation.
+    This function applies aux.translate to the parameter numbers in formulas:
+    dashboard "function" is written in terms of the internal parameter index,
+    while Minuit parameter index skips shared or formula-determined ('=') parameters  
     '''
     from mujpy.aux.aux import translate
 
@@ -438,12 +453,14 @@ def int2_method_key(dashboard,the_model):
                 # nint must be translated into nmin 
                 string = translate(nint,lmin,pardict['function']) # here is where lmin is used
                 # translate substitutes lmin[n] where n is the index read in the function (e.g. p[3])
-                keys.append(string) # the function will be eval-uated, eval(key) inside mucomponents
+                key_as_lambda = eval('lambda p:'+string) # NEW! speedup
+                keys.append(key_as_lambda) # the function key in keys will be evaluated, key(p), inside mucomponents
                 # isminuit.append(False)
                 lmin.append(0)
             else:# flag[j] == '~' or flag[j] == '!'
                 nmin += 1
-                keys.append('p['+str(nmin)+']')  # this also needs direct translation                      
+                key_as_lambda = eval('lambda p:'+'p['+str(nmin)+']') # NEW! speedup
+                keys.append(key_as_lambda) # the function key in keys will be evaluated, key(p), inside mucomponents
                 lmin.append(nmin) # 
                 # isminuit.append(True)
         # print('int2_method aux debug: bndmthd = {}, keys = {}'.format(bndmthd,keys))
@@ -503,9 +520,10 @@ def int2_multigroup_method_key(dashboard,the_model,guess=True):
             for j,pardict in enumerate(component['pardicts']): 
                 nint += 1  # internal parameter index incremented always 
                 if mask_function_multi[nint]>0:
-                    key.append(pardict["function_multi"][l]) 
+                    key_as_lambda = eval('lambda p:'+pardict["function_multi"][l]) # NEW! speedup
                 else:                
-                    key.append(pardict["function"]) # the function will be eval-uated inside mucomponents
+                    key_as_lambda = eval('lambda p:'+pardict["function"]) # NEW! speedup
+                key.append(key_as_lambda) # the function key will be evaluated, key(p), inside mucomponents
             keys.append(key)
         # print('int2_method aux debug: bndmthd = {}, keys = {}'.format(bndmthd,keys))
         method_key.append([bndmthd,keys]) # vectorialized method, with keys 
@@ -552,6 +570,57 @@ def int2_calib_method_key(dashboard,the_model):
     '''
     from mujpy.aux.aux import translate
 
+    model_guess = dashboard['model_guess']  # guess surely exists
+
+    ntot = sum([len(model_guess[k]['pardicts']) for k in range(len(model_guess))])-1 # minus alpha
+    lmin = [] # initialize the minuit parameter index of dashboard function indices 
+    nint = -1 # initialize the number of internal parameters
+    nmin = -1 # initialize the number of minuit parameters
+    method_key = []
+    function = [pardict['function'] for component in model_guess for pardict in component['pardicts']]
+    for k in range(1,len(model_guess)):  # scan the model popping 'al' and its parameter 'alpha'
+        name = model_guess[k]['name']
+        # print('name = {}, model = {}'.format(name,self._the_model_))
+        bndmthd = the_model.__getattribute__(name) 
+        keys = []
+        # isminuit = [] not used
+        flag = [item['flag'] for item in model_guess[k]['pardicts']]
+        for j,pardict in enumerate(model_guess[k]['pardicts']): 
+            nint += 1  # internal parameter incremente always   
+            if flag[j] == '=': #  function is written in terms of nint
+                # nint must be translated into nmin 
+                string = translate(nint,lmin,pardict['function']) # here is where lmin is used
+                # translate substitutes lmin[n] where n is the index read in the function (e.g. p[3])
+                keys.append(string) # the function will be eval-uated, eval(key) inside mucomponents
+                # isminuit.append(False)
+                lmin.append(0)
+            else:# flag[j] == '~' or flag[j] == '!'
+                nmin += 1
+                keys.append('p['+str(nmin)+']')  # this also needs direct translation                      
+                lmin.append(nmin) # 
+                # isminuit.append(True)
+        method_key.append([bndmthd,keys]) 
+    return method_key
+
+def int2_calib_multigroup_method_key(dashboard,the_model):
+    '''
+    input: the dashboard dict structure and the fit model 'alxx..' instance
+           the actual model contains 'al' plus 'xx', ..
+           the present method considers only the latter FOR PLOTTING ONLY 
+           (USE int2_method for the actual calib fit)
+    output: a list of methods for calib fits, in the order of the 'xx..' model components 
+            (skipping al) for the use of mumodel._add_single_.
+    Invoked by the iMinuit initializing call
+             self._the_model_._load_data_, 
+    just before submitting migrad, 
+    self._the_model_ is an instance of mumodel 
+     
+    This function applies aux.translate to the parameter numbers in formulas
+    since on the dash each parameter of each component gets an internal number,
+    but alpha is popped and shared or formula-determined ('=') ones are not minuit parameters  
+    '''
+    from mujpy.aux.aux import translate
+    print('int2_calib_multigroup_method_key aux debug: copy of non multigroup, adapt!')
     model_guess = dashboard['model_guess']  # guess surely exists
 
     ntot = sum([len(model_guess[k]['pardicts']) for k in range(len(model_guess))])-1 # minus alpha
@@ -721,6 +790,7 @@ def model_name(dashboard):
 def userpars(dashboard):
     '''
     checks if there are userpardicts in the fit dashboard
+    alias of global type fit, of any kind (gg, gr, G)
     used by fit and plt switchyard
     '''
     return "userpardicts_guess" in dashboard
@@ -1843,7 +1913,7 @@ def translate(nint,lmin,function_in):
         function: single function string, of dashboard index nint, to be translated
     output: 
         function_out: single translated function
-    Used in int2_int and min2int to replace parameter indices contained in function[nint] e.g.
+    Used in int2_method_key and min2int to replace parameter indices contained in function[nint] e.g.
 
     ::
  
@@ -1915,7 +1985,7 @@ def value_error(value,error):
         form += 'f}({})".format(value,most_significant)'
     else:
         if abs(value)<eps:
-            form = 'print("0(0)")' # too small both
+            form = '"(0(0)"' # too small both
         else:
-            form = 'print("{}(0)".format(value))' # too small error
+            form = '"{}(0)".format(value)' # too small error
     return eval(form)

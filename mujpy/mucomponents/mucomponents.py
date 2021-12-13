@@ -58,10 +58,13 @@ class mumodel(object):
 
         for k, val in enumerate(_components_):
             if val[0]: # val[0] is directly the method for all components but dalpha
+                # print('mucomponents _load_data_ debug: keys = {}'.format(val[1]))
                 self._ntruecomponents_ += 1
                 self._components_.append(val) # store again [method, [key,...,key]], ismin
             else:  # when the method is da  (val[0] was set to [], i.e. False)
-                self._da_index_ = 1+int(val[1][0][2:val[1][0].find(']')]) # position in minuit parameter list +1 to pass logical test
+                npar = sum([len(comp[1]) for comp in _components_])
+                p = range(npar)
+                self._da_index_ = 1+val[1][0](p) # position in minuit parameter list +1 to pass logical test
                 # print('_da_index_ = {}'.format(self._da_index_-1))
         self._include_all_() # to rcover from possible fft mode
         try:
@@ -208,7 +211,16 @@ class mumodel(object):
             return False, e       
         return True, '' # no error
 
-    def _add_single_(self,x,*argv):   ## must be (self,x,*argv): it can also be invoked by plot over x != self._x_
+#####################################################################################################
+# add methods:
+# the 'time' array is x, not self._x_ because they are invoked by plot with different t vectors
+#  _add_single_ :         single run, single group (still has da)
+#  _add_calib_single_ :   single run single group with recalculation of asymmetry and errors
+#  _add_single_calib_ :   single run single group for calib plot (normal asymmetry)
+#  _add_multigroup_ :     single run multigroup global (for single chisquare)
+#####################################################################################################
+
+    def _add_single_(self,x,*argv): 
         '''
          input: 
             x       time array
@@ -237,9 +249,7 @@ class mumodel(object):
             component = self._components_[j][0]
             keys = self._components_[j][1] 
             # print('add_single mucomponents debug: keys = {}'.format(keys))
-            pars = []
-            for l in range(len(keys)):
-                pars.append(eval(keys[l])) # typically evaluates p[1], p[2] etc.
+            pars = [key(p) for key in keys] # NEW! spedup, evaluates p[1], p[2] etc.
             # print('y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
             # print('pars = {}'.format(pars))
             # print('f.shape = {}, zeros.shape = {}'.format(f.shape,zeros_like(x).shape))
@@ -260,11 +270,11 @@ class mumodel(object):
                     alpha,val1,val2,val3,val4,val5, ... at this iteration 
                     argv is a list of values [alpha,val1,val2,val3,val4,val5, ...]
 
-        _add_calib_single_ DISTRIBUTES THESE PARAMETER VALUES::
+        _add_single_calib_ DISTRIBUTES THESE PARAMETER VALUES for plots::
 
               asymmetry fit with fitted alpha
+              version for plotting calib fits as normal asymmetry fits
               order driven by model e.g. alml
-
         NO FFT mode, no check on self._include_components
         '''      
         from numpy import where
@@ -272,22 +282,20 @@ class mumodel(object):
                 
         f = zeros_like(x)  # initialize a 1D array
         p = argv 
-        alpha = p[0]
-        #print('_add_calib_single_ debug alpha = {}, p = {}'.format(alpha,p))
+        # alpha = p[0]
+        # print('_add_calib_single_ debug alpha = {}, p = {}'.format(alpha,p))
                 
         for j in range(1,self._ntruecomponents_): # all components in model, excluding alpha
             method = self._components_[j][0]
             keys = self._components_[j][1] 
-            pars = []
-            for l in range(len(keys)):
-                pars.append(eval(keys[l])) # typically evaluates p[1], p[2] etc.
-            # print('_add_calib_single_ debug y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
-            # print('_add_single_calib_ debug pars = {} for component {}/{}'.format(pars,j+1,self._ntruecomponents_))
-            # print('_add_calib_single_ debug f.shape = {}, zeros.shape = {}'.format(f.shape,zeros_like(x).shape))
+            pars = [key(p) for key in keys] # NEW! spedup, evaluates p[1], p[2] etc.
             f += method(x,*pars)  # must contain x, for plot x != self._x_
             # remember *p.comp means 'pass as many arguments as required by component, exausting the list p_comp'
 
-        return f     
+            # print('_add_calib_single_ debug y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
+            # print('_add_single_calib_ debug pars = {} for component {}/{}'.format(pars,j+1,self._ntruecomponents_))
+            # print('_add_calib_single_ debug f.shape = {}, zeros.shape = {}'.format(f.shape,zeros_like(x).shape))
+        return f   
 
     def _add_calib_single_(self,x,*argv):
         '''
@@ -322,9 +330,7 @@ class mumodel(object):
         for j in range(1,self._ntruecomponents_): # all components in model, excluding alpha
             method = self._components_[j][0]
             keys = self._components_[j][1] 
-            pars = []
-            for l in range(len(keys)):
-                pars.append(eval(keys[l])) # typically evaluates p[1], p[2] etc.
+            pars = [key(p) for key in keys] # NEW! spedup, evaluates p[1], p[2] etc.
             # print('_add_calib_single_ debug y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
             # print('_add_calib_single_ debug pars = {}'.format(pars))
             # print('_add_calib_single_ debug f.shape = {}, zeros.shape = {}'.format(f.shape,zeros_like(x).shape))
@@ -333,7 +339,7 @@ class mumodel(object):
 
         return f     
 
-    def _add_multigroup_(self,x,*argv):   ## must be (self,x,*argv): it can also be invoked by plot over x != self._x_
+    def _add_multigroup_(self,x,*argv):   
         '''
          input: 
             x       time array
@@ -349,8 +355,7 @@ class mumodel(object):
         and produce a n-valued np.array function f, f[k] for y[k],e[k] 
         '''      
 
-        f = zeros((self._y_.shape[0],x.shape[0]))  # initialize a 2D array
-        
+        f = zeros((self._y_.shape[0],x.shape[0]))  # initialize a 2D array        
         p = argv 
         
         # self._component_ contains [bndkeys,...,bndkeys], as many as the model components (e.g. 2 for mgbl)
@@ -362,20 +367,17 @@ class mumodel(object):
             keys = self._components_[j][1] # = [keys_1,keys_2,...]
             # keys = [[p0g0, p0g1,...],[p1g0, p1g1, ..],[p2g0, p2,g1,...]..]
             # print('add_multigroup mucomponents debug: key = {}'.format(keys))
-            pars = []
-            for groups_key in keys:
-                pargroup =[]
-                for key in groups_key:
-                    pargroup.append(eval(key))
-                pars.append(pargroup)
+            pars = [[key(p) for key in groups_key] for groups_key in keys]# NEW! spedup, evaluates p[1], p[2] etc.
+            f += component(x,*pars)  # must contain x, 
+                                                 # for plot x != self._x_
+            # remember *p.comp means 'pass as many arguments as required by component, exausting the list p_comp'
+
             # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
             # pars = [[eval(key) for key in groups_key] for groups_key in keys]
             # print('add_multigroup mucomponents debug: y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
             # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
-            # print('add_multigroup mucomponents debug: f.shape = {}, zeros.shape = {}'.format(f.shape,zeros_like(x).shape))
-            f += component(x,*pars)  # must contain x, 
-                                                 # for plot x != self._x_
-            # remember *p.comp means 'pass as many arguments as required by component, exausting the list p_comp'
+            # print('add_multigroup mucomponents debug: f.shape = {}, zeros.shape = {}'.format(
+            #                                                         f.shape,zeros_like(x).shape))
         return f     
 
     def _fft_init(self,include_components,include_da=True):
