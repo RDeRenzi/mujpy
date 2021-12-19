@@ -88,7 +88,7 @@ class mufit(object):
             version = self.dashboard["version"]
             while len(version)>3 and version[0]=='g' and version[2]=='_':
                 if version[1] in {'r','g','G'}:
-                    version[:3] =''
+                    version = version[3:]
                 else:
                     break 
             # print('choosefit mufit debug:    self.suite.single() = {}'.format(self.suite.single()))  
@@ -129,7 +129,9 @@ class mufit(object):
                                               # can be sequential or global
                     if self.calib():          # A2-calib, True if the first component is 'al'
                         if sum(multigroup_in_components(self.dashboard)): # single run calib 
-                                                       
+                        
+                            self.dashboard["version"]=('gg_'+version if 
+                                            self.dashboard["version"][0:3]!='gg_' else version)                           
                             self.dofit_calib_singlerun_multigroup_userpardicts(returntup)  
                                                                           # multi group global A2_01-calib
                         else: 
@@ -140,7 +142,6 @@ class mufit(object):
                                               # A2 multi group single run single chi2 global parameters
                             self.dashboard["version"]=('gg_'+version if 
                                             self.dashboard["version"][0:3]!='gg_' else version)
-                            # print('choosefit mufit debug: multigroup user recognized')
                             self.dofit_singlerun_multigroup_userpardicts(returntup) # True, True, False, True
                         else:                 # A2_0 DONE multi-group-sequentially single run 
                             self.dofit_singlerun_multigroup_sequential(returntup)   # True, True, False, False, True
@@ -171,7 +172,7 @@ class mufit(object):
         yf,yb,bf,bb,yfm,ybm = self.suite.single_for_back_counts(self.suite._the_runs_[0],self.suite.grouping[kgroup]) 
                               # the second dimension is group
         start, stop, pack = returntup
-        t,yf,yb,bf,bb,yfm,ybm = rebin_decay(self.suite.time,yf,yb,bf,bb,yfm,ybm,[start,stop],pack)
+        t,yf,yb,bf,bb,yfm,ybm = rebin_decay(self.suite.time,yf,yb,bf,bb,[start,stop],pack)
 
         [fitvalues,fiterrors,fitfixed,fitlimits,parameter_names] = int2min(self.dashboard["model_guess"])
 
@@ -198,7 +199,7 @@ class mufit(object):
         kgroup = 0
         if self.lastfit.valid:
             self.suite.groups[0]["alpha"] = self.lastfit.values[0]
-
+            self.suite.grouping[0]["alpha"] = self.lastfit.values[0]
             # write summary on console
 
             self.summary(start, stop, t[1]-t[0],kgroup) 
@@ -224,9 +225,6 @@ class mufit(object):
             
             self.save_fit(krun,0,string2) 
            
-            # just a check (maybe can be removed):    
-            if (self.lastfit.nfit != len(fitfixed)-sum(fitfixed)):
-                self.suite.console('Ouch! Minuit.nfit = {}, number pars = {}, number fixed = {}'.format(self.lastfit.nfit,len(fitfixed),sum(fitfixed)))
         else:
             self.suite.console('**** Minuit did not converge! ****')
             print(self.lastfit)
@@ -438,90 +436,86 @@ class mufit(object):
         # write summary on console
         self.summary_global(start, stop, time[1]-time[0])
 
-        # record result in csv file
-        version = self.dashboard["version"]
-        strgrp = stringify_groups(self.suite.groups)
-        modelname = ''.join([component["name"] for component in self.dashboard['model_guess']])
-        file_csv = self.suite.logpath+modelname+'.'+version+'.'+strgrp+'.csv'
-        the_run = self.suite._the_runs_[0][0]
-        filespec = self.suite.datafile[-3:]
-        header, row = self.prepare_csv()
-        string1, string2 = write_csv(header,row,the_run,file_csv,filespec)
-        # self.suite.console(string1)
-        #self.suite.console(string2)
-        krun = 0
-        self.save_fit_multigroup(krun,string2)
-        # just a check (maybe can be removed):    
-        if (self.lastfit.nfit != len(fixed)-sum(fixed)):
-            self.suite.console('Ouch! Minuit.nfit = {}, number pars = {}, number fixed = {}'.format(self.lastfit.nfit,len(fixed),sum(fixed)))
+        if self.lastfit.valid:
+            # record result in csv file
+            version = self.dashboard["version"]
+            strgrp = stringify_groups(self.suite.groups)
+            modelname = ''.join([component["name"] for component in self.dashboard['model_guess']])
+            file_csv = self.suite.logpath+modelname+'.'+version+'.'+strgrp+'.csv'
+            the_run = self.suite._the_runs_[0][0]
+            filespec = self.suite.datafile[-3:]
+            header, row = self.prepare_csv()
+            string1, string2 = write_csv(header,row,the_run,file_csv,filespec)
+            # self.suite.console(string1)
+            #self.suite.console(string2)
+            krun = 0
+            self.save_fit_multigroup(krun,string2)
+        else:
+            self.suite.console('**** Minuit did not converge! ****')
+            print(self.lastfit)
 
     def dofit_calib_singlerun_multigroup_userpardicts(self,returntup):
         '''
         performs calib fit on single run, multiple groups global
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import int2min, int2_method_key, rebin_decay, write_csv
+        from mujpy.aux.aux import int2min_multigroup, int2_multigroup_method_key 
+        from mujpy.aux.aux import rebin_decay, write_csv, stringify_groups
         
-        self.suite.console('Multigroup calib global: does not work yet')      
+        # self.suite.console('Multigroup calib global: does not work yet')      
 
-        yf,yb,bf,bb,yfm,ybm = self.suite.single_for_back_counts(self.suite._the_runs_[0],self.suite.grouping[0]) 
+        yf,yb,bf,bb,_,_ = self.suite.single_multigroup_for_back_counts(self.suite._the_runs_[0],self.suite.grouping) 
                               # the second dimension is group
         start, stop, pack = returntup
-        t,yf,yb,bf,bb,yfm,ybm = rebin_decay(self.suite.time,yf,yb,bf,bb,yfm,ybm,[start,stop],pack)
+        t,yf,yb,bf,bb,yfm,ybm = rebin_decay(self.suite.time,yf,yb,bf,bb,[start,stop],pack)
+        # print('mufit dofit_calib_singlerun_multigroup_userpardicts debug: yfm {}, ybm {}'.format(yfm,ybm))
 
-        values,_,_,_,_ = int2min(self.dashboard["model_guess"])
+        values,errors,fixed,limits,names = int2min_multigroup(self.dashboard["userpardicts_guess"])
+
+        methods_keys = int2_multigroup_method_key(self.dashboard,self._the_model_) 
+        # as many as the total component parameters for one group, includes "al"!
 
         # print('dofit_calib_singlerun_singlegroup mufit debug: fitvalues = {}'.format(fitvalues))
 #        for k in range(len(fitvalues)):
 #            self.suite.console('{} = {}, step = {}, fix = {}, limits ({},{})'.format(parameter_names[k], fitvalues[k],fiterrors[k],fitfixed[k],fitlimits[k][0],fitlimits[k][1]))
 
-        self._the_model_._load_calib_single_data_(t,yf,yb,bf,bb,yfm,ybm,
-                                                  int2_method_key(self.dashboard,self._the_model_))
-                                             # int2_int() returns a list of methods to calculate the components
+        self._the_model_._load_data_calib_multigroup_(t,yf,yb,bf,bb,yfm,ybm,methods_keys)
 
         self.lastfit = Minuit(self._the_model_._chisquare_,
-                              name=parameter_names,
-                              *fitvalues) 
+                              name=names,
+                              *values) 
         # print('dofit_calib_singlerun_singlegroup mufit debug: fitvalues = {}'.format(fitvalues))                                       
-        self.lastfit.errors = fiterrors
-        self.lastfit.limits = fitlimits
-        self.lastfit.fixed = fitfixed
+        self.lastfit.errors = errors
+        self.lastfit.fixed = fixed
+        self.lastfit.limits = limits
         # self.freepars = self.lastfit.nfit
         self.number_dof = len(t) - self.lastfit.nfit
         self.lastfit.migrad()
         self.lastfit.hesse()
 
-        kgroup = 0
         if self.lastfit.valid:
-            self.suite.groups[kgroup]["alpha"] = self.lastfit.values[0]
-
+            pardict = self.dashboard["model_guess"][0]["pardicts"][0]
+            p = self.lastfit.values
+            for kgroup,group in enumerate(self.suite.grouping):
+                group['alpha'] = eval(pardict["function_multi"][kgroup])
+                self.suite.groups[kgroup]["alpha"] = eval(pardict["function_multi"][kgroup])            
             # write summary on console
-
-            self.summary(start, stop, t[1]-t[0],kgroup) # DEBUG! then remove # 
+            self.summary_global(start, stop, t[1]-t[0])
 
             # record result in csv file
             version = self.dashboard["version"]
-            group = self.suite.groups[kgroup] # assumes only one group
-            fgroup, bgroup, alpha = group['forward'],\
-					                group['backward'],\
-					                group['alpha']
-            strgrp = fgroup.replace(',','_')+'-'+bgroup.replace(',','_')
+            strgrp = stringify_groups(self.suite.groups)
             modelname = ''.join([component["name"] for component in self.dashboard['model_guess']])
             file_csv = self.suite.logpath+modelname+'.'+version+'.'+strgrp+'.csv'
             the_run = self.suite._the_runs_[0][0]
             filespec = self.suite.datafile[-3:]
-            
-            header, row = self.prepare_csv() # DEBUG
-            
-            string1, string2 = write_csv(header,row,the_run,file_csv,filespec) # DEBUG
-
+            header, row = self.prepare_csv()
+            string1, string2 = write_csv(header,row,the_run,file_csv,filespec)
             # self.suite.console(string1)
             #self.suite.console(string2)
             krun = 0
-            
-            self.save_fit(krun,kgroup,string2)  # DEBUG
-
-            # just a check (maybe can be removed):    
+            self.save_fit_multigroup(krun,string2)   
+         
         else:
             self.suite.console('**** Minuit did not converge! ****')
             print(self.lastfit)
@@ -533,13 +527,13 @@ class mufit(object):
         from iminuit import Minuit
         from mujpy.aux.aux import int2min, int2_method_key, rebin_decay, write_csv, min2int
         
-        # self.suite.console('Multigroup calib: does not work yet')      
+        # self.suite.console('Multigroup calib: does not work yet')
         string = []
         for kgroup,group in enumerate(self.suite.grouping):
             yf,yb,bf,bb,yfm,ybm = self.suite.single_for_back_counts(self.suite._the_runs_[0],group) 
                                   # the second dimension is group
             start, stop, pack = returntup
-            t,yf,yb,bf,bb,yfm,ybm = rebin_decay(self.suite.time,yf,yb,bf,bb,yfm,ybm,[start,stop],pack)
+            t,yf,yb,bf,bb,yfm,ybm = rebin_decay(self.suite.time,yf,yb,bf,bb,[start,stop],pack)
 
             values,errors,fixed,limits,names = int2min(self.dashboard["model_guess"])
 
@@ -564,7 +558,7 @@ class mufit(object):
 
             if self.lastfit.valid:
                 self.suite.groups[kgroup]["alpha"] = self.lastfit.values[0]
-
+                self.suite.grouping[kgroup]["alpha"] = self.lastfit.values[0]
                 # write summary on console
 
                 self.summary(start, stop, t[1]-t[0],kgroup)  
@@ -867,7 +861,7 @@ class mufit(object):
         '''
         from mujpy.aux.aux import get_title, spec_prec, chi2std, initialize_csv 
         from mujpy.aux.aux import minparam2_csv, chi2_csv, min2int
-        from mujpy.aux.aux import multigroup_in_components, min2int_multigroup
+        from mujpy.aux.aux import multigroup_in_components
 
         # print('k = {}, self.nrun = {}'.format(k,[j for j in self.nrun]))
 

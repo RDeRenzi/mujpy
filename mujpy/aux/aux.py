@@ -507,6 +507,7 @@ def int2_multigroup_method_key(dashboard,the_model,guess=True):
     else:
         return []
     nint = -1 # initialize the index of the dashboard component parameters
+    # p = [1.13,1.05,0.25,0.3,0.8,700,35,125,3.3,680,0.1] # debug delete
     for component in model:  # scan the model components
         name = component['name']
         keys = []
@@ -523,6 +524,7 @@ def int2_multigroup_method_key(dashboard,the_model,guess=True):
                     key_as_lambda = eval('lambda p:'+pardict["function_multi"][l]) # NEW! speedup
                 else:                
                     key_as_lambda = eval('lambda p:'+pardict["function"]) # NEW! speedup
+                # print('aux int2_multigroup_method_key debug: key_as_lambda(p) = {} **delete also p!'.format(key_as_lambda(p)))
                 key.append(key_as_lambda) # the function key will be evaluated, key(p), inside mucomponents
             keys.append(key)
         # print('int2_method aux debug: bndmthd = {}, keys = {}'.format(bndmthd,keys))
@@ -738,15 +740,15 @@ def min2int_multigroup(dashboard,p,e):
         for component in model:  # scan the model components
             component_name = component['name']
             label = component['label']
-            nint = nint0
+            # nint = nint0
             name, par, epar = [], [], [] # inner list, components
             for j,pardict in enumerate(component['pardicts']): 
-                nint += 1  # internal parameter index incremented always 
+                nint0 += 1  # internal parameter index incremented always 
                 if j==0:
                     name.append('{}: {}_{}'.format(component_name,pardict['name'],label))
                 else:
                     name.append('{}_{}'.format(pardict['name'],label))
-                if mask_function_multi[nint]>0:
+                if mask_function_multi[nint0]:
                     par.append(eval(pardict["function_multi"][l])) 
                     try:
                         epar.append(eval(pardict["error_propagate_multi"][l]))
@@ -758,6 +760,7 @@ def min2int_multigroup(dashboard,p,e):
                         epar.append(eval(pardict["error_propagate"]))
                     except:
                         epar.append(eval(pardict["function"].replace('p','e')))
+                # print('aux min2int_multigroup debug: nint = {} name = {} par = {}, epar = {}'.format(nint0,name[-1],par[-1],epar[-1]))
             pars.append(par) # middel list, model
             names.append(name)
             epars.append(epar)
@@ -779,7 +782,89 @@ def print_components(names,values,errors):
 	from mujpy.aux.aux import value_error
 	out = [' '.join([names[k],'=',value_error(values[k],errors[k])]) for k in range(len(names))]
 	return " ".join(out)
-	    
+	
+def mixer(t,y,f0):
+    '''
+    mixer of a time-signal with a reference 
+    input
+        t time
+        y the time-signal
+        f0 frequency of the cosine reference
+    output
+        y_rrf = 2*y*cos(2*pi*f0*t)  
+    t is 1d and y is 1-d, 2-d or 3-d but t.shape[0] == y.shape[-1]
+    t is vstack-ed to be the same shape as y
+    '''
+    from mujpy.aux.aux import filter
+    from numpy import pi, cos, vstack, fft, delete
+    ydim, tdim = len(y.shape), len(t.shape)
+    # print('aux mixer debug 1: y t shape {}, {}'.format(y.shape,t.shape))
+    if tdim == 1: # must replicate t to the same dimensions as y 
+        if ydim ==2:
+            for k in range(ydim):
+                if k:
+                    time = vstack((time,t))
+                else:
+                    time = t
+            t = time
+        elif ydim==3: # max is ydim = 3
+            for j in range(len.shape[-1]):
+                for k in len.shape[-2]:
+                    if k:
+                        time = vstack((time,t))
+                    else:
+                        time = t
+                if j:
+                    for l in len.shape[-1]:
+                        tim = vstack((tim,time))
+                    else:
+                        tim = time
+            t = tim 
+    n = t.shape[-1] # apodize by zero padding to an even number
+    yf = fft.irfft(filter(t,fft.rfft(2*y*cos(2*pi*f0*t),n=n+1),f0),n=2*n)
+    # now delete padded zeros 
+    mindex = range(n,2*n)
+    yf =delete(yf,mindex,-1)
+    # print('aux mixer debug 3: yf shape {}'.format(yf.shape))
+    return yf
+    
+def filter(t,fy,f0):
+    '''
+    filter above 0.2*fy peak freq 
+    works for 1-2 d
+    '''
+    from numpy import arange, mgrid, where
+    # determine max frequency fmax
+    leny = len(fy.shape)
+    if leny == 1:
+        dt = t[1]-t[0]
+        # array f of fourier component indices (real fft, 0 to fmax)
+        m = fy.shape
+        f = arange(m) 
+    elif leny == 2:
+        dt = t[0,1]-t[0,0]
+        # find peak in rfft below the rrf frequency f0
+        # array f of fourier component indices (real fft, 0 to fmax)
+        n,m = fy.shape
+        _,f = mgrid[0:n,0:m] 
+    else:
+        dt = t[0,0,1]-t[0,0,0]
+        l,n,m = fy.shape
+        _,_,f = mgrid[0:l,0:n,0:m] 
+                
+    fmax = 1/2/dt
+    mask = (f<=f0/fmax*m).astype(int)
+    # find where fy has a peak, below the rrf frequency f0
+    if leny == 1:
+        npeak = where(abs(fy)==abs(mask*fy).max()).max()
+    elif leny == 2:
+        npeak = where(abs(fy)==abs(mask*fy).max())[1].max()
+    else:
+        npeak = where(fy==(mask*fy).max())[2].max()    
+    mask = (f<=2*npeak).astype(int)
+    # print('aux filter debug 2: fy {},mask {} shape'.format(fy.shape,mask.shape))    
+    return fy*mask
+    
 def model_name(dashboard):
     '''
     input the dashboard dictionary structure
@@ -807,20 +892,12 @@ def multigroup_in_components(dashboard):
         with at least one "function_multi":[string, string ..] key
         0 otherwise
     '''
-    mask = []
+
     #print('multigroup_in_components aux debug: model_guess len {}'.format(len(dashboard["model_guess"])))
     #print('multigroup_in_components aux debug: pardicts len {}'.format(len(dashboard["model_guess"][0]['pardicts'])))
     #print('multigroup_in_components aux debug: pardict.keys len {}'.format(len(dashboard["model_guess"][0]['pardicts'][0].keys())))
-    for component in dashboard["model_guess"]:
-        for pardict in component["pardicts"]:
-            for x in pardict.keys():
-                if x == 'function_multi':
-                    k = 1
-                    break
-                else:
-                    k = 0 
-            mask.append(k)
-    return mask                                
+
+    return ['function_multi' in pardict.keys() for component in dashboard["model_guess"]  for pardict in component["pardicts"]]                                
                             
     # contains 1 for all parameters that have "function_multi", 0 otherwise 
     # return [k for k,component in enumerate(component_function) if component>0]
@@ -1370,11 +1447,15 @@ def get_title(run,notemp=False,nofield=False):
     '''
     form standard psi title
     '''
-    if notemp:
-        return '{} {} {}'.format(run.get_sample(),run.get_orient(),run.get_field())
-    elif nofield:
-        return '{} {} {}'.format(run.get_sample(),run.get_orient(),run.get_temp())
-    return '{} {} {} {}'.format(run.get_sample(),run.get_orient(),run.get_field(),run.get_temp())    
+    title = [(run.get_sample()).rstrip()]
+    title.append((run.get_orient()).rstrip())  
+    if not notemp:
+        tstr = run.get_temp()
+        temp = float(tstr[:tstr.index('K')-1])
+        title.append('{:.1f}K'.format(temp))
+    if not nofield:
+        title.append('{:.0f}mT'.format(float(run.get_field())/10))
+    return ' '.join(title)    
 
 def get_run_number_from(path_filename,filespecs):
     '''
@@ -1757,12 +1838,12 @@ def rebin(x,y,strstp,pack,e=None):
     else:
         return xr,yr
 
-def rebin_decay(x,yf,yb,bf,bb,ybf,ybm,strstp,pack):
+def rebin_decay(x,yf,yb,bf,bb,strstp,pack):
     '''
     input:
         x is 1D intensive (time)
         yf, yb 1D, 2D, 3D extensive arrays to be rebinned
-        bf, bb, yfm, yfb are scalars (see musuite.single_for_back_counts)
+        bf, bb are scalars or arrays (see musuite.single_for_back_counts and musuite.single_multigroup_for_back_counts)
         pack > 1 is the rebinning factor, e.g it returns::
     
         xr = array([x[k*pack:k*(pack+1)].sum()/pack for k in range(int(floor((stop-start)/pack)))])
@@ -1785,6 +1866,7 @@ def rebin_decay(x,yf,yb,bf,bb,ybf,ybm,strstp,pack):
     xx =x[start:start+mn] # slice of the first 2D array
     xx = xx.reshape(m,pack) # temporaty 2d array
     xr = xx.sum(1)/pack # rebinned first ndarray
+    bfr, bbr = bf*pack, bb*pack
     if len(yf.shape)==1:
         yfr = empty(m)
         ybr = empty(m) 
@@ -1793,20 +1875,27 @@ def rebin_decay(x,yf,yb,bf,bb,ybf,ybm,strstp,pack):
         yfr = yfr.reshape(m,pack)  # temporaty 2d
         ybr = ybr.reshape(m,pack)  # temporaty 2d
         yfr = yfr.sum(1) # rebinned row extensive          
-        ybr = ybr.sum(1) # rebinned row extensive          
+        ybr = ybr.sum(1) # rebinned row extensive       
+        yfmr, ybmr = mean((yfr-bfr)*exp(xr/TauMu_mus())), mean((ybr-bbr)*exp(xr/TauMu_mus()))   
     elif len(yf.shape)==2:
         nruns = yf.shape[0] # number of runs
         yfr = empty((nruns,m))
-        for k in range(nruns): # each row is a run
+        ybr = empty((nruns,m)) 
+        for k in range(nruns): # each row is a run, or a group
             yyf = yf[k][start:start+mn]  # slice row
             yyf = yyf.reshape(m,pack)  # temporaty 2d
             yfr[k] = yyf.sum(1) # rebinned row extesive
             yyb = yb[k][start:start+mn]  # slice row
             yyb = yyb.reshape(m,pack)  # temporaty 2d
             ybr[k] = yyb.sum(1) # rebinned row extesive
-    elif len(yf.shape)==3:        
+            bfr, bbr = bf[k]*pack, bb[k]*pack
+            # print('aux,rebin_decay,debug: bfr {}, bbr {}'.format(bfr, bbr))
+            yfmr, ybmr = mean((yfr[:][k]-bfr)*exp(xr/TauMu_mus())), mean((ybr[:][k]-bbr)*exp(xr/TauMu_mus()))
+            
+    elif len(yf.shape)==3:        # probably never used unless calib mode becomes a C2 case
         ngroups,nruns = yf.shape[0:2] # number of runs
         yfr = empty((ngroups,nruns,m))
+        ybr = empty((nruns,m)) 
         for k in range(ngroups): 
             for j in range(nruns):  
                 yyf = yf[k][j][start:start+mn]  # slice row
@@ -1815,8 +1904,8 @@ def rebin_decay(x,yf,yb,bf,bb,ybf,ybm,strstp,pack):
                 yyb = yb[k][j][start:start+mn]  # slice row
                 yyb = yyb.reshape(m,pack)  # temporaty 2d
                 ybr[k][j] = yyb.sum(1) # rebinned row extesive
-    bfr, bbr = bf*pack, bb*pack
-    yfmr, ybmr = mean((yfr-bfr)*exp(xr/TauMu_mus())), mean((yfr-bfr)*exp(xr/TauMu_mus()))
+                bfr, bbr = bf[k][j]*pack, bb[k][j]*pack
+                yfmr, ybmr = mean((yfr[:][k][j]-bfr)*exp(xr/TauMu_mus())), mean((ybr[:][k][j]-bbr)*exp(xr/TauMu_mus()))
     return xr,yfr,ybr,bfr,bbr,yfmr,ybmr
 
 def safetry(string):

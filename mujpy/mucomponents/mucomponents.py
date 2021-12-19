@@ -148,7 +148,7 @@ class mumodel(object):
                 self._e_ = ones((y.shape))
             else:
                 if len(y.shape)>1:
-                    if e.shape!=y.shape or x.shape[0]!=eshape[-1]:
+                    if e.shape!=y.shape or x.shape[0]!=e.shape[-1]:
                         raise ValueError('x, y, e have different lengths, {},{},{}'.format(x.shape,
                                                                                        y.shape,
                                                                                        e.shape))          
@@ -211,13 +211,115 @@ class mumodel(object):
             return False, e       
         return True, '' # no error
 
+    def _load_data_calib_multigroup_(self,x,yf,yb,bf,bb,yfm,ybm,components,e=1): 
+
+        '''
+        input: 
+            x, yf, yb  are numpy arrays, yf, yb are 2d
+            bf, bb, yfm, ybm are backgrounnd f and b, and its exponential average, f and b 
+            e = 1, since errors are calculated (should be simplified)
+            components is a list [[method,[[key,...],...,[key,...]]],...,[method,[[key...],...,[key,...]]]], 
+                produced by int2_method() from mujpy.aux.aux
+                where method is an instantiation of a component, e.g. self.ml 
+                and value = eval(key) produces the parameter value (the inner key list is for different groups)
+            _add_multigroup_ must produce an 2d function f.shape(ngroup,nbins)
+            therefore _components_ must be a np.vectorize of ngroup copies of the method 
+            method da not allowed here, no need for alpha
+            no fft of residues
+        '''
+        # self._components_ = [[method,[key,...,key]],...,[method,[key,...,key]]], and eval(key) produces the parmeter value
+        # self._alpha_, self._da_index_ (index of dalpha or [])
+        # self._ntruecomponents_ = number of components apart from dalpha 
+        self._x_ = x
+        self._yf_ = yf 
+        self._yb_ = yb
+        self._bf_ = bf
+        self._bb_ = bb 
+        self._yfm_ = yfm
+        self._ybm_ = ybm
+        self._components_ = []
+        self._add_ = self._add_calib_multigroup_
+        self._ntruecomponents_ = 0
+
+        for k, val in enumerate(components):
+            self._ntruecomponents_ += 1
+            # print('mucomponents _load_data_calib_multigroup_ debug: val = {}'.format(val))
+            self._components_.append(val) # store again [method, [key,...,key]], ismin
+        try:
+            if isinstance(e,int):
+                self._e_ = ones((yf.shape))
+            else:
+                if len(yf.shape)>1:
+                    # print('_load_data_multigroup_ mucomponents debug: x,y,e not e=1')
+                    if e.shape!=yf.shape or x.shape[0]!=yf.shape[-1]:
+                        print('_load_data_multigroup_ mucomponents debug: x,y,e different shape[0]>1')
+                        raise ValueError('x, y, e have different lengths, {},{},{}'.format(x.shape,
+                                                                                       y.shape,
+                                                                                       e.shape))          
+                elif e.shape!=yf.shape or e.shape[0]!=x.shape[0]:
+                    # print('_load_data_multigroup_ mucomponents debug: x,y,e different shape[0]=1')
+                    raise ValueError('x, y, e have different lengths, {},{},{}'.format(x.shape,
+                                                                                           y.shape,
+                                                                                           e.shape))          
+            # print('_load_data_multigroup_ mucomponents debug: defining self._e_')
+            self._e_ = e
+        except ValueError as e:
+            return False, e       
+        return True, '' # no error
+
+    def _load_data_multigroup_calib_(self,x,y,components,e=1): 
+
+        '''
+        for normal asymmetry plot of a calib best fit (or guess)
+        input: 
+            x, y, e are numpy arrays, y, e are 2d 
+            e = 1 or missing yields unitary errors 
+            components is a list [[method,[[key,...],...,[key,...]]],...,[method,[[key...],...,[key,...]]]], 
+                produced by int2_method() from mujpy.aux.aux
+                where method is an instantiation of a component, e.g. self.ml 
+                and value = eval(key) produces the parameter value (the inner key list is for different groups)
+            _add_multigroup_ must produce an 2d function f.shape(ngroup,nbins)
+            therefore _components_ must be a np.vectorize of ngroup copies of the method 
+            method da not allowed here, no need for alpha
+            no fft of residues
+        '''
+        self._x_ = x
+        self._y_ = y        # self._global_ = True if _nglobals_ is not None else False
+        self._components_ = components
+        self._add_ = self._add_single_multigroup_calib_
+        self._ntruecomponents_ = 0
+
+        for k, val in enumerate(components):
+                self._ntruecomponents_ += 1
+        try:
+            if isinstance(e,int):
+                self._e_ = ones((y.shape))
+                # print('mucomponents _load_data_multigroup_calib_ debug, self._e_ = uno'.format(self._e_))    
+            else:
+                if len(y.shape)>1:
+                    if e.shape!=y.shape or x.shape[0]!=e.shape[-1]:
+                        raise ValueError('x, y, e have different lengths, {},{},{}'.format(x.shape,
+                                                                                       y.shape,
+                                                                                       e.shape))          
+                    else:
+                        self._e_ = e
+                        # print('mucomponents _load_data_multigroup_calib_ debug, self._e_ = e')
+                elif e.shape!=y.shape or e.shape[0]!=x.shape[0]:
+                        raise ValueError('x, y, e have different lengths, {},{},{}'.format(x.shape,
+                                                                                       y.shape,
+                                                                                       e.shape))          
+        except ValueError as e:
+            return False, e 
+        return True, '' # no error
+
 #####################################################################################################
 # add methods:
 # the 'time' array is x, not self._x_ because they are invoked by plot with different t vectors
-#  _add_single_ :         single run, single group (still has da)
-#  _add_calib_single_ :   single run single group with recalculation of asymmetry and errors
-#  _add_single_calib_ :   single run single group for calib plot (normal asymmetry)
-#  _add_multigroup_ :     single run multigroup global (for single chisquare)
+#  _add_single_ :           single run, single group (still has da)
+#  _add_calib_single_ :     single run single group with recalculation of asymmetry and errors
+#  _add_single_calib_ :     single run single group for calib plot (normal asymmetry)
+#  _add_multigroup_ :       single run multigroup global (for single chisquare)
+#  _add_calib_multigroup_ : single run multigroup global with recalculation of asymmetry and errors
 #####################################################################################################
 
     def _add_single_(self,x,*argv): 
@@ -297,6 +399,47 @@ class mumodel(object):
             # print('_add_calib_single_ debug f.shape = {}, zeros.shape = {}'.format(f.shape,zeros_like(x).shape))
         return f   
 
+    def _add_single_multigroup_calib_(self,x,*argv):
+        '''
+         input: 
+            x       time array
+            *argv   passed as a variable number of parameter values 
+                    alpha,val1,val2,val3,val4,val5, ... at this iteration 
+                    argv is a list of values [alpha,val1,val2,val3,val4,val5, ...]
+
+        _add_single_calib_ DISTRIBUTES THESE PARAMETER VALUES for plots::
+
+              asymmetry fit with fitted alpha
+              version for plotting calib fits as normal asymmetry fits
+              order driven by model e.g. alml
+        NO FFT mode, no check on self._include_components
+        '''      
+        from numpy import where
+        from mujpy.aux.aux import TauMu_mus
+                
+        f = zeros((self._y_.shape[0],x.shape[0]))  # initialize a 1D array
+        p = argv 
+        # alpha = p[0]
+        # print('_add_calib_single_ debug alpha = {}, p = {}'.format(alpha,p))
+                
+        for j in range(1,self._ntruecomponents_): # all components in model excluding "al", which must always be the first
+            component = self._components_[j][0]
+            keys = self._components_[j][1] # = [keys_1,keys_2,...]
+            # keys = [[p0g0, p0g1,...],[p1g0, p1g1, ..],[p2g0, p2,g1,...]..]
+            # print('add_multigroup mucomponents debug: key = {}'.format(keys))
+            pars = [[key(p) for key in groups_key] for groups_key in keys]# NEW! spedup, evaluates p[1], p[2] etc.
+            f += component(x,*pars)  # must contain x, 
+                                                 # for plot x != self._x_
+            # remember *p.comp means 'pass as many arguments as required by component, exausting the list p_comp'
+
+            # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
+            # pars = [[eval(key) for key in groups_key] for groups_key in keys]
+            # print('add_multigroup mucomponents debug: y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
+            # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
+            # print('add_multigroup mucomponents debug: f.shape = {}, zeros.shape = {}'.format(
+            #                                                         f.shape,zeros_like(x).shape))
+        return f     
+
     def _add_calib_single_(self,x,*argv):
         '''
          input: 
@@ -363,6 +506,72 @@ class mumodel(object):
         # such that method(x,*par_i),  produce the additive function component for group i
         # and par_i[k] = eval(keys_i[k])   
         for j in range(self._ntruecomponents_): # all components in model excluding da
+            component = self._components_[j][0]
+            keys = self._components_[j][1] # = [keys_1,keys_2,...]
+            # keys = [[p0g0, p0g1,...],[p1g0, p1g1, ..],[p2g0, p2,g1,...]..]
+            # print('add_multigroup mucomponents debug: key = {}'.format(keys))
+            pars = [[key(p) for key in groups_key] for groups_key in keys]# NEW! spedup, evaluates p[1], p[2] etc.
+            f += component(x,*pars)  # must contain x, 
+                                                 # for plot x != self._x_
+            # remember *p.comp means 'pass as many arguments as required by component, exausting the list p_comp'
+
+            # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
+            # pars = [[eval(key) for key in groups_key] for groups_key in keys]
+            # print('add_multigroup mucomponents debug: y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
+            # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
+            # print('add_multigroup mucomponents debug: f.shape = {}, zeros.shape = {}'.format(
+            #                                                         f.shape,zeros_like(x).shape))
+        return f     
+
+    def _add_calib_multigroup_(self,x,*argv):   
+        '''
+         input: 
+            x       time array
+            *argv   passed as a variable number of parameter values 
+                    val0,val1,val2,val3,val4,val5, ... at this iteration 
+                    argv is a list of values [val0,val1,val2,val3,val4,val5, ...]
+
+        _add_ DISTRIBUTES THESE PARAMETER VALUES::
+
+              asymmetry fit with fixed alpha
+              order driven by model e.g. mgbl
+        must loop over groups, whose number n = y.shape[0]
+        and produce a n-valued np.array function f, f[k] for y[k],e[k] 
+        '''      
+        from mujpy.aux.aux import TauMu_mus
+        from numpy import where,sqrt,exp,array
+
+        f = zeros((self._yf_.shape[0],x.shape[0]))  # initialize a 2D array        
+        p = argv 
+        # print('mucomponents _add_calib_multigroup_ debug: Minuit p = {}'.format(p))
+        alpha = []
+        for group in self._components_[0][1]:
+            # print('mucomponents _add_calib_multigroup_ debug: group = {}'.format(group))
+            key = group[0]
+            # print('mucomponents _add_calib_multigroup_ debug: component p = {}'.format(key(p)))
+            alpha.append([key(p)])
+        alpha= array(alpha)
+        # print('mucomponents _add_calib_multigroup_ debug: alpha = {}'.format(alpha))
+        #alpha = alpha.transpose() # shape is (ngroups,1)
+        # compute asymmetry and error (needed only by fit, for plot it's a small overhead)
+        # can multiply 2-d np.arrays a*A*b if a.shape,A.shape,b.shape = ((1, n), (m, n), (m, 1))
+        # caution: self._yf_ self._yb_ are (ngroups,nbins), x is (1,nbins) and alpha is (ngropus,1), hence
+        #          alpha multiplies from the right 
+        #          x functions multipy from the left
+        
+        denfactorleft = exp(-x/TauMu_mus())
+        denfactorright = self._yfm_ + self._ybm_*alpha
+        denominator = denfactorleft*denfactorright # f+b normalization count
+        self._y_ = (self._yf_ - self._yb_*alpha - (self._bf_ - self._bb_*alpha)) / denominator 
+        errexp = sqrt(self._yf_ + self._yb_*alpha**2) # equivalent f+b counts
+        errexp[where(errexp==0)] = 1  #   set to 1 the minimum error for zero equivalent f+b counts
+        self._e_ = errexp / denominator 
+        
+        # self._component_ contains [bndkeys,...,bndkeys], as many as the model components (e.g. 2 for mgbl)
+        # bndkeys is [method, [keys_1,keys_2]] if there are 2 groups, keys_i is a list of keys for group i=1,2   
+        # such that method(x,*par_i),  produce the additive function component for group i
+        # and par_i[k] = eval(keys_i[k])   
+        for j in range(1,self._ntruecomponents_): # all components in model excluding "al", which must always be the first
             component = self._components_[j][0]
             keys = self._components_[j][1] # = [keys_1,keys_2,...]
             # keys = [[p0g0, p0g1,...],[p1g0, p1g1, ..],[p2g0, p2,g1,...]..]

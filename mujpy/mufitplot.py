@@ -12,7 +12,7 @@ class mufitplot(object):
 # and calculating chi2.
 # everything can be obtained from dashboard 
 # essentially by replicating what mufit does
-    def __init__(self,plot_range,the_suite,dashboard_file,guess=False,fig=None):
+    def __init__(self,plot_range,the_suite,dashboard_file,guess=False,fig=None,rotating_frame_frequencyMHz = 0.0):
         '''
         input: 
             either
@@ -42,6 +42,7 @@ class mufitplot(object):
                 ok = False
         self.fig = fig  
         if ok:
+            self.rotating_frame_frequencyMHz = rotating_frame_frequencyMHz
             self.guess = guess
             self.model = "model_guess" 
             if not self.guess:
@@ -115,12 +116,12 @@ class mufitplot(object):
             run = self.suite._the_runs_[0]
             if self.multigroup:
                 for k in range(len(self.suite.grouping)):
-                    run_title.append(str(run[0].get_runNumber_int())+': '+get_title(run[0]))
+                    run_title.append(str(run[0].get_runNumber_int())+'-'+get_title(run[0]))
             else:
-                run_title.append(str(run[0].get_runNumber_int())+': '+get_title(run[0]))
+                run_title.append(str(run[0].get_runNumber_int())+'-'+get_title(run[0]))
         else:
             for k,run in enumerate(self.suite._the_runs_):
-                run_title.append(str(run[0].get_runNumber_int())+': '+get_title(run[0]))
+                run_title.append(str(run[0].get_runNumber_int())+'-'+get_title(run[0]))
         return run_title
         
               
@@ -132,10 +133,10 @@ class mufitplot(object):
         from mujpy.aux.aux import multigroup_in_components
         if self.suite.single():
             if self.suite.multi_groups():
+                self.suite.console('Multigroup animation: toggle pause/resume by clicking on the plot')
                 if sum(multigroup_in_components(self.dashboard[0])): # single chi2
                     ok = self.single_plot_multi(plot_range)
                 else:                          # as many chi2 as groups
-                    self.suite.console('Multigroup animation: toggle pause/resume by clicking on the plot')
                     ok = self.single_plot_multi_sequential(plot_range)
             else:                              # simple single plot
                 ok = self.single_plot(plot_range)
@@ -151,12 +152,16 @@ class mufitplot(object):
             asymm, asyme 1d        
         calib pops first par and passes it as alpha to standard plot
         '''
-        from mujpy.aux.aux import int2min
+        from mujpy.aux.aux import int2min, mixer
+        from numpy import cos, pi
         kgroup = 0 # default single group 
         pars,_,_,_,_ = int2min(self.dashboard[0][self.model])
         if self.calib():
             self.suite.grouping[kgroup]['alpha'] = pars[0] # from fit parameter to standard asymmetry mode
         asymm, asyme = self.suite.asymmetry_single(self.suite._the_runs_[0],0)
+        if self.rotating_frame_frequencyMHz:
+            self.rrf_asymm = mixer(self.suite.time,asymm,self.rotating_frame_frequencyMHz)
+            self.rrf_asyme = mixer(self.suite.time,asyme,self.rotating_frame_frequencyMHz)
         #self.suite.console('mufitplot: Inside single plot; debug mode')
         self.multigroup = False
         return self.plot_run(plot_range,pars,asymm,asyme)        
@@ -167,13 +172,27 @@ class mufitplot(object):
             pars, list of one list of fit parameter values
             asymm, asyme 1d        
         '''
-        from mujpy.aux.aux import int2min_multigroup
+        from mujpy.aux.aux import int2min_multigroup, mixer
+        from numpy import cos, pi, vstack
         userpardicts = (self.dashboard[0]["userpardicts_guess"] if self.guess else 
                         self.dashboard[0]["userpardicts_result"])
+        pardict = self.dashboard[0]["model_guess"][0]["pardicts"][0]
         pars,_,_,_,_ = int2min_multigroup(userpardicts)
-        # if self.calib():
-        #     self.suite.grouping[kgroup]['alpha'] = pars[0] # from fit parameter to standard asymmetry mode
-        asymm, asyme = self.suite.asymmetry_multigroup()
+        p = pars
+        if self.calib():
+            for kgroup,group in enumerate(self.suite.grouping):
+                group['alpha'] = eval(pardict["function_multi"][kgroup])
+                self.suite.groups[kgroup]["alpha"] = eval(pardict["function_multi"][kgroup])
+        asymm, asyme = self.suite.asymmetry_multigroup()        
+        if self.rotating_frame_frequencyMHz:
+            # print('mufitplot single_plot_multi debug: asymm.shape[0] = {}'.format(asymm.shape[0]))
+            for k in range(asymm.shape[0]):
+                if not k:
+                    time = self.suite.time
+                else:
+                    time = vstack((time,self.suite.time))
+            self.rrf_asymm = mixer(time,asymm,self.rotating_frame_frequencyMHz)
+            self.rrf_asyme = mixer(time,asyme,self.rotating_frame_frequencyMHz)
         self.multigroup = True
         #self.suite.console('mufitplot: Inside single plot; debug mode')
         return self.plot_run(plot_range,pars,asymm,asyme)        
@@ -188,9 +207,18 @@ class mufitplot(object):
         if model_guess
             reproduces the same from a single guesses            
         '''
-        from mujpy.aux.aux import int2min
+        from mujpy.aux.aux import int2min, mixer
+        from numpy import cos, pi, vstack
         # dashboard is a multi_sequential thing: each sequential fit has its own
-        asymm, asyme = self.suite.asymmetry_multigroup() 
+        asymm, asyme = self.suite.asymmetry_multigroup()
+        if self.rotating_frame_frequencyMHz:
+            for k in range(asymm.shape[0]):
+                if not k:
+                    time = self.suite.time
+                else:
+                    time = vstack((time,self.suite.time))
+            self.rrf_asymm = mixer(time,asymm,self.rotating_frame_frequencyMHz)
+            self.rrf_asyme = mixer(time,asyme,self.rotating_frame_frequencyMHz)
         pars = []
         # self.suite.console('mufitplot: Inside sequential plot; debug mode')
         for kgroup in range(asymm.shape[0]):
@@ -210,7 +238,8 @@ class mufitplot(object):
             pars, list of lists  of fit parameter values
             asymm, asyme 2d
         '''
-        from mujpy.aux.aux import int2min
+        from mujpy.aux.aux import int2min, mixer
+        from numpy import cos, pi, vstack
         
         kgroup = 0 # default single 
         # dashboard must become a suite thing: each sequential fit has its own
@@ -223,6 +252,14 @@ class mufitplot(object):
             pars.append(values)
         asymm, asyme = self.suite.asymmetry_multirun(kgroup) # 
         self.multigroup = False
+        if self.rotating_frame_frequencyMHz:
+            for k in range(asymm.shape[0]):
+                if not k:
+                    time = self.suite.time
+                else:
+                    time = vstack((time,self.suite.time))
+            self.rrf_asymm = mixer(time,asymm,self.rotating_frame_frequencyMHz)
+            self.rrf_asyme = mixer(time,asyme,self.rotating_frame_frequencyMHz)
         return self.plot_run(plot_range,pars,asymm,asyme)        
      
     def plot_run(self,plot_range,pars,asymm,asyme):
@@ -242,7 +279,7 @@ class mufitplot(object):
         Draws either a 2x2 or 2x3 subplots figure 
         using aux.plot functions 
         '''
-        from mujpy.aux.aux import derange, rebin, multigroup_in_components, userpars
+        from mujpy.aux.aux import derange, rebin, multigroup_in_components, userpars, mixer
         from mujpy.aux.plot import set_single_fit, set_sequence_fit
         from iminuit import Minuit
         from numpy import ones 
@@ -255,7 +292,8 @@ class mufitplot(object):
         # print('plot_run mufitplot debug: single not multigroup {}, multigroup in comp {}'.format(self.suite.single() and not self.multigroup,bool(sum(multigroup_in_components(self.dashboard[0])))))
 
         run_title = self.get_run_title()    # always a list, even for single 
-        string = 'global ' if userpars(self.dashboard[0]) else ''            
+        string = 'global ' if userpars(self.dashboard[0]) else ''  
+                  
         if self.guess:
             run_title = [title + ": "+string+"guess values" for title in run_title]
         else:
@@ -276,7 +314,10 @@ class mufitplot(object):
         # load modules and reproduce fit
         t_fit,y_fit,ey_fit = rebin(self.suite.time,asymm,[fit_start,fit_stop],fit_pack,e=asyme)
         # single slices as in fit 
-        nu_fit, f_fit, chi_fit = chi(t_fit,y_fit,ey_fit,pars)             
+        nu_fit, f_fit, chi_fit = chi(t_fit,y_fit,ey_fit,pars)
+        if self.rotating_frame_frequencyMHz: # (t_fit,y_fit,f_fit,ey_fit) the last three must be transformed to rrf
+            _,y_fit,ey_fit = rebin(self.suite.time,self.rrf_asymm,[fit_start,fit_stop],fit_pack,e=self.rrf_asyme)
+            f_fit = mixer(t_fit,f_fit,self.rotating_frame_frequencyMHz)
         if not nu_fit:
             return False
         # function as in fit
@@ -290,18 +331,30 @@ class mufitplot(object):
             
             t_late,y_late,ey_late = rebin(self.suite.time,asymm,[stop,last],packlate,e=asyme)
             # rebinned late slices 
-            tfl,dum = rebin(self.suite.time,asymm,[stop,last],1)
+            packfit = int(packlate/2)
+            tfl,dum = rebin(self.suite.time,asymm,[stop,last],packfit)
             # late time slice for function
             # tfl,fl for late plot curve 
-            _, f_late_res,_  = chi(t_late,None,None,pars)
-            _,fl,_ = chi(tfl,None,None,pars)            # t_late,f_late_res for plotting residues  
-
+            _, f_late_res,_  = chi(t_late,None,None,pars) # for f_late_res calculating residues (on data points)
+            _,fl,_ = chi(tfl,None,None,pars)            # t_late,fls for plotting residues  
+            if self.rotating_frame_frequencyMHz: # (t_late,y_late,f_late_res,ey_late) the last three must be transformed to rrf
+                                                 # (tfl,fl) non rebinned, the last must be transformed to rrf
+                _,y_late,ey_late = rebin(self.suite.time,self.rrf_asymm,[start,stop],packlate,e=self.rrf_asyme)
+                f_late_res = mixer(t_late, f_late_res,self.rotating_frame_frequencyMHz) 
+                fl = mixer(tfl, fl,self.rotating_frame_frequencyMHz) 
             
             fit_late_start = int(stop/packlate*fit_pack) # divides fit_range in early and late
+            
+            # redo the same with the original fit binning fit_pack, only for histo and chi2
             t_fit_late,y_fit_late,ey_fit_late = rebin(self.suite.time,asymm,        
                                                 [fit_late_start,fit_stop],fit_pack,e=asyme)
-            # single slices as in fit 
+            # no rotating frame version for this!
             nu_fit_late, f_fit_late, chi_fit_late = chi(t_fit_late,y_fit_late,ey_fit_late,pars)
+            if self.rotating_frame_frequencyMHz: # (t_fit_late,y_fit_late,f_fit_late,ey_fit_late) the last three must be transformed to rrf
+                _,y_fit_late,ey_fit_late = rebin(self.suite.time,self.rrf_asymm,[fit_start,fit_late_start],fit_pack,e=self.rrf_asyme)
+                f_fit_late = mixer(t_fit_late, f_fit_late,self.rotating_frame_frequencyMHz) 
+            print('mufitplot plot_run debug: y_fit_late ey_fit_late f_fit_late shape = {},  {},  {}'.format(y_fit_late.shape, ey_fit_late.shape, f_fit_late.shape))
+
             if not nu_fit_late:
                 return False
             # function as in fit
@@ -310,6 +363,10 @@ class mufitplot(object):
                                                 [fit_start,fit_late_start],fit_pack,e=asyme)
             # single slices as in fit 
             nu_fit_early, f_fit_early, chi_fit_early = chi(t_fit_early,y_fit_early,ey_fit_early,pars)
+            if self.rotating_frame_frequencyMHz:
+                _,y_fit_early,ey_fit_early = rebin(self.suite.time,self.rrf_asymm,[fit_start,fit_late_start],fit_pack,e=self.rrf_asyme)
+                f_fit_early = mixer(t_fit_early, f_fit_early,self.rotating_frame_frequencyMHz) 
+
             if not nu_fit_early:
                 return False
             # function as in fit
@@ -331,14 +388,21 @@ class mufitplot(object):
         t,y,ey = rebin(self.suite.time,asymm,[start,stop],pack,e=asyme)
         # rebinned single or early slices 
         nudum, f_res, _ = chi(t,y,ey,pars)
+        packfit = int(pack/2)
+        tf,dum = rebin(self.suite.time,asymm,[start,stop],packfit)
+        # single or early time slice for plot function 
+        _,f,_ = chi(tf,None,None,pars)
+        if self.rotating_frame_frequencyMHz: # (t,y,f_res,ey) the last three must be transformed to rrf
+                                             # (tf,f) non rebinned, the last must be transformed to rrf
+            _,y,ey = rebin(self.suite.time,self.rrf_asymm,[start,stop],pack,e=self.rrf_asyme)
+            f_res = mixer(t, f_res,self.rotating_frame_frequencyMHz) 
+            f = mixer(tf, f,self.rotating_frame_frequencyMHz) 
+        
         if not nudum:
             return False
         # print('nu = {}, chi_res = {}'.format(nu,chi_res))
         # t,fres calculated on plot points for residues
 
-        tf,dum = rebin(self.suite.time,asymm,[start,stop],1)
-        # single or early time slice for plot function 
-        _,f,_ = chi(tf,None,None,pars)
 
         
         # assume self.suite.single() 
@@ -379,7 +443,7 @@ class mufitplot(object):
                                     run_title,
                                     chi_dof,
                                     data_late,
-                                    chi_dof_late)
+                                    chi_dof_late,rrf=self.rotating_frame_frequencyMHz)
         return True
 
     def chi_1(self,t,yin,eyin,pars):
@@ -395,7 +459,6 @@ class mufitplot(object):
         '''
         from mujpy.aux.aux import _nparam, int2_method_key, int2_calib_method_key      
         from mujpy.aux.aux import multigroup_in_components, int2_multigroup_method_key   
-        from numpy import vstack
         
         # print('chi_1 mufitplot debug: {}'.format(pars)) 
         if sum(multigroup_in_components(self.dashboard[0])):
@@ -417,7 +480,11 @@ class mufitplot(object):
         if yin is not None: # data are not None
         # (int2_calib_method_key(self.dashboard[0],self._the_model_) if self.calib() else
             if sum(multigroup_in_components(self.dashboard[0])):
-                ok, msg = self._the_model_._load_data_multigroup_(t,yin,methods_keys,e=eyin) 
+                if self.calib():
+                    # print('mufitplot chi_1 debug: y.shape = {}, e.shape = {}'.format(eyin.shape,yin.shape))
+                    ok, msg = self._the_model_._load_data_multigroup_calib_(t,yin,methods_keys,e=eyin) 
+                else:
+                    ok, msg = self._the_model_._load_data_multigroup_(t,yin,methods_keys,e=eyin)
             elif self.calib():
                 ok, msg = self._the_model_._load_data_calib_(t,yin,methods,self.suite.grouping[kgroup]['alpha'],e=eyin) 
             else:
@@ -452,7 +519,6 @@ class mufitplot(object):
         deals also with cases where only f is needed (plot function)
         '''
         from mujpy.aux.aux import _nparam, int2_method_key
-        from numpy import vstack
         
         # print('chi_2 muplotfit debug: pars = {}'.format(pars)) 
         if len(self.suite.grouping)==1 or self.model == "model_guess":

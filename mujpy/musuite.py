@@ -138,7 +138,7 @@ class suite(object):
         from mujpy.muisis2py.muisis2py import muisis2py as isisload
         # muisis2py has the same methods as musr2py
         from mujpy.aux.aux import get_datafilename, get_title
- 
+
         read_ok = True
         runadd = []
         for j,run in enumerate(self.runs[k]): # run is a single run number
@@ -640,6 +640,44 @@ class suite(object):
         #############################################################
         # rebin eA works for ISIS, must be corrected for PSI        #
         # yfm, ybm depend on binning   
+
+    def single_multigroup_for_back_counts(self,runs,groupings):
+        """
+        * input: 
+        *         runs, runs to add
+        *         grouping, dict with list of detectors 
+                            grouping['forward'] and grouping['backward']
+        * output:
+        *         yforw, ybackw  
+        *                        = sum_{i=for or back}(data_i - background_i), PSI, 
+        *                        = sum_{i=for or back}data_i, ISIS
+        *         background_forw  =
+        *         background_backw = average backgrounds
+        *         yfbmean        = mean of (yforw-bf)*exp(t/TauMu)
+        *         ybackw         = mean of (ybackw-bb)*exp(t/TauMu)
+        * used only by calib multigroups
+        * yforw, ybackw are 2D numpy arrays, the last four output items are arrays 
+        """
+        from numpy import vstack,array
+        bf,bb,yfm,ybm = [],[],[],[]
+        for k,grouping in enumerate(groupings):
+            yforw, ybackw, background_forw, background_backw, yforwm, ybackwm = self.single_for_back_counts(runs,grouping)
+            bf.append(background_forw)
+            bb.append(background_backw)
+            yfm.append(yforwm)
+            ybm.append(ybackwm)
+            if k:
+                yf = vstack((yf,yforw))
+                yb = vstack((yb,ybackw))
+            else:
+                yf = yforw
+                yb = ybackw
+        bf = array(bf)
+        bb = array(bb)
+        yfm = array(yfm)
+        ybm = array(ybm)
+        return yf,yb,bf,bb,yfm,ybm
+        
 
     def asymmetry_single(self,the_run,kgroup):
         """

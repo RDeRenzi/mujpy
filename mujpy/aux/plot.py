@@ -186,7 +186,7 @@ def set_fig(num,nrow,ncol,title,**kwargs):  # NOT CLEAR WHERE IT IS USED
     fig.canvas.manager.set_window_title(title)
     return fig, ax  
 
-def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late):
+def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):
     '''
     input:
         
@@ -289,11 +289,15 @@ def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,c
                                       w_early,
                                       dy_fit_late,
                                       w_late)   
-    suptitle(run_title)                                   
+    if rrf:
+        string = r'$\nu_R=$'+'{:.1f}MHz   '.format(rrf)
+        suptitle(string+run_title,x=-0.125,ha='right')    
+    else:
+        suptitle(run_title)                           
     draw(fig)
     return fig
 
-def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late):
+def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):
     '''
     input:
         
@@ -337,7 +341,10 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         global ax_0
         
         #print('animate_fit: plot debug: Hey, I am here!, i = {}'.format(i))
-        supti.set_text(run_title[i])
+        if rrf:
+            supti.set_text(stringrrf+run_title[i]) 
+        else:
+            supti.set_text(run_title[i]) 
         line.set_ydata(y[i]) # begin errorbar
         segs = [array([[q,w-a],[q,w+a]]) for q,w,a in zip(t,y[i],ey[i])]
         ye[0].set_segments(segs) 
@@ -361,10 +368,10 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         # update text
         if len(fgroup)==1:
             string1 = 'F-B: {} - {}\n'.format(fgroup[0],bgroup[0])
-            string1 += r'$\alpha=$ {}'.format(alpha[0])
+            string1 += r'$\alpha=$ {:.4f}'.format(alpha[0])
         else:
             string1 = 'F-B: {} - {}\n'.format(fgroup[i],bgroup[i])
-            string1 += r'$\alpha=$ {}'.format(alpha[i])
+            string1 += r'$\alpha=$ {:.4f}'.format(alpha[i])
         string1 += '\n$\chi^2_f=$ {:.4f}\n ({:.2f}-{:.2f})\n{} dof'.format(chi_fit[i],lc,hc,nu_fit) 
         text1.set_text(string1)
 
@@ -422,7 +429,10 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
 #        nu_fit, chi_fit = chi_dof
 
         # print('init_animate_fit: plot debug: Hey, I am here!')
-        supti.set_text(run_title[0]) 
+        if rrf:
+            supti.set_text(stringrrf+run_title[0]) 
+        else:
+            supti.set_text(run_title[0]) 
         line.set_ydata(y[0]) # begin errorbar
         segs = [array([[q,w-a],[q,w+a]]) for q,w,a in zip(t,y[0],ey[0])]
         ye[0].set_segments(segs)
@@ -441,7 +451,7 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
 
         # update text
         string1 = 'F-B: {} - {}\n'.format(fgroup[0],bgroup[0])
-        string1 += r'$\alpha=$ {}'.format(alpha[0])
+        string1 += r'$\alpha=$ {:.4f}'.format(alpha[0])
         string1 += '\n$\chi^2_f=$ {:.4f}\n ({:.2f}-{:.2f})\n{} dof'.format(chi_fit[0],lc,hc,nu_fit) 
         text1.set_text(string1)
 
@@ -556,7 +566,7 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
  
         line, xe, ye = errorb(ax_early,t,y[0],ey[0],color[0])
         fline = plot_fit(ax_early,tf,f[0],color[1])
-        res = plot_res(ax_early_res,t,y[0]-f_res[0],color[0])
+        res = plot_res(ax_early_res,t,y[0]-f_res[0],color[0],rrf=rrf,early=True)
         linel, xel, yel = errorb(ax_late,t_late,y_late[0],ey_late[0],color[2])
         flinel = plot_fit(ax_late,tfl,fl[0],color[1])
         resl = plot_res(ax_late_res,t_late,y_late[0]-f_late_res[0],color[2])
@@ -632,7 +642,11 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
                                             blit=False)
 
     fig.canvas.mpl_connect('button_press_event', toggle_pause)
-    supti = P.suptitle(run_title[0]) # 'large','small'
+    if rrf:
+        stringrrf = r'$\nu_R=$'+'{:.1f}MHz   '.format(rrf)
+        supti = P.suptitle(stringrrf+run_title[0])#,x=-0.125,ha='right')    
+    else:
+        supti = P.suptitle(run_title[0]) # 'large','small'
     draw(fig)
     return fig
 
@@ -788,7 +802,7 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
     hc = 1+hb[max(list(where((cc<norm.cdf(1))&(cc>norm.cdf(-1))))[0])]/nu_fit
     
     string1 = 'F-B: {} - {}\n'.format(fgroup,bgroup)
-    string1 += r'$\alpha$ = {:.4f}'.format(alpha)
+    string1 += r'$\alpha=$ {:.4f}'.format(alpha)
     string1 += '\n$\chi^2_r=$ {:.3f}\n ({:.2f}-{:.2f})\n{} dof'.format(chi_fit,lc,hc,nu_fit)
     text1 = ax.text(xtxt,ylim[0]+0.55*dylim,string1,bbox={'facecolor': 'white', 'pad': pad}) 
     ax.axis('off')
