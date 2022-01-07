@@ -6,6 +6,7 @@
     {
       "name": "mg",
       "label": "T_fast",
+      "fft": false,
       "pardicts": [
         {
           "name": "A",
@@ -56,6 +57,7 @@
     {
       "name": "ml",
       "label": "T_slow",
+      "fft": false,
       "pardicts": [
         {
           "name": "A",

@@ -422,11 +422,6 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         '''
         from  numpy import histogram, array
         global ax_0
-#        # unpack data, chi_dof
-#        # data packed by mufitplot: 
-#        t, y, ey, f_res, tf, f, dy_fit = data
-#        # chi_dof packed by mufitplot: 
-#        nu_fit, chi_fit = chi_dof
 
         # print('init_animate_fit: plot debug: Hey, I am here!')
         if rrf:
@@ -516,16 +511,19 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
     prop_cycle = rcParams['axes.prop_cycle']
     color = prop_cycle.by_key()['color']
     anim_delay = 1000.
+#        # unpack data, chi_dof
+#        # data packed by mufitplot: 
+#        # chi_dof packed by mufitplot: 
 
     t, y, ey, f_res, tf, f, dy_fit = data
-#    print('debug-plot: sizes t {}, y {}, ey {}, f_res {}, tf {}, f {}, dy_fit {}'.format(
-#                                                                                  t.shape,
-#                                                                                  y.shape,
-#                                                                                  ey.shape,
-#                                                                                  f_res.shape,
-#                                                                                  tf.shape,
-#                                                                                  f.shape,
-#                                                                                  dy_fit.shape))
+#    print('aux plot debug: max, min t {}, y {}, ey {}, f_res {}, tf {}, f {}, dy_fit {}'.format(
+#                                                                                 [t.min(),t.max()],
+#                                                                                 [y.min(),y.max()],
+#                                                                               [ey.min(),ey.max()],
+#                                                                         [f_res.min(),f_res.max()],
+#                                                                               [tf.min(),tf.max()],
+#                                                                                 [f.min(),t.max()],
+#                                                                      [dy_fit.min(),dy_fit.max()]))
     fgroup, bgroup, alpha = group
     nu_fit, chi_fit = chi_dof  
     n = len(chi_fit)
@@ -566,7 +564,7 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
  
         line, xe, ye = errorb(ax_early,t,y[0],ey[0],color[0])
         fline = plot_fit(ax_early,tf,f[0],color[1])
-        res = plot_res(ax_early_res,t,y[0]-f_res[0],color[0],rrf=rrf,early=True)
+        res = plot_res(ax_early_res,t,y[0]-f_res[0],color[0])
         linel, xel, yel = errorb(ax_late,t_late,y_late[0],ey_late[0],color[2])
         flinel = plot_fit(ax_late,tfl,fl[0],color[1])
         resl = plot_res(ax_late_res,t_late,y_late[0]-f_late_res[0],color[2])
@@ -649,6 +647,135 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         supti = P.suptitle(run_title[0]) # 'large','small'
     draw(fig)
     return fig
+
+def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
+    '''
+    input:
+        fig_fft figure handle
+        model_name e.g. "mgml"
+        f frequency slice
+        a data fft real part slice
+        af partial model fft real part slice
+        e, scalar, std on a, af
+    output the figure (anim for 2,3d a, af)
+    '''
+    from numpy import arange, array
+    from mujpy.aux.aux import autops, ps, _ps_acme_score, _ps_peak_minima_score
+    from copy import deepcopy
+    import matplotlib.pyplot as P
+    from matplotlib.path import Path
+    import matplotlib.patches as patches
+    import matplotlib.animation as animation
+
+    ###################
+    # PYPLOT ANIMATIONS
+    ###################
+    def animate_fft(i):
+        '''
+        anim function
+        update fft data, fit fft and their color 
+
+        '''
+        # color = next(ax_fft._get_lines.prop_cycler)['color']
+        ax_fft.set_title(run_title[i])
+        marks.set_ydata(ap[i,:])
+        segs = [array([[q,w-a],[q,w+a]]) for q,w,a in zip(f,ap[i],ap[0]-ap[0]+ep[0])]
+        ye[0].set_segments(segs)
+        fline.set_ydata(apf[i,:])
+        return marks, ye, fline
+
+
+    def init_animate_fft():
+        '''
+        anim init function
+        blitting (see wikipedia)
+        to give a clean slate 
+
+        '''
+        ax_fft.set_title(run_title[0])
+        marks.set_ydata(ap[0,:])
+        segs = [array([[q,w-a],[q,w+a]]) for q,w,a in zip(f,ap[0],ap[0]-ap[0]+ep[0])]
+        # print('plot init_animate_fft debug: ye = {}'.format(ye))
+        ye[0].set_segments(segs)
+        fline.set_ydata(apf[0,:])
+        return marks, ye, fline 
+
+    global paused_fft
+    global anim_fft
+
+    paused_fft = False
+    def toggle_pause_fft(*args, **kwargs):
+        global paused_fft
+        global anim_fft
+        if paused_fft:
+            anim_fft.event_source.start() # matplotlib.__version__ >= 3.4 
+            # animation.event_source.start()
+        else:
+            anim_fft.event_source.stop() # if matplotlib.__version__ >= 3.4 
+            # animation.event_source.stop()
+        paused_fft = not paused_fft   
+    
+    ########################
+    # build or recall Figure
+    ########################
+    font = {'family':'Ubuntu','size':10}
+    P.rc('font', **font)
+    anim_delay = 1000.
+
+    if fig_fft: # has been set to a handle once
+        fig_fft.clf()
+        fig_fft,ax_fft = P.subplots(num=self.fig_fft.number)
+    else: # handle does not exist, make one
+        fig_fft,ax_fft = P.subplots(figsize=(6,4))
+        fig_fft.canvas.manager.set_window_title('FFT')
+    ax_fft.set_xlabel('Frequency [MHz]')
+    ax_fft.set_title(run_title[0]+' - '+model_name)
+    xm, xM = f.min(),f.max()                    
+    ax_fft.set_xlim(xm,xM)
+
+
+    yM = 1.02*max(ap.max(),apf.max())
+    # print('plot set_figure_fft debug: ap.min()={}, apf.min()={}'.format(ap.min(),apf.min())) 
+    ym = min(0,1.02*ap.min(),1.02*apf.min())
+    if len(ap.shape)==1: # single 
+        ax_fft.errorbar(f,ap,'o',yerr=ep,ms=2,alpha=0.8)
+        ax_fft.plot(f,apf,'-',lw=1,alpha=0.8)
+    ##########################
+    # animation initial plot #
+    ##########################
+    else: # multigroup and/or multirun
+        # print('plot set_figure_fft debug: ep = {}'.format(ep[0]))
+
+        marks, xe, ye, = ax_fft.errorbar(f,ap[0,:],fmt='o',yerr=ep[0],ms=2,alpha=0.8)
+        fline, = ax_fft.plot(f,apf[0,:],'-',lw=1,alpha=0.8)
+        #######
+        # anim
+        #######
+    ax_fft.set_ylim(ym,yM)
+    
+    ax_fft.text(0.75*xM,ym-0.125*(yM-ym),'Click to pause/resume',fontsize='medium')
+    if len(ap.shape)>1:
+        anim_fft = animation.FuncAnimation(fig_fft, animate_fft, 
+                                                frames=range(len(run_title)),
+                                                init_func=init_animate_fft,
+                                                interval=anim_delay,
+                                                repeat=True,
+                                                blit=False)
+    fig_fft.canvas.mpl_connect('button_press_event', toggle_pause_fft)
+
+#        # print('f.shape = {}, ap.shape = {}'.format(f.shape,ap.shape))  
+#        ax_fft.plot(f[k],ap[k],'o',ms=2,alpha=0.5,color=color[k]) # f, ap, apf are     plotiled!
+#        ax_fft.plot(f[k],apf[k],'-',lw=1,alpha=0.5,color=color[k])
+#        ax_fft.fill_between([f[0,0],f[0,-1]],[k*yoffset,k*yoffset],[k*yoffset+fft_e[k],k*yoffset+fft_e[k]],facecolor=color[k],alpha=0.2)
+        ###################
+        # errors, alpha_version for single
+        ################### 
+#                    if self._single_: 
+
+    ax_fft.set_ylabel(ylabel)
+
+    fig_fft.canvas.manager.window.tkraise()
+    P.draw()
 
 
 def errorb(ax,t,y,ey,color):
@@ -894,7 +1021,6 @@ def plot_chi2(ax,dy_fit,nu_fit,dy_early,w_early,dy_late,w_late):
         return vertf, nhistf, bottom, xbin, vertl, nhistl, verte, nhiste
     else:
         return vertf, nhistf, bottom, xbin, None, None, None, None
-        
 
 def draw(fig):
     '''
@@ -903,4 +1029,4 @@ def draw(fig):
 
     fig.canvas.manager.window.tkraise()# fig.canvas.manager.window.raise_()
     draw_now()
-
+    

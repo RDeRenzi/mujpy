@@ -30,10 +30,18 @@ class mumodel(object):
                (1+1/\sqrt{3})\cos\pi\gamma_\mu\mbox{dipfield}(3+\sqrt{3})\,t ]\exp(-\mbox{Lor_rate}\,t)$', 
                      'kg':r'Gauss Kubo-Toyabe: static and dynamic, in zero or longitudinal field by G. Allodi [Phys Scr 89, 115201]'}
         self._axis_ = None # for self._chisquare_ when set 0,1 sums only along that axis
-        # self._alpha_ =  [] to be deleted
     # ---- end generic __init__
+    
+###############################################################################
+# General structure:
+# _load_... loads data and defines which _add_... method
+# _add_... distributes Minuit parameters to components, adds components into model function
+# calib is dealt differently in fit where 
+#                    alpha is a parameter and asymmetry,errors must be recalculated
+#                    and in plot where alpha is used to caclulate asymmetry, error data
+# fft has its own
 
-    def _load_data_(self,x,y,_components_,_alpha_,e=1):
+    def _load_data_(self,x,y,_components_,e=1):
         '''
         input: 
             x, y, e are numpy arrays, y, e are 1d 
@@ -42,19 +50,16 @@ class mumodel(object):
                 produced by int2_method() from mujpy.aux.aux
                 where method is an instantiation of a component, e.g. self.ml 
                 and value = eval(key) produces the parameter value
-            _alpha_ is the fixed value used to produce asymmetry y and needed only by method da
-        the argument _components_ is stored in self._components_
         '''
         # self._components_ = [[method,[key,...,key]],...,[method,[key,...,key]]], and eval(key) produces the parmeter value
-        # self._alpha_, self._da_index_ (index of dalpha or [])
-        # self._ntruecomponents_ = number of components apart from dalpha 
         self._x_ = x
         self._y_ = y        # self._global_ = True if _nglobals_ is not None else False
-        self._alpha_ = _alpha_
         self._components_ = []
         self._da_index_ = []
         self._add_ = self._add_single_
         self._ntruecomponents_ = 0
+        self._n0truecomponents_ = 0
+        
 
         for k, val in enumerate(_components_):
             if val[0]: # val[0] is directly the method for all components but dalpha
@@ -110,13 +115,15 @@ class mumodel(object):
         self._add_ = self._add_calib_single_
         # print('_load_calib_single_data_ in mucomponents debug: self._add_ = {}'.format(self._add_))
         self._ntruecomponents_ = 0
+        self._n0truecomponents_ = 1
+
         for k, val in enumerate(components):
             #if val[0]: # val[0] is directly the method for all components but al
             # however al is taken care of by range(1,self._ntruecomponents_) in _add_calib_single_
             self._ntruecomponents_ += 1 # total number of components including 'al'
         # print('_load_calib_single_data_ mucomponents debug: self._ntruecomponents_ = {}'.format(self._ntruecomponents_))
 
-    def _load_data_calib_(self,x,y,components,_alpha_,e=1): 
+    def _load_data_calib_(self,x,y,components,e=1): 
 
         '''
         for normal asymmetry plot of a calib best fit (or guess)
@@ -127,18 +134,16 @@ class mumodel(object):
                 produced by int2_method() from mujpy.aux.aux
                 where method is an instantiation of a component, e.g. self.ml 
                 and value = eval(key) produces the parameter value
-            _alpha_ is the fixed value used to produce asymmetry y and needed only by method da
         the argument _components_ is stored in self._components_
         '''
         # self._components_ = [[method,[key,...,key]],...,[method,[key,...,key]]], and eval(key) produces the parmeter value
-        # self._alpha_, self._da_index_ (index of dalpha or [])
         # self._ntruecomponents_ = number of components apart from dalpha 
         self._x_ = x
         self._y_ = y        # self._global_ = True if _nglobals_ is not None else False
-        self._alpha_ = _alpha_
         self._components_ = components
-        self._add_ = self._add_single_calib_
+        self._add_ = self._add_single_ # calib_ #  always preceed by _load_data_calib_
         self._ntruecomponents_ = 0
+        self._n0truecomponents_ = 1
 
         for k, val in enumerate(components):
                 self._ntruecomponents_ += 1
@@ -178,13 +183,13 @@ class mumodel(object):
             no fft of residues
         '''
         # self._components_ = [[method,[key,...,key]],...,[method,[key,...,key]]], and eval(key) produces the parmeter value
-        # self._alpha_, self._da_index_ (index of dalpha or [])
         # self._ntruecomponents_ = number of components apart from dalpha 
         self._x_ = x
         self._y_ = y        # self._global_ = True if _nglobals_ is not None else False
         self._components_ = []
         self._add_ = self._add_multigroup_
         self._ntruecomponents_ = 0
+        self._n0truecomponents_ = 0
 
         for k, val in enumerate(components):
             self._ntruecomponents_ += 1
@@ -228,7 +233,6 @@ class mumodel(object):
             no fft of residues
         '''
         # self._components_ = [[method,[key,...,key]],...,[method,[key,...,key]]], and eval(key) produces the parmeter value
-        # self._alpha_, self._da_index_ (index of dalpha or [])
         # self._ntruecomponents_ = number of components apart from dalpha 
         self._x_ = x
         self._yf_ = yf 
@@ -240,6 +244,7 @@ class mumodel(object):
         self._components_ = []
         self._add_ = self._add_calib_multigroup_
         self._ntruecomponents_ = 0
+        self._n0truecomponents_ = 1
 
         for k, val in enumerate(components):
             self._ntruecomponents_ += 1
@@ -286,8 +291,10 @@ class mumodel(object):
         self._x_ = x
         self._y_ = y        # self._global_ = True if _nglobals_ is not None else False
         self._components_ = components
-        self._add_ = self._add_single_multigroup_calib_
+        self._add_ = self._add_multigroup_ # single_multigroup_calib_ 
+        self.ntruecomp = 1
         self._ntruecomponents_ = 0
+        self._n0truecomponents_ = 1
 
         for k, val in enumerate(components):
                 self._ntruecomponents_ += 1
@@ -318,8 +325,10 @@ class mumodel(object):
 #  _add_single_ :           single run, single group (still has da)
 #  _add_calib_single_ :     single run single group with recalculation of asymmetry and errors
 #  _add_single_calib_ :     single run single group for calib plot (normal asymmetry)
+#                                  use _add_single_ after _load_data_calib_
 #  _add_multigroup_ :       single run multigroup global (for single chisquare)
 #  _add_calib_multigroup_ : single run multigroup global with recalculation of asymmetry and errors
+#  _add_fft_ : single run, single group for partial residues
 #####################################################################################################
 
     def _add_single_(self,x,*argv): 
@@ -335,13 +344,10 @@ class mumodel(object):
               asymmetry fit with fixed alpha
               order driven by model e.g. blml
 
-        UNIFIED WITH FFT, where, for each component f adds it::
-   
-            if self._fft_include_components[j] else 0. 
-            if if self._fft_include_da else f
+        Removed "da" forever - use calib instead
 
-        FINAL COMMMENT: eval implies both a python time overhead and a security breach
-                        is there a way to avoid it, implementing free parameter functions?    
+        Removed FFT, see _add_fft_ instead
+
         '''      
 
         f = zeros_like(x)  # initialize a 1D array
@@ -355,90 +361,55 @@ class mumodel(object):
             # print('y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
             # print('pars = {}'.format(pars))
             # print('f.shape = {}, zeros.shape = {}'.format(f.shape,zeros_like(x).shape))
-            f += component(x,*pars) if self._include_components[j] else 0. # must contain x, 
-                                                                           # for plot x != self._x_
+            f += component(x,*pars)  # if self._include_components[j] else 0. # removed 2.0
+                                     # must contain x, for plot x != self._x_
             # remember *p.comp means 'pass as many arguments as required by component, exausting the list p_comp'
-        if self._da_index_:  # linearized correction 
-            dalpha = p[self._da_index_-1]
-            dada = dalpha/self._alpha_
-            f = ((2.+dada)*f-dada)/((2.+dada)-dada*f) if self._include_da else f
-        return f     
-
-    def _add_single_calib_(self,x,*argv):
+#        if self._da_index_:  # linearized correction 
+#            dalpha = p[self._da_index_-1]
+#            dada = dalpha/self._alpha_
+#            f = ((2.+dada)*f-dada)/((2.+dada)-dada*f) if self._include_da else f
+        return f
+        
+    def _add_fft_(self,x,y,*argv,calib = False):
         '''
-         input: 
-            x       time array
-            *argv   passed as a variable number of parameter values 
-                    alpha,val1,val2,val3,val4,val5, ... at this iteration 
-                    argv is a list of values [alpha,val1,val2,val3,val4,val5, ...]
-
-        _add_single_calib_ DISTRIBUTES THESE PARAMETER VALUES for plots::
-
-              asymmetry fit with fitted alpha
-              version for plotting calib fits as normal asymmetry fits
-              order driven by model e.g. alml
-        NO FFT mode, no check on self._include_components
-        '''      
-        from numpy import where
-        from mujpy.aux.aux import TauMu_mus
-                
-        f = zeros_like(x)  # initialize a 1D array
-        p = argv 
-        # alpha = p[0]
-        # print('_add_calib_single_ debug alpha = {}, p = {}'.format(alpha,p))
-                
-        for j in range(1,self._ntruecomponents_): # all components in model, excluding alpha
-            method = self._components_[j][0]
-            keys = self._components_[j][1] 
-            pars = [key(p) for key in keys] # NEW! spedup, evaluates p[1], p[2] etc.
-            f += method(x,*pars)  # must contain x, for plot x != self._x_
-            # remember *p.comp means 'pass as many arguments as required by component, exausting the list p_comp'
-
-            # print('_add_calib_single_ debug y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
-            # print('_add_single_calib_ debug pars = {} for component {}/{}'.format(pars,j+1,self._ntruecomponents_))
-            # print('_add_calib_single_ debug f.shape = {}, zeros.shape = {}'.format(f.shape,zeros_like(x).shape))
-        return f   
-
-    def _add_single_multigroup_calib_(self,x,*argv):
+        input:
+            x time array, 1d
+            *argv Minuit parameters
+          Called only externally. Produces f for the fft of residues in mufitplot::
+          
+            y - f
+          
+          Components can be selectively added to f
+          i.e. subtracted in the residues::
+   
+            f += method(x,*pars) if self._include_components[j] else 0. 
+            
+          For the time being only single run single group (f is 1d)
         '''
-         input: 
-            x       time array
-            *argv   passed as a variable number of parameter values 
-                    alpha,val1,val2,val3,val4,val5, ... at this iteration 
-                    argv is a list of values [alpha,val1,val2,val3,val4,val5, ...]
-
-        _add_single_calib_ DISTRIBUTES THESE PARAMETER VALUES for plots::
-
-              asymmetry fit with fitted alpha
-              version for plotting calib fits as normal asymmetry fits
-              order driven by model e.g. alml
-        NO FFT mode, no check on self._include_components
-        '''      
-        from numpy import where
-        from mujpy.aux.aux import TauMu_mus
-                
-        f = zeros((self._y_.shape[0],x.shape[0]))  # initialize a 1D array
-        p = argv 
-        # alpha = p[0]
-        # print('_add_calib_single_ debug alpha = {}, p = {}'.format(alpha,p))
-                
-        for j in range(1,self._ntruecomponents_): # all components in model excluding "al", which must always be the first
-            component = self._components_[j][0]
-            keys = self._components_[j][1] # = [keys_1,keys_2,...]
-            # keys = [[p0g0, p0g1,...],[p1g0, p1g1, ..],[p2g0, p2,g1,...]..]
-            # print('add_multigroup mucomponents debug: key = {}'.format(keys))
-            pars = [[key(p) for key in groups_key] for groups_key in keys]# NEW! spedup, evaluates p[1], p[2] etc.
-            f += component(x,*pars)  # must contain x, 
-                                                 # for plot x != self._x_
+        f = zeros_like(y)  # initialize a 1D array
+        for k,p in enumerate(argv):
+            # print('mucomponent _add_fft_ debug: p {}'.format(p[-1]))
+            ntruecomp = 1 if calib else 0
+            # print('add_single mucomponents debug: p = {}'.format(p))
+            for j in range(ntruecomp,self._ntruecomponents_): # all components in model excluding da
+                component = self._components_[j][0]
+                keys = self._components_[j][1] 
+                # print('mucomponent _add_fft_ debug: component {}, keys {}'.format(component,keys))
+                # print('add_fft_ mucomponents debug: keys = {}'.format(keys))
+#                for key in keys:
+#                    print('mucomponent add_fft_ debug: key(p) = {}'.format(key(p)))
+                pars = [key(p) for key in keys] # NEW! spedup, evaluates p[1], p[2] etc.
+                # print('y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
+                # print('pars = {}'.format(pars))
+                # print('f.shape = {}, zeros.shape = {}'.format(f.shape,zeros_like(x).shape))
+                f[k,:] += component(x,*pars) if self._include_components[j] else 0. # new 2.0
+                                     # must contain x, for plot x != self._x_
             # remember *p.comp means 'pass as many arguments as required by component, exausting the list p_comp'
-
-            # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
-            # pars = [[eval(key) for key in groups_key] for groups_key in keys]
-            # print('add_multigroup mucomponents debug: y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
-            # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
-            # print('add_multigroup mucomponents debug: f.shape = {}, zeros.shape = {}'.format(
-            #                                                         f.shape,zeros_like(x).shape))
-        return f     
+#        if self._da_index_:  # linearized correction 
+#            dalpha = p[self._da_index_-1]
+#            dada = dalpha/self._alpha_
+#            f = ((2.+dada)*f-dada)/((2.+dada)-dada*f) if self._include_da else f
+        return f
 
     def _add_calib_single_(self,x,*argv):
         '''
@@ -470,7 +441,7 @@ class mumodel(object):
         errexp[where(errexp==0)] = 1  #   set to 1 the minimum error for zero equivalent f+b counts
         self._e_ = errexp / denominator 
                 
-        for j in range(1,self._ntruecomponents_): # all components in model, excluding alpha
+        for j in range(self._n0truecomponents_,self._ntruecomponents_): # all components in model, excluding alpha
             method = self._components_[j][0]
             keys = self._components_[j][1] 
             pars = [key(p) for key in keys] # NEW! spedup, evaluates p[1], p[2] etc.
@@ -505,7 +476,7 @@ class mumodel(object):
         # bndkeys is [method, [keys_1,keys_2]] if there are 2 groups, keys_i is a list of keys for group i=1,2   
         # such that method(x,*par_i),  produce the additive function component for group i
         # and par_i[k] = eval(keys_i[k])   
-        for j in range(self._ntruecomponents_): # all components in model excluding da
+        for j in range(self._n0truecomponents_,self._ntruecomponents_): # all components in model excluding da
             component = self._components_[j][0]
             keys = self._components_[j][1] # = [keys_1,keys_2,...]
             # keys = [[p0g0, p0g1,...],[p1g0, p1g1, ..],[p2g0, p2,g1,...]..]
@@ -571,7 +542,7 @@ class mumodel(object):
         # bndkeys is [method, [keys_1,keys_2]] if there are 2 groups, keys_i is a list of keys for group i=1,2   
         # such that method(x,*par_i),  produce the additive function component for group i
         # and par_i[k] = eval(keys_i[k])   
-        for j in range(1,self._ntruecomponents_): # all components in model excluding "al", which must always be the first
+        for j in range(self._n0truecomponents_,self._ntruecomponents_): # all components in model excluding "al", which must always be the first
             component = self._components_[j][0]
             keys = self._components_[j][1] # = [keys_1,keys_2,...]
             # keys = [[p0g0, p0g1,...],[p1g0, p1g1, ..],[p2g0, p2,g1,...]..]
@@ -589,21 +560,92 @@ class mumodel(object):
             #                                                         f.shape,zeros_like(x).shape))
         return f     
 
-    def _fft_init(self,include_components,include_da=True):
+    def _add_single_calib_(self,x,*argv):
         '''
-        saves the string of component flags used to generate a partial residue for FFT
+        use _add_single_ instead, after _load_data_calib_
+         input: 
+            x       time array
+            *argv   passed as a variable number of parameter values 
+                    alpha,val1,val2,val3,val4,val5, ... at this iteration 
+                    argv is a list of values [alpha,val1,val2,val3,val4,val5, ...]
+
+        _add_single_calib_ DISTRIBUTES THESE PARAMETER VALUES for plots::
+
+              asymmetry fit with fitted alpha
+              version for plotting calib fits as normal asymmetry fits
+              order driven by model e.g. alml
+        NO FFT mode, no check on self._include_components
+        '''      
+#        from numpy import where
+#        from mujpy.aux.aux import TauMu_mus
+#                
+#        f = zeros_like(x)  # initialize a 1D array
+#        p = argv 
+#                
+#        for j in range(self._n0truecomponents_,self._ntruecomponents_): 
+#            method = self._components_[j][0]
+#            keys = self._components_[j][1] 
+#            pars = [key(p) for key in keys] 
+#            f += method(x,*pars)  
+#        return f   
+
+    def _add_single_multigroup_calib_(self,x,*argv):
         '''
-        self._include_components = include_components # True means include, False, do not include 
-                                              # in function f, for partial residues = asymm - f
-        self._include_da = include_da # True means "da is a component" and "include it" in function f,
-                                              # for partial residues = asymm - f, False, all other combinations
+        use instead _add_multigroup_ after _load_data_multigroup_calib_ 
+         input: 
+            x       time array
+            *argv   passed as a variable number of parameter values 
+                    alpha,val1,val2,val3,val4,val5, ... at this iteration 
+                    argv is a list of values [alpha,val1,val2,val3,val4,val5, ...]
+
+        _add_single_calib_ DISTRIBUTES THESE PARAMETER VALUES for plots::
+
+              asymmetry fit with fitted alpha
+              version for plotting calib fits as normal asymmetry fits
+              order driven by model e.g. alml
+        NO FFT mode, no check on self._include_components
+        '''
+#        from numpy import where
+#        from mujpy.aux.aux import TauMu_mus
+#                
+#        f = zeros((self._y_.shape[0],x.shape[0]))  # initialize a 1D array
+#        p = argv 
+#        # alpha = p[0]
+#        # print('_add_single_multigroup_calib_ debug alpha = {}, p = {}'.format(alpha,p))
+#                
+#        for j in range(self._n0truecomponents_,self._ntruecomponents_): # all components in model excluding "al", which must always be the first
+#            component = self._components_[j][0]
+#            keys = self._components_[j][1] # = [keys_1,keys_2,...]
+#            # keys = [[p0g0, p0g1,...],[p1g0, p1g1, ..],[p2g0, p2,g1,...]..]
+#            # print('add_multigroup mucomponents debug: key = {}'.format(keys))
+#            pars = [[key(p) for key in groups_key] for groups_key in keys]# NEW! spedup, evaluates p[1], p[2] etc.
+#            f += component(x,*pars)  # must contain x, 
+#                                                 # for plot x != self._x_
+#            # remember *p.comp means 'pass as many arguments as required by component, exausting the list p_comp'
+
+#            # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
+#            # pars = [[eval(key) for key in groups_key] for groups_key in keys]
+#            # print('add_multigroup mucomponents debug: y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
+#            # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
+#            # print('add_multigroup mucomponents debug: f.shape = {}, zeros.shape = {}'.format(
+#            #                                                         f.shape,zeros_like(x).shape))
+#        return f     
+
+
+    def _fft_init(self,include_components):
+        '''
+        input:
+          include_components 
+                True to subtract in residues  asymm - f
+        used to generate a partial residue for FFT
+        '''
+        self._include_components = include_components 
 
     def _include_all_(self):
         '''
         reset to normal fit mode (initially of after fft)
         '''
         self._include_components = [True]*self._ntruecomponents_
-        self._include_da = True
 
     def al(self,x,α):
         '''
@@ -813,7 +855,22 @@ class mumodel(object):
         ''' 
         # print('_chisquare_ mucomponents debug: {} {} {}'.format(self._x_.shape,self._y_.shape,self._e_.shape))
         return sum(  ( (self._add_(self._x_,*argv) - self._y_) /self._e_)**2 ,axis=self._axis_ )
-        
+
+    def _chisquare_single_(self,*argv,k=0,l=None):
+        '''
+        inputs:
+            argv ar single run single group fit parameters
+            k[, l] are indices of _y_ and _e_ multidimensional arrays
+        Used only in mufitplot
+        Provides partial chisquares over individual runs or groups
+        ''' 
+        # print('_chisquare_ mucomponents debug: {} {} {}'.format(self._x_.shape,self._y_.shape,self._e_.shape))
+        if l is None:
+            
+            return sum(  ( (self._add_(self._x_,*argv) - self._y_[k,:]) /self._e_[k,:])**2 )
+        else:
+            return sum(  ( (self._add_(self._x_,*argv) - self._y_[k,l,:]) /self._e_[k,l,:])**2 )
+            
     from iminuit import Minuit as _M
     _chisquare_.errordef = _M.LEAST_SQUARES
 

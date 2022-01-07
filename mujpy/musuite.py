@@ -134,7 +134,7 @@ class suite(object):
         Returns -1 and quits if musr2py or muisis2py complain, 0 otherwise
         '''
         
-        from mujpy.musr2py.musr2py import musr2py as psiload
+        from musr2py import MuSR_td_PSI_bin as psiload
         from mujpy.muisis2py.muisis2py import muisis2py as isisload
         # muisis2py has the same methods as musr2py
         from mujpy.aux.aux import get_datafilename, get_title
@@ -227,7 +227,7 @@ class suite(object):
         from numpy import sqrt
 
         m = len(self._the_runs_[k]) # number of added runs
-        weight = [float(sum(self._the_runs_[k][j].get_histo_array_int(2))) for j in range(m)]
+        weight = [float(sum(self._the_runs_[k][j].get_histo_vector(counter,1))) for counter in range(self._the_runs_[0][0].get_numberHisto_int()) for j in range(m)]
         if sum(weight)>0:
             weight = [w/sum(weight) for k,w in enumerate(weight)]
             t_value = sum([self._the_runs_[k][j].get_temperatures_vector()[self.thermo]
@@ -253,7 +253,7 @@ class suite(object):
 
         WARNING: this module is for PSI only        
         '''
-        import numpy as np
+        from numpy import array, where, arange, zeros, mean, ones, sqrt, linspace
         from iminuit import Minuit, cost
         
         import matplotlib.pyplot as P
@@ -302,22 +302,23 @@ class suite(object):
             ############################# 
             npeaks = []
             for counter in range(self._the_runs_[0][0].get_numberHisto_int()):
-                histo = np.empty(self._the_runs_[0][0].get_histo_array_int(counter).shape)
+                histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
                 for k in range(len(self._the_runs_[0])): # may add runs
-                    histo += self._the_runs_[0][k].get_histo_array_int(counter)
-                npeaks.append(np.where(histo==histo.max())[0][0])
-            npeaks = np.array(npeaks)
+                    histo += array(self._the_runs_[0][k].get_histo_vector(counter,1))
+                binpeak = where(histo==histo.max())[0][0]
+                npeaks.append(binpeak)
+            npeaks = array(npeaks)
 
             ###############
             # right plateau
             ###############
-            nbin =  max(npeaks) + second_plateau # this sets a counter dependent second plateau bin interval
-            x = np.arange(0,nbin,dtype=int) # nbin bins from 0 to nbin-1
-            self.lastbin, np3s = npeaks.min() - self.prepostpk[0], npeaks.max() + self.prepostpk[1] 
+            nbin =  int(max(npeaks) + second_plateau) # this sets a counter dependent second plateau bin interval
+            x = arange(0,nbin,dtype=int) # nbin bins from 0 to nbin-1
+            self.lastbin, np3s = npeaks.min() - self.prepostpk[0], int(npeaks.max() + self.prepostpk[1])
             # final bin for background average, first bin for right plateau estimate (last is nbin)
 
-            x0 = np.zeros(self._the_runs_[0][0].get_numberHisto_int()) # for center of peaks
-                   
+            x0 = zeros(self._the_runs_[0][0].get_numberHisto_int()) # for center of peaks
+
             if mplot:
                 for counter in range(self._the_runs_[0][0].get_numberHisto_int(),sum(ax_counters.shape)):
                     ax_counters[divmod(counter,3)].cla()
@@ -325,12 +326,12 @@ class suite(object):
 
             for counter in range(self._the_runs_[0][0].get_numberHisto_int()):
                 # prepare for muprompt fit
-                histo = np.empty(self._the_runs_[0][0].get_histo_array_int(counter).shape)
+                histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
                 for k in range(len(self._the_runs_[0])): # may add runs
-                    histo += self._the_runs_[0][k].get_histo_array_int(counter)
+                    histo += self._the_runs_[0][k].get_histo_vector(counter,1)
                 p = [ peakheight, float(npeaks[counter]), peakwidth, 
-                      np.mean(histo[self.firstbin:self.lastbin]), 
-                      np.mean(histo[np3s:nbin])]
+                      mean(histo[self.firstbin:self.lastbin]), 
+                      mean(histo[np3s:nbin])]
                 y = histo[:nbin]
                 ##############
                 # guess values
@@ -348,7 +349,7 @@ class suite(object):
                 if mplot:    # do plot
                     n1 = npeaks[counter]-50
                     n2 = npeaks[counter]+50
-                    x3 = np.arange(n1,n2,1./10.)
+                    x3 = arange(n1,n2,1./10.)
                     ax_counters[divmod(counter,3)].cla()
                     ax_counters[divmod(counter,3)].plot(x[n1:n2],y[n1:n2],'.')
                     ax_counters[divmod(counter,3)].plot(x3,mm.f(x3,A,X0,Dx,Ak1,Ak2))
@@ -386,13 +387,13 @@ class suite(object):
             ############################# 
             ncounters = self._the_runs_[0][0].get_numberHisto_int()
             npeaks = []
-            a = 0.5*np.ones(ncounters)
-            b = 30*np.ones(ncounters)
-            dn = 5*np.ones(ncounters)
+            a = 0.5*ones(ncounters)
+            b = 30*ones(ncounters)
+            dn = 5*ones(ncounters)
             for counter in range(ncounters):
-                histo = np.empty(self._the_runs_[0][0].get_histo_array_int(counter).shape)
+                histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
                 for k in range(len(self._the_runs_[0])): # may add runs
-                    histo += self._the_runs_[0][k].get_histo_array_int(counter)
+                    histo += self._the_runs_[0][k].get_histo_vector(counter,1)
                 npeakguess = scanms(histo,100) # simple search for a step pattern
                 if npeakguess>0:
                     npeaks.append(npeakguess)
@@ -401,14 +402,14 @@ class suite(object):
                     self.console('     set to arbitrary bin 20000')
                     npeaks.append(20000)
                 else:
-                    npeaks.append(np.where(histo==histo.max())[0][0])
+                    npeaks.append(where(histo==histo.max())[0][0])
                 ###############
                 # now fit it
                 ###############
                 if counter != 0:
                     n2 = npeaks[counter] + second_plateau # counter dependent bin interval
                     n1 = npeaks[counter] + first_plateau
-                    x = np.arange(n1,n2+1,dtype=int) # n2-n1+1 bins from n1 to n2 included for plotting
+                    x = arange(n1,n2+1,dtype=int) # n2-n1+1 bins from n1 to n2 included for plotting
                     y = histo[n1:n2+1]
                     # next will try likelihood
                     c = cost.LeastSquares(x,y,1,step)
@@ -421,7 +422,7 @@ class suite(object):
                         npeaks.append(n)
                     else:
                         self.console('****   step fit not converged for detector {}'.format(counter))
-            x0 = np.array(npeaks).astype(int)
+            x0 = array(npeaks).astype(int)
             self.lastbin = x0.min() - self.prepostpk[0].value # final bin for background average 
 
             ############################
@@ -434,12 +435,12 @@ class suite(object):
                 for counter in range(ncounters):
                     ax_counters[divmod(counter,3)].cla()
                     # ax_counters[divmod(counter,3)].axis('off')
-                    histo = np.empty(self._the_runs_[0][0].get_histo_array_int(counter).shape)
+                    histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
                     for k in range(len(self._the_runs_[0])): # may add runs
-                        histo += self._the_runs_[0][k].get_histo_array_int(counter)
-                    x = np.arange(n1,n2+1,dtype=int) # n2-n1+1 bins from n1 to n2 included for plotting
+                        histo += self._the_runs_[0][k].get_histo_vector(counter,1)
+                    x = arange(n1,n2+1,dtype=int) # n2-n1+1 bins from n1 to n2 included for plotting
                     y = histo[n1:n2+1]
-                    x3 = np.arange(n1,n2)
+                    x3 = arange(n1,n2)
                     ax_counters[divmod(counter,3)].plot(x,y,'.')
                     ax_counters[divmod(counter3)].plot(x,
                                 step(x,a[counter],npeaks[counter],dn[counter],b[counter]),'r-')
@@ -447,24 +448,24 @@ class suite(object):
                     prompt_fit_text[counter] = ax_counters[divmod(counter,3)].text(x_text,
                                   y_text,'Det #{}\nt0={}bin'.format(counter+1,x0[counter]))
             self.nt0 = x0 # bin of peak, nd.array of shape run.get_numberHisto_int() 
-            self.dt0 = np.zeros(x0.shape) # fraction of bin, nd.array of shape run.get_numberHisto_int()
+            self.dt0 = zeros(x0.shape) # fraction of bin, nd.array of shape run.get_numberHisto_int()
 
         elif self.filespecs[1].value=='nxs': # ISIS
-            histo = np.empty(self._the_runs_[0][0].get_histo_array_int(0).shape[0])
+            histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
             for counter in range(self._the_runs_[0][0].get_numberHisto_int()):
                 for k in range(len(self._the_runs_[0])): # may add runs
-                    histo += self._the_runs_[0][k].get_histo_array_int(counter)
-            error = np.sqrt(histo)
-            error[np.where(error==0)]=1
+                    histo += self._the_runs_[0][k].get_histo_vector(counter,1)
+            error = sqrt(histo)
+            error[where(error==0)]=1
             dh = histo[1:]-histo[:-1]
-            kt0 = np.where(dh==dh.max())[0] # [0]
+            kt0 = where(dh==dh.max())[0] # [0]
             musbin = float(self.nsbin.value)/1e3
             t0 = kt0*musbin
             N = histo[int(kt0)+10]*TauMu_mus()
             D = 0.080
             n1 = 0
             n2 = 101
-            t = musbin*np.linspace(n1,n2-1,n2)
+            t = musbin*linspace(n1,n2-1,n2)
             mm = muedge()
             mm._init_(t,histo[n1:n2])
             m = Minuit(mm,t00=t0,N=N,D=D)
@@ -479,9 +480,9 @@ class suite(object):
                 ax_counters.plot(t,mm.f(t,t0,N,D))
                 x_text,y_text = t[int(2*n2/3)],0.2*max(histo[n1:n2])
                 ax_counters.text(x_text,y_text,'t0 = {:.1f} mus'.format(t0))
-            self.nt0 = np.array([t0/float(self.nsbin.value)]).round().astype(int) # bin of peak, 
+            self.nt0 = array([t0/float(self.nsbin.value)]).round().astype(int) # bin of peak, 
                                              # nd.array of shape run.get_numberHisto_int() 
-            self.dt0 = np.array(t0-self.nt0) # fraction of bin, in ns
+            self.dt0 = array(t0-self.nt0) # fraction of bin, in ns
 
 
         if mplot:   # show results                  
@@ -579,7 +580,7 @@ class suite(object):
                 #print(run)
                 for counter in grouping['forward']: # first good bin, last good bin from data array start
                 
-                    histo = run.get_histo_array_int(counter) # counter data array in forw group
+                    histo = run.get_histo_vector(counter,1) # counter data array in forw group
                     if filespec =='bin' or filespec=='mdu': # PSI, counter specific range                  
                         n1 = self.nt0[counter] + self.offset
                         n2 = n1 + self.histoLength 
@@ -588,7 +589,7 @@ class suite(object):
                         
                 for counter in grouping['backward']: # first good bin, last good bin from data attay start
                 
-                    histo = run.get_histo_array_int(counter) # counter data array in back group
+                    histo = run.get_histo_vector(counter,1) # counter data array in back group
                     if filespec=='bin' or filespec=='mdu': #  PSI, counter specific range  
                         n1 = self.nt0[counter] + self.offset
                         n2 = n1 + self.histoLength 
@@ -689,6 +690,7 @@ class suite(object):
         * run instances from musr2py/muisis2py  (psi/isis load routine) 
         *
         outputs: 
+            # can be A1 fit, but is also invoked by all others
             asymmetry and asymmetry error (1d)
          """
         from numpy import exp, sqrt, where
@@ -722,6 +724,7 @@ class suite(object):
                     containing the respective lists of detectors
         * uses the suite of run instances from musr2py/muisis2py  (psi/isis load routine) 
         *
+        # can be B1, C1 fits 
         outputs: 
             asymmetry and asymmetry error (2d)
                  also generates self.time (1d)
@@ -744,8 +747,9 @@ class suite(object):
         input: none
             calls self.asymmetry_single which calls self.single_for_back_counts
         outputs: 
+            # can be A20, A21 fits 
             asymmetry and asymmetry error (2d)
-         """
+        """
         from numpy import vstack
 
         if self.loadfirst:
@@ -768,16 +772,43 @@ class suite(object):
         else:
             self.console('** CHECK ACCESS to database (or load runs first)') 
             return None, None
-                
+            
+    def asymmetry_multirun_multigroup(self):
+        '''
+        input: none
+            calls self.asymmetry_single which calls self.single_for_back_counts
+        outputs: 
+            # can be B20, B21 or C2 fit 
+            asymmetry and asymmetry error (3d)
+            for run in runs:
+                for group in groups:
+                    np.vstack # axis=1
+                np.vstack # axis=0
+        '''
+        from numpy import array, vstack
+        if self.loadfirst:
+            for k,run in enumerate(self._the_runs_):
+                for kgroup in range(len(self.grouping)):
+                    if kgroup:
+                        a,e = self.asymmetry_single(run,kgroup)
+                        asy,ase = vstack((asy,a),axis=0), vstack((ase,e),axis=0)
+                    else:
+                        asy,ase = self.asymmetry_single(run,kgroup)
+                if k:
+                    asymm, asyme  = vstack((asymm,array([asy]))), vstack((asyme,array([ase])))
+                else:
+                    asymm, asyme = array([asy]),array([ase])
+            return asymm, asyme
+        else:
+            self.console('** CHECK ACCESS to database (or load runs first)') 
+            return None, None
+               
     def single(self):
         '''
-        True if there is a single run (fit type A)
-        False if there are many runs (fit types B and C)
-        Usage:
-            if single:
-                do something with single run
-            else:
-                do something with multiple runs
+        Boole test
+        output:
+            True if there is a single run (fit type A)
+            False if there are many runs (fit types B and C)
         '''
         try:
             test = len(self._the_runs_)==1
@@ -788,13 +819,10 @@ class suite(object):
             
     def multi_groups(self):
         '''
-        True if more groups
-        False if just one group
-        Usage:
-            if multi_groups:
-                do something with single group
-            else:
-                do something with multi groups
+        Boole test
+        output:
+            True if more groups (fits A2, B2, C2)
+            False if just one group (fits A1, B1, C1)
         '''
         # print('multi_group suite debug: self.grouping {} len {}'.format(self.grouping,len(self.grouping)))
         return len(self.grouping)>1        

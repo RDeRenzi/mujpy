@@ -320,20 +320,15 @@ def int2min(model):
             either dashboard["model_guess"] (after add_step_limits_to_model)
             or  dashboard["model_guess"] both lists of dicts
     output: a list of lists:  
-        fitvalues: minuit parameter values, either guess of result
-        fiterrors: their steps
-        fitfixed: True/False for each
-        fitlimits: [low, high] limits for each or [None,None]  
-        parameter_name: name of parameter 'x_label' for each parameter
-
-    To be used e.g. as:
-            self.lastfit = Minuit(self._the_model_._chisquare_,
-                             name=parameter_name,
-                             *fitvalues)                                        
-            self.lastfit.errors = fiterrors
-            self.lastfit.limits = fitlimits
-            self.lastfit.fixed = fitfixed
-            self.lastfit.migrad()
+        values: minuit parameter values, either guess of result
+        errors: their steps
+        fixed: True/False for each
+        limits: [low, high] limits for each or [None,None]  
+        names: name of parameter 'x_label' for each parameter
+    new version must accommodate all, e.g.:
+        single run single group 
+        multi run multi group sequential 
+        multi run multi group global      
     '''
     from mujpy.aux.aux import _nparam
 
@@ -344,8 +339,8 @@ def int2min(model):
     # parameters to iMinuit, removing '='s (functions)  #
     #####################################################
                                                         
-    fitval, fiterr, fitfix, fitlim = [], [], [], []           
-    parameter_name = []
+    val, err, fix, lim = [], [], [], []           
+    names = []
 
     nint = -1 # initialize
     for k in range(len(model)):  # scan the model components
@@ -354,17 +349,17 @@ def int2min(model):
             nint += 1  # internal parameter incremented always   
             # print(pardict)
             if pardict['flag'] != '=': #  skip functions, only new minuit parameters
-                fitval.append(float(pardict['value']))
-                parameter_name.append(pardict['name']+'_'+label) 
-                fiterr.append(float(pardict['error']))
-                fitlim.append(pardict['limits'])
+                val.append(float(pardict['value']))
+                names.append(pardict['name']+'_'+label) 
+                err.append(float(pardict['error']))
+                lim.append(pardict['limits'])
             if pardict['flag'] == '~':
-                 fitfix.append(False)
+                fix.append(False)
             elif pardict['flag'] == '!':
-                fitfix.append(True)
-    # self.console('fitval = {}\nfiterr = {}\nfitfix = {}\nfitlim = {}\ncomp name = {},\npar name = {} '.format(fitval,fiterr,fitfix,fitlim,component_name,parameter_name)) 
+                fix.append(True)
+    # self.console('val = {}\nerr = {}\nfix = {}\nlim = {},\npar name = {} '.format(val,err,fix,lim, names)) 
 
-    return fitval, fiterr, fitfix, fitlim, parameter_name
+    return val, err, fix, lim, names
 
 def int2min_multigroup(pardicts):
     '''
@@ -405,6 +400,26 @@ def int2min_multigroup(pardicts):
             fitlim.append(pardict['limits'])
         # self.console('fitval = {}\nfiterr = {}\nfitfix = {}\nfitlim = {}\ncomp name = {},\npar name = {} '.format(fitval,fiterr,fitfix,fitlim,component_name,parameter_name)) 
     return fitval, fiterr, fitfix, fitlim, parameter_name
+
+def int2fft(model):
+    '''
+    input: 
+        model 
+            dashboard["model_guess"] 
+    output: 
+        fft_subtract: a list of boolean values, one per model component
+            fft flag True, component subtracted in residues 
+    '''
+    from mujpy.aux.aux import _nparam
+    fft_flag = []
+    fft_name = []
+    for componentdict in model:  # scan the model components
+        if "fft" not in componentdict.keys():
+            append(False)
+        else:
+            append(componentdict["fft"])
+        fft_name.append(componentdict["name"])
+    return fft_name, fft_flag
     
 ##################################
 # method and key methods: provide component methods 
@@ -508,6 +523,7 @@ def int2_multigroup_method_key(dashboard,the_model,guess=True):
         return []
     nint = -1 # initialize the index of the dashboard component parameters
     # p = [1.13,1.05,0.25,0.3,0.8,700,35,125,3.3,680,0.1] # debug delete
+    # print('aux int2_multigroup_method_key debug: fake values k, p {}'.format([[k,par] for k,par in enumerate(p)]))
     for component in model:  # scan the model components
         name = component['name']
         keys = []
@@ -521,8 +537,10 @@ def int2_multigroup_method_key(dashboard,the_model,guess=True):
             for j,pardict in enumerate(component['pardicts']): 
                 nint += 1  # internal parameter index incremented always 
                 if mask_function_multi[nint]>0:
+                    # print('aux int2_multigroup_method_key debug: l = {}, pardict = {}'.format(l,pardict["function_multi"][l])) 
                     key_as_lambda = eval('lambda p:'+pardict["function_multi"][l]) # NEW! speedup
                 else:                
+                    # print('aux int2_multigroup_method_key debug: l = 0&1, pardict = {}'.format(pardict["function"])) 
                     key_as_lambda = eval('lambda p:'+pardict["function"]) # NEW! speedup
                 # print('aux int2_multigroup_method_key debug: key_as_lambda(p) = {} **delete also p!'.format(key_as_lambda(p)))
                 key.append(key_as_lambda) # the function key will be evaluated, key(p), inside mucomponents
@@ -555,6 +573,7 @@ def fstack(npfunc,x,*pars):
     
 def int2_calib_method_key(dashboard,the_model):
     '''
+    NOT USED, remove
     input: the dashboard dict structure and the fit model 'alxx..' instance
            the actual model contains 'al' plus 'xx', ..
            the present method considers only the latter FOR PLOTTING ONLY 
@@ -606,6 +625,7 @@ def int2_calib_method_key(dashboard,the_model):
 
 def int2_calib_multigroup_method_key(dashboard,the_model):
     '''
+    NOT USED, remove
     input: the dashboard dict structure and the fit model 'alxx..' instance
            the actual model contains 'al' plus 'xx', ..
            the present method considers only the latter FOR PLOTTING ONLY 
@@ -713,9 +733,15 @@ def min2int(model_guess,values_in,errors_in):
 def min2int_multigroup(dashboard,p,e):
     '''
     input:
-        userpardicts_guess from dashboard (each dict corresponds to a Minuit parameter)
+        userpardicts_guess from dashboard 
+            (each dict corresponds to a Minuit parameter)
+            used only to retrieve "function" or "function_multi" 
+            and "error_propagation_multi"
+            p,e Minuit best fit parameter values and std
     output: for all parameters
-        names list of lists of parameter names
+        namesg list of lists of dashboard parameter names
+        parsg list of lists of dashboard parameter values
+        eparsg list of lists of dashboard parameter errors
     used only in summary_global
     '''
     # 
@@ -725,7 +751,7 @@ def min2int_multigroup(dashboard,p,e):
     # print('min2int_multigroup in aux debug: dash {}'.format(dashboard))
     mask_function_multi = multigroup_in_components(dashboard)
 
-    userpardicts = dashboard['userpardicts_guess']
+    userpardicts = dashboard['userpardicts_guess']  
     e = [e[k] if pardict['flag']=='~' else 0 for k,pardict in enumerate(userpardicts)]
     # names = [pardict['name'] for pardict in userpardicts]
 
@@ -880,6 +906,14 @@ def userpars(dashboard):
     '''
     return "userpardicts_guess" in dashboard
 
+def userlocals(dashboard):
+    '''
+    input:
+        full dashboard
+    output:
+        True is "userpardicts_local" in dashboard.keys 
+    '''
+    return "userpardicts_local" in dashboard    
 
 def multigroup_in_components(dashboard):
     '''
@@ -913,25 +947,6 @@ def stringify_groups(groups):
         strgrp.append(fgroup.replace(',','_')+'-'+bgroup.replace(',','_'))
     return '_'.join(strgrp)
 
-def tilde_in_components(dashboard):
-    '''
-    input full dashboard
-    output list of indices where  
-        "model_guess" (list) 
-        contains at least one component (dict) 
-        whose "pardicts" (list) 
-        contains a parameter dict 
-        with at least one "flag":"~" key
-    Indices refers to a single list 
-    of dashboard component parameters
-    The model name (e.g. mgbl) dictates the order
-    '''
-    component_flags = [pardict["flag"] for component in dashboard["model_guess"] 
-                                       for pardict in component["pardicts"]]
-    indices_tilde = [i for i, x in enumerate(component_flags) if x == "~"]
-
-    return indices_tilde
-    
 def modelstrip(name):
     '''
     strips numbers of external parameters at beginning of model name
@@ -1451,11 +1466,37 @@ def get_title(run,notemp=False,nofield=False):
     title.append((run.get_orient()).rstrip())  
     if not notemp:
         tstr = run.get_temp()
-        temp = float(tstr[:tstr.index('K')-1])
+        temp = float(tstr[:tstr.index('K')])
         title.append('{:.1f}K'.format(temp))
     if not nofield:
-        title.append('{:.0f}mT'.format(float(run.get_field())/10))
+        field = run.get_field()
+        title.append('{:.0f}mT'.format(float(field[:field.index('G')])/10))
     return ' '.join(title)    
+    
+def get_run_title(the_suite):
+    '''
+    output 
+        list of run and title strings
+            each run and group in the run replicates its run number + title
+    used only in mufitplot (fit and fft  
+    '''
+    from mujpy.aux.aux import get_title
+    run_title = []
+    for run in the_suite._the_runs_:
+        for kgroup in range(len(the_suite.grouping)):
+                run_title.append(str(run[0].get_runNumber_int())+'-'+get_title(run[0]))
+    return run_title
+    
+def get_nruns(the_suite):
+    '''
+    get nrun strings
+    '''
+    nruns = []
+    print
+    for k,run in enumerate(the_suite._the_runs_):
+        nruns.append(str(run[0].get_runNumber_int()))
+    return nruns
+
 
 def get_run_number_from(path_filename,filespecs):
     '''
@@ -1684,32 +1725,6 @@ def plot_parameters(nsub,labels,fig=None):
         axout = ax    # just one column
     return fig, axout
 
-def plotile(x,xdim=0,offset=0):
-    '''
-    Produces a tiled plot, in the sense of np.tile e.g.
-
-    ::
-
-        x.shape = (1,1000) 
-        y.shape = (4,1000)
-        xt = plotile(x,4)
-        yt = plotile(y,offset=0.1) 
-
-    '''
-    # x is an array(x.shape[0],x.shape[1])
-    # xoffset is a step offset
-    # xdim = x.shape[0] if xdim == 0 else xdim
-    # each row is shifted by xoffset*n, where n is the index of the row  
-    # 
-    # 
-    from copy import deepcopy
-    from numpy import tile, arange
-    xt = deepcopy(x)
-    if xdim != 0: # x is a 1D array, must be tiled to xdim
-        xt = tile(xt,(int(xdim),1))
-    if offset != 0:
-        xt += tile(offset*arange(xt.shape[0]),(x.shape[1],1)).transpose()
-    return xt
 
 def set_bar(n,b):
     '''

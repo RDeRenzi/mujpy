@@ -49,6 +49,12 @@ class mufit(object):
         # self.suite.console("* Check dashboard method *")
         self.component_names = [item['name'] for item in _available_components_()]
         self._the_model_ = mumodel()
+        self.lastfits = [] # lastfit initialization: 
+                           # A1, A21 and calib, C1, C2 will add a single Minuit instance
+                           # A20 and calib, B1, B2 will add a sequence of instances 
+                           # self.lastfit survives for backward compatibility
+                           # and is always the last
+                           # it is also simply appended to self.lastfits, a list
         # self.suite.console("**** Fit initialized *****")
             
         if self.choosefit(chain):
@@ -65,7 +71,7 @@ class mufit(object):
         '''
         from iminuit import Minuit
         from mujpy.aux.aux import derange, add_step_limits_to_model, checkvalidmodel
-        from mujpy.aux.aux import model_name, userpars, tilde_in_components, multigroup_in_components
+        from mujpy.aux.aux import model_name, userpars, userlocals, multigroup_in_components
         
         if self.nodata or self.nodash:
             return True        
@@ -77,6 +83,12 @@ class mufit(object):
             self.suite.console('*** Check your dashboard:')
             return True
         else:
+            # buffer to transfer sequential fits to save_fit_multigroups
+            #   used only by A20, left empty otherwise, can be used to detect A20
+            self.names = []
+            self.values = []
+            self.stds = [] 
+            self.fvals = []
             # add errors and limits to dashboard            
             self.dashboard = add_step_limits_to_model(self.dashboard)
             # require six switches: suite.single, suite.multi_groups, calib, userpardicts, sequential_runs 
@@ -114,16 +126,11 @@ class mufit(object):
                     if userpars(self.dashboard): # C1
                         self.dashboard["version"]=('gr_'+version if 
                                         self.dashboard["version"][0:3]!='gr_' else version)
-                        self.dofit_singlegroup_userpardicts(returntup) 
+                        self.dofit_multirun_singlegroup_userpardicts(returntup) 
                     else:                     # B1 DONE
-                        self.dofit_singlegroup_sequential(returntup,chain)
+                        self.dofit_multirun_singlegroup_sequential(returntup,chain)
 
             else:                             # A2, B2, C2 multi groups fits 
-                #  buffer to transfer sequential fits to save_fit_multigroups
-                self.names = []
-                self.values = []
-                self.stds = [] 
-                self.fvals = []
                 if self.suite.single():       # A2 (single run  multi group)
                                               # can be calib 
                                               # can be sequential or global
@@ -146,7 +153,7 @@ class mufit(object):
                         else:                 # A2_0 DONE multi-group-sequentially single run 
                             self.dofit_singlerun_multigroup_sequential(returntup)   # True, True, False, False, True
                 else:                         # B2, C2 multi group multirun 
-                    if tilde_in_components(self.dashboard): # C2 multi group multirun global 
+                    if userlocals(self.dashboard): # C2 multi group multirun global 
                         # this is a fit with global parameters
                         self.dashboard["version"]=('gg_'+version if 
                                         self.dashboard["version"][0:3]!='gg_' else version)
@@ -160,7 +167,8 @@ class mufit(object):
 
     def dofit_calib_singlerun_singlegroup(self,kgroup,returntup):
         '''
-        performs calib fit on single run, single group, tested A1-calib
+        performs calib fit on single run, single group, 
+        (A1-calib) tested
         input 
             kgroup is group index in suitegrouping
         '''
@@ -195,6 +203,7 @@ class mufit(object):
         self.number_dof = len(t) - self.lastfit.nfit
         self.lastfit.migrad()
         self.lastfit.hesse()
+        self.lastfits.append(self.lastfit)
 
         kgroup = 0
         if self.lastfit.valid:
@@ -232,7 +241,8 @@ class mufit(object):
 
     def dofit_singlerun_singlegroup(self,returntup):  
         '''
-        performs fit on single run, single group A1, ready
+        performs fit on single run, single group
+        (A1) tested
         '''
         from iminuit import Minuit
         from mujpy.aux.aux import int2min, int2_method_key, rebin, write_csv
@@ -249,7 +259,6 @@ class mufit(object):
 #            self.suite.console('{} = {}, step = {}, fix = {}, limits ({},{})'.format(parameter_names[k], fitvalues[k],fiterrors[k],fitfixed[k],fitlimits[k][0],fitlimits[k][1]))
 
         self._the_model_._load_data_(time,asymm,int2_method_key(self.dashboard,self._the_model_),
-                                     self.suite.grouping[0]['alpha'],
                                      e=asyme) 
                                      # pass data to model, one at a time
         ############################## int2_int() returns a list of methods to calculate the components
@@ -265,6 +274,7 @@ class mufit(object):
         self.number_dof = len(asymm) - self.lastfit.nfit
         self.lastfit.migrad()
         self.lastfit.hesse()
+        self.lastfits.append(self.lastfit)
 
         # write summary on console
         kgroup = 0
@@ -292,7 +302,8 @@ class mufit(object):
                  
     def dofit_singlerun_multigroup_sequential(self,returntup):
         '''
-        performs fit on single run, multiple groups sequentially
+        performs fit on single run, multi-group data sequentially
+        (A20) tested
         '''
         from iminuit import Minuit
         from mujpy.aux.aux import int2min, int2_method_key, min2int
@@ -315,7 +326,6 @@ class mufit(object):
             ok, errmsg = self._the_model_._load_data_(
                                         time,a,
                                         int2_method_key(self.dashboard,self._the_model_),
-                                        self.suite.groups[kgroup]['alpha'],
                                         e=e) 
             if not ok:
                 self.suite.console(repr(errmsg))
@@ -332,6 +342,7 @@ class mufit(object):
             self.number_dof = len(a) - self.lastfit.nfit
             self.lastfit.migrad()
             self.lastfit.hesse()
+            self.lastfits.append(self.lastfit)
 
             # write summary on console
             self.summary(start, stop, time[1]-time[0],kgroup)
@@ -368,7 +379,8 @@ class mufit(object):
 
     def dofit_singlerun_multigroup_userpardicts(self,returntup):
         '''
-        performs fit on single run, multiple groups globally
+        performs fit on single run, global multi-group data
+        (A21) tested
         All minuit parameters must be predefined as user pardicts
         All component parameters must be assigned by functions to the previous
         (the absence of "flag":"~" parameters identifies this type of fit)
@@ -432,6 +444,7 @@ class mufit(object):
         self.number_dof = asymm.size - self.lastfit.nfit
         self.lastfit.migrad()
         self.lastfit.hesse()
+        self.lastfits.append(self.lastfit)
 
         # write summary on console
         self.summary_global(start, stop, time[1]-time[0])
@@ -457,6 +470,7 @@ class mufit(object):
     def dofit_calib_singlerun_multigroup_userpardicts(self,returntup):
         '''
         performs calib fit on single run, multiple groups global
+        (A21-calib) tested
         '''
         from iminuit import Minuit
         from mujpy.aux.aux import int2min_multigroup, int2_multigroup_method_key 
@@ -492,6 +506,7 @@ class mufit(object):
         self.number_dof = len(t) - self.lastfit.nfit
         self.lastfit.migrad()
         self.lastfit.hesse()
+        self.lastfits.append(self.lastfit)
 
         if self.lastfit.valid:
             pardict = self.dashboard["model_guess"][0]["pardicts"][0]
@@ -522,7 +537,8 @@ class mufit(object):
     
     def dofit_calib_singlerun_multigroup_sequential(self,returntup):
         '''
-        performs calib fit on single run, multiple groups sequential
+        performs calib fit on single run, multiple groups sequentially
+        (A20-calib) tested
         '''
         from iminuit import Minuit
         from mujpy.aux.aux import int2min, int2_method_key, rebin_decay, write_csv, min2int
@@ -542,7 +558,7 @@ class mufit(object):
     #            self.suite.console('{} = {}, step = {}, fix = {}, limits ({},{})'.format(parameter_names[k], fitvalues[k],fiterrors[k],fitfixed[k],fitlimits[k][0],fitlimits[k][1]))
 
             self._the_model_._load_calib_single_data_(t,yf,yb,bf,bb,yfm,ybm,
-                                                      int2_method_key(self.dashboard,self._the_model_))
+                                    int2_method_key(self.dashboard,self._the_model_))
                                                  # int2_int() returns a list of methods to calculate the components
 
             self.lastfit = Minuit(self._the_model_._chisquare_,
@@ -555,6 +571,7 @@ class mufit(object):
             self.number_dof = len(t) - self.lastfit.nfit
             self.lastfit.migrad()
             self.lastfit.hesse()
+            self.lastfits.append(self.lastfit)
 
             if self.lastfit.valid:
                 self.suite.groups[kgroup]["alpha"] = self.lastfit.values[0]
@@ -595,18 +612,20 @@ class mufit(object):
                 print(self.lastfit)
         self.save_fit_multigroup(krun,string)  # DEBUG
 
-    def dofit_singlegroup_userpardicts(self,returntup):          
+    def dofit_multirun_singlegroup_userpardicts(self,returntup):          
         '''
-        not yet
+        performs global fit of many-run single-group data
+        (C1) not yet
         '''
-    def dofit_singlegroup_sequential(self,returntup,chain):
+    def dofit_multirun_singlegroup_sequential(self,returntup,chain):
         '''
-        performs sequential fit on single group B1, tested
+        performs sequential fit on many-run, single-group data
+        (B1) tested
         '''
         from iminuit import Minuit
         from mujpy.aux.aux import int2min, int2_method_key, rebin, write_csv
 
-        # print('dofit_singlegroup_sequential mufit debug')
+        # print('dofit_multirun_singlegroup_sequential mufit debug')
         # self.suite.console('In sequential single')   
         a, e = self.suite.asymmetry_multirun(0) # runs to loaded, group index
         # a, e are 2d: (run,timebin) 
@@ -624,7 +643,6 @@ class mufit(object):
         for asymm, asyme in zip(asymms,asymes): 
             krun += 1
             self._the_model_._load_data_(time,asymm,int2_method_key(self.dashboard,self._the_model_),
-                                     self.suite.grouping[0]['alpha'],
                                      e=asyme) 
                                     # int2_int() returns a list of methods to calculate the components
 
@@ -638,6 +656,7 @@ class mufit(object):
             self.number_dof = len(asymm) - self.lastfit.nfit
             self.lastfit.migrad()
             self.lastfit.hesse()
+            self.lastfits.append(self.lastfit)
 
         # write summary on console
             self.summary_sequential(start, stop, time[1]-time[0],k=krun)
@@ -663,12 +682,14 @@ class mufit(object):
            
     def dofit_multirun_multigroup_userpardicts(self,returntup):
         '''
-        not yet
+        performs single global fit of many-run, many-group data
+        (C2) not yet
         '''
             
     def dofit_sequentialrun_multigroup_userpardicts(self,returntup):
         '''
-        not yet
+        performs sequential mani-run, multigroup-global fits over a suite of runs
+        (B2) not yet
         '''
 
     def global_fit(self):
@@ -958,9 +979,11 @@ class mufit(object):
         '''
         input:
             krun is index in self.suite._the_runs_
-            kgroup is indek in self.suite.groups
-        saves a dashboard file adding the bestfit parameters as "userpardicts_result"
-        for a single run, multi groups global fit.
+            string_in is the result of the write_csv process
+        if fit is global
+            saves a dashboard json adding the bestfit parameters as "userpardicts_result"
+        else if sequential
+            saves as many single run single group "model_result" dashboard json 
         Use "version" as additional label to qualify fit (auto 'gg_
         filename is logpath + modelname + nrun  + srtgrp0 + strgrp...  + version .json
         nrun = runNumber, strgrp0,1,... = shorthand for allgroups
@@ -981,10 +1004,22 @@ class mufit(object):
         file_json = self.suite.logpath+modelname+'.'+nrun+'.'+strgrp+'.'+version+'_fit.json'
         # dashboard result-augmented
         chi2 = []
-        if isinstance(string_in, list): # sequential
-            # sequential fit: use "model_result" as a list of lists
+        if isinstance(string_in, list): # sequential fit
+        # MUST refactor into saving one _fit json dashboard file per group
+        # reflects the fact that as many chi2 as groups were minimized
+        # use just a "model_result" list for each instead of: 
+        # remove =  [], split stringify_groups in bits, update a file_json per group 
+        # and bring with open(file_json,"w") within the if
+            # use "model_result" as a list of lists
+            
             self.dashboard["model_result"] = []
+            for string in string_in:
+                self.suite.console(string)
             for kgroup in range(len(string_in)):
+                fgroup, bgroup = self.suite.groups[kgroup]['forward'],\
+                                 self.suite.groups[kgroup]['backward']
+                strgrp = fgroup.replace(',','_') + '-' + bgroup.replace(',','_')
+                file_json = self.suite.logpath+modelname+'.'+nrun+'.'+strgrp+'.'+version+'_fit.json'
                 group_results = deepcopy(self.dashboard["model_guess"])
                 value, std = self.values[kgroup], self.stds[kgroup]
                 # print('save_fit_multigroup mufit debug: value {}'.format(value))
@@ -992,11 +1027,13 @@ class mufit(object):
                     # print('save_fit_multigroup mufit debug: n components {}'.format(len(component["pardicts"]))) 
                     for j,pardict in enumerate(component['pardicts']):
                         pardict["value"] = value[k][j]
-                        pardict["std"] = std[k][j]
-                
-                chi2.append(self.fvals[kgroup] /self.number_dof)
-                self.dashboard["model_result"].append(group_results)
-            self.dashboard["chi2"]=chi2  
+                        pardict["std"] = std[k][j]               
+                chi2 = self.fvals[kgroup] /self.number_dof
+                self.dashboard["model_result"] = group_results
+                self.dashboard["chi2"]=chi2
+                with open(file_json,"w") as f:
+                    json.dump(self.dashboard,f, indent=2,ensure_ascii=False)                 
+                self.suite.console('Best fit of group {} saved in {} '.format(strgrp,file_json))
         else: # global
             # userpardicts fit
             names = [parameter["name"] for parameter in self.dashboard["userpardicts_guess"]]
@@ -1005,17 +1042,14 @@ class mufit(object):
                  userpardicts.append({'name':name,'value':value,'std':std})
             self.dashboard["userpardicts_result"] = userpardicts
             self.dashboard["chi2"] = self.lastfit.fval /self.number_dof
-        if os.path.isfile(file_json): 
-            os.rename(file_json,file_json+'~')
-        with open(file_json,"w") as f:
-            json.dump(self.dashboard,f, indent=2,ensure_ascii=False) # ,object_pairs_hook=OrderedDict)
-
-        if isinstance(string_in, list):
-            string_in.insert(0,'Best fit saved in {} '.format(file_json))
-            string_in = ' '.join(string_in)
-        else:
+            if os.path.isfile(file_json): 
+                os.rename(file_json,file_json+'~')
+            with open(file_json,"w") as f:
+                json.dump(self.dashboard,f, indent=2,ensure_ascii=False)
             string_in = 'Best fit saved in {} '.format(file_json)+string_in
-        self.suite.console(string_in)
+            self.suite.console(string_in)
+# ,object_pairs_hook=OrderedDict)
+
 
     def show_calib(self):
         '''
