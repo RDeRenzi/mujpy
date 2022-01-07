@@ -11,20 +11,20 @@ Once cloned, run::
 
   jupyter-lab
 
-and launch the exampleTst-xxx.ipynb notebooks (if you do not have access to PSI afs, first download the data files from http://musruser.psi.ch/cgi-bin/SearchDB.cgi
+and launch the example/Tst_xxx.ipynb notebooks (check path to suitable data files for the tested type of fit)
 
 Each notebook shows how to perform
 * TF calibration, both single group (A1-calib) and multigroup (A2-calib), either sequential or global 
 * single run fit (A1), 
 * sequential single run fits (B1),
 * single run multi-group fit (A2), either sequential or global
-with plots: static for single fit, animated plots for multiple fits (both sequential or global) 
-  
+with plots: static for single fit, animated plots for multiple fits (both sequential or global) and optional fft
+
 Linux installation instructions, Valid on WIN10 that has a linux shell, to come.
 Docs not updated yet
 
 ----
-Fro old installation instructions (v 1.1)
+Old installation instructions (v 1.1)
 * Make sure you have python, standard on linux, and jupyter lab. Otherwise install them (see https://docs.python.org/3/using/windows.html, https://docs.python.org/3/using/mac.html, jupyter.readthedoc.io).
 * Install mujpy. Clone or download from https://github.com/RDeRenzi/mujpy, unzip into the directory of your choice::
 
