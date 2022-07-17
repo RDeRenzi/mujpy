@@ -1,32 +1,14 @@
 {
   "version": "1",
-  "fit_range": "0,25000,50",
-  "offset": 20,
+  "fit_range": "0,24000,5",
   "model_guess": [
     {
-      "name": "al",
-      "label": "",
-      "pardicts": [
-        {
-          "name": "α",
-          "value": 1.03,
-          "flag": "~",
-          "function": "",
-          "error": 0.01,
-          "limits": [
-            0,
-            null
-          ]
-        }
-      ]
-    },
-    {
-      "name": "ml",
-      "label": "_wf",
+      "name": "mg",
+      "label": "T_fast",
       "pardicts": [
         {
           "name": "A",
-          "value": 0.26,
+          "value": 0.09,
           "flag": "~",
           "function": "",
           "error": 0.01,
@@ -48,7 +30,7 @@
         },
         {
           "name": "φ",
-          "value": 80.0,
+          "value": 0.0,
           "flag": "~",
           "function": "",
           "error": 1.0,
@@ -58,13 +40,63 @@
           ]
         },
         {
-          "name": "λ",
-          "value": 0.1,
+          "name": "σ",
+          "value": 1.0,
           "flag": "~",
           "function": "",
           "error": 0.01,
           "limits": [
             null,
+            null
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ml",
+      "label": "T_slow",
+      "pardicts": [
+        {
+          "name": "A",
+          "value": 0.09,
+          "flag": "~",
+          "function": "",
+          "error": 0.01,
+          "limits": [
+            null,
+            null
+          ]
+        },
+        {
+          "name": "B",
+          "value": 10.0,
+          "flag": "~",
+          "function": "",
+          "error": 0.1,
+          "limits": [
+            null,
+            null
+          ]
+        },
+        {
+          "name": "φ",
+          "value": 0.0,
+          "flag": "=",
+          "function": "p[2]",
+          "error": 1.0,
+          "limits": [
+            null,
+            null
+          ]
+        },
+        {
+          "name": "λ",
+          "value": 0.02,
+          "flag": "~",
+          "function": "",
+          "error": 0.005,
+          "limits": [
+            -80.0,
             null
           ]
         }

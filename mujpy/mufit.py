@@ -33,6 +33,7 @@ class mufit(object):
         try:  
             with open(dashboard_file,"r") as f:
                 self.dashboard = json.load(f) # ,object_pairs_hook=OrderedDict)
+                # print('mufit _initialise_fit debug: dash {}'.format(self.dashboard['model_guess']))
                 self.nodash = False                
                 # dashboard is a dict structure, not an Ordered Dictionary structure
         except Exception as e:
@@ -59,6 +60,8 @@ class mufit(object):
             
         if self.choosefit(chain):
             self.suite.console('     mufit stops here')
+#        else:
+#            print('mufitplot debug: Really finished')
 
         #self.suite.console('{}'.format(self.lastfit.params))       
     
@@ -90,7 +93,7 @@ class mufit(object):
             self.stds = [] 
             self.fvals = []
             # add errors and limits to dashboard            
-            self.dashboard = add_step_limits_to_model(self.dashboard)
+            # self.dashboard = add_step_limits_to_model(self.dashboard)
             # require six switches: suite.single, suite.multi_groups, calib, userpardicts, sequential_runs 
 
             #####################
@@ -122,6 +125,7 @@ class mufit(object):
                         self.dofit_calib_singlerun_singlegroup(0,returntup)  
                     else:                     # A1 DONE
                         self.dofit_singlerun_singlegroup(returntup)
+                        print('mufit choosefit debug: should be finished!')       
                 else:                         # B1, C1  
                     if userpars(self.dashboard): # C1
                         self.dashboard["version"]=('gr_'+version if 
@@ -161,7 +165,7 @@ class mufit(object):
                     else:                     # B2 multigroup, sequential multirun (sequential all does not exist)
                         self.dashboard["version"]=('gg_'+version if 
                                         self.dashboard["version"][0:3]!='gg_' else version)
-                        self.dofit_sequentialrun_multigroup_userpardicts(returntup) 
+                        self.dofit_sequentialrun_multigroup_userpardicts(returntup,chain) 
                         # pe.g TF sequential of multigroups with shared parameters
         return False
 
@@ -175,7 +179,7 @@ class mufit(object):
         from iminuit import Minuit
         from mujpy.aux.aux import int2min, int2_method_key, rebin_decay, write_csv
         
-        self.suite.console('In single calib.')      
+        # self.suite.console('In single calib.')      
 
         yf,yb,bf,bb,yfm,ybm = self.suite.single_for_back_counts(self.suite._the_runs_[0],self.suite.grouping[kgroup]) 
                               # the second dimension is group
@@ -253,10 +257,12 @@ class mufit(object):
         start, stop, pack = returntup
         time,asymm,asyme = rebin(self.suite.time,a,[start,stop],pack,e=e)
 
+#        for cmp in self.dashboard["model_guess"]:
+#            for pd in cmp["pardicts"]:
+#                print('dofit_singlerun_singlegroup debug: {} = {}, step = {}, fix = {}, limits ({},{})'.format(pd['name'], pd['value'],pd['error'],pd['flag'],pd['limits'][0],pd['limits'][1]))
+
         values,errors,fixed,limits,parameter_names = int2min(self.dashboard["model_guess"])
 
-#        for k in range(len(fitvalues)):
-#            self.suite.console('{} = {}, step = {}, fix = {}, limits ({},{})'.format(parameter_names[k], fitvalues[k],fiterrors[k],fitfixed[k],fitlimits[k][0],fitlimits[k][1]))
 
         self._the_model_._load_data_(time,asymm,int2_method_key(self.dashboard,self._the_model_),
                                      e=asyme) 
@@ -272,6 +278,7 @@ class mufit(object):
         self.lastfit.fixed = fixed
         # self.freepars = self.lastfit.nfit
         self.number_dof = len(asymm) - self.lastfit.nfit
+        # print('mufit dofit_singlerun_singlegroup debug: Minuit name value error limits fixed {}'.format([[name,value,error,limit,fix] for name,value,error,limit,fix in zip(parameter_names,values,errors,limits,fixed)]))
         self.lastfit.migrad()
         self.lastfit.hesse()
         self.lastfits.append(self.lastfit)
@@ -295,11 +302,9 @@ class mufit(object):
         string1, string2 = write_csv(header,row,the_run,file_csv,filespec)
         # self.suite.console(string1)
         #self.suite.console(string2)
-        krun = 0
-        self.save_fit(krun,0,string2)
-
-        return True
-                 
+        krun,kgroup = 0,0
+        self.save_fit(krun,kgroup,string2)
+                  
     def dofit_singlerun_multigroup_sequential(self,returntup):
         '''
         performs fit on single run, multi-group data sequentially
@@ -442,6 +447,7 @@ class mufit(object):
         self.lastfit.fixed = fixed
         # self.freepars = self.lastfit.nfit
         self.number_dof = asymm.size - self.lastfit.nfit
+        # print('mufit dofit_singlerun_multigroup_userpardicts debug: name value error limits fixed {}'.format([[name,value,error,limit,fix] for name,value,error,limit,fix in zip(parameter_names,values,errors,limits,fixed)]))
         self.lastfit.migrad()
         self.lastfit.hesse()
         self.lastfits.append(self.lastfit)
@@ -449,21 +455,20 @@ class mufit(object):
         # write summary on console
         self.summary_global(start, stop, time[1]-time[0])
 
-        if self.lastfit.valid:
-            # record result in csv file
-            version = self.dashboard["version"]
-            strgrp = stringify_groups(self.suite.groups)
-            modelname = ''.join([component["name"] for component in self.dashboard['model_guess']])
-            file_csv = self.suite.logpath+modelname+'.'+version+'.'+strgrp+'.csv'
-            the_run = self.suite._the_runs_[0][0]
-            filespec = self.suite.datafile[-3:]
-            header, row = self.prepare_csv()
-            string1, string2 = write_csv(header,row,the_run,file_csv,filespec)
-            # self.suite.console(string1)
-            #self.suite.console(string2)
-            krun = 0
-            self.save_fit_multigroup(krun,string2)
-        else:
+        # record result in csv file
+        version = self.dashboard["version"]
+        strgrp = stringify_groups(self.suite.groups)
+        modelname = ''.join([component["name"] for component in self.dashboard['model_guess']])
+        file_csv = self.suite.logpath+modelname+'.'+version+'.'+strgrp+'.csv'
+        the_run = self.suite._the_runs_[0][0]
+        filespec = self.suite.datafile[-3:]
+        header, row = self.prepare_csv()
+        string1, string2 = write_csv(header,row,the_run,file_csv,filespec)
+        # self.suite.console(string1)
+        #self.suite.console(string2)
+        krun = 0
+        self.save_fit_multigroup(krun,string2)
+        if not self.lastfit.valid:
             self.suite.console('**** Minuit did not converge! ****')
             print(self.lastfit)
 
@@ -512,7 +517,7 @@ class mufit(object):
             pardict = self.dashboard["model_guess"][0]["pardicts"][0]
             p = self.lastfit.values
             for kgroup,group in enumerate(self.suite.grouping):
-                group['alpha'] = eval(pardict["function_multi"][kgroup])
+                group["alpha"] = eval(pardict["function_multi"][kgroup])
                 self.suite.groups[kgroup]["alpha"] = eval(pardict["function_multi"][kgroup])            
             # write summary on console
             self.summary_global(start, stop, t[1]-t[0])
@@ -673,10 +678,11 @@ class mufit(object):
             the_run = self.suite._the_runs_[krun][0]
             # print(the_run.get_runNumber_int())
             filespec = self.suite.datafile[-3:]
-            header, row = self.prepare_csv(k=krun)
+            header, row = self.prepare_csv(krun=krun)
             string1, string2 = write_csv(header,row,the_run,file_csv,filespec)
             #self.suite.console(string1)
-            self.save_fit(krun,0,string2)
+            kgroup = 0
+            self.save_fit(krun,kgroup,string2)
             if (chain):
                 values = self.lastfit.values
            
@@ -686,11 +692,102 @@ class mufit(object):
         (C2) not yet
         '''
             
-    def dofit_sequentialrun_multigroup_userpardicts(self,returntup):
+    def dofit_sequentialrun_multigroup_userpardicts(self,returntup,chain):
         '''
         performs sequential mani-run, multigroup-global fits over a suite of runs
-        (B2) not yet
+        (B2) testing
         '''
+        from iminuit import Minuit
+        from mujpy.aux.aux import int2min_multigroup, int2_multigroup_method_key, rebin
+        from mujpy.aux.aux import stringify_groups, write_csv
+        from numpy import where, array, finfo, sqrt
+        
+        from matplotlib.pyplot import subplots, draw 
+
+        # print('dofit_multirun_singlegroup_sequential mufit debug')
+        # self.suite.console('In sequential single')   
+        a, e = self.suite.asymmetry_multirun_multigroup() # runs to loaded, group index
+        # a, e are 2d: (run,timebin) 
+        print('mufit dofit_sequentialrun_multigroup_userpardicts debug: shape asymm, asyme = {}, {}'.format(a.shape,e.shape))
+        start, stop, pack = returntup
+        time,asymmrg,asymerg = rebin(self.suite.time,a,[start,stop],pack,e=e)
+        zer = array(where(asymerg<2e-162))
+        # time (1d): (timebin)    asymms, asymes (2d): (run,timebin) 
+        values,errors,fixed,limits,parameter_names = int2min_multigroup(
+                                            self.dashboard["userpardicts_guess"])
+
+#        for k in range(len(fitvalues)):
+#            self.suite.console('{} = {}, step = {}, fix = {}, limits ({},{})'.format(parameter_names[k], fitvalues[k],fiterrors[k],fitfixed[k],fitlimits[k][0],fitlimits[k][1]))
+        print('mufit dofit_sequentialrun_multigroup_userpardicts debug: Minuit inputs')
+        j = -1
+        for ns,vs,es,fx,lm in zip(parameter_names,values,errors,fixed,limits):
+            j +=1
+            print('{} {} = {}({}), {}, {} '.format(j,ns,vs,es,fx,lm))
+        
+        methods_keys = int2_multigroup_method_key(self.dashboard,self._the_model_)
+        # print('mufit dofit_sequentialrun_multigroup_userpardicts debug: methods_keys contains {} methods with{} keys/method'.format(len(methods_keys),[len(c) for g in methods_keys for c in g[1]]))
+        krun = -1
+        
+        
+        fig,ax = subplots()
+        da, ms, lw = 0.2, 0.1, 0.3
+        
+        for asymm, asyme in zip(asymmrg,asymerg): 
+            krun += 1
+            for kg in range(asyme.shape[0]):
+                
+                if array(where(asyme[kg,:]==0)).sum():
+                    print('mufit dofit_sequentialrun_multigroup_userpardicts debug: check asyme[{},{}] contains zeros!'.format(krun,kg))
+                    print('mufit dofit_sequentialrun_multigroup_userpardicts debug: asymm.shape {} '.format(asymm.shape))
+            # asymm is 2d (group, bins)
+            self._the_model_._load_data_multigroup_(time,asymm,methods_keys,e=asyme) 
+                                    # int2_int() returns a list of methods to calculate the components
+            fs = self._the_model_._add_(time,*values)
+            print('mufit dofit_sequentialrun_multigroup_userpardicts debug: fs.shape  {} '.format(fs.shape)) 
+            kk, line, fmt,  = -1, ['b-','g-'],['r.','m.']
+            for a,e,f in zip(asymm,asyme,fs):
+                kk+=1
+                ax.errorbar(time,a+krun*da,yerr=e,fmt=fmt[kk],ms=ms,alpha=0.3)
+                ax.plot(time,f+krun*da,line[kk],lw=lw,alpha=0.8)
+            self.lastfit = Minuit(self._the_model_._chisquare_,
+                              name=parameter_names,
+                              *values)                                        
+            self.lastfit.errors = errors
+            self.lastfit.limits = limits
+            self.lastfit.fixed = fixed
+            # self.freepars = self.lastfit.nfit
+            self.number_dof = asymm.size - self.lastfit.nfit
+            # print('mufit dofit_sequentialrun_multigroup_userpardicts debug: name value error limits fixed {}'.format([[name,value,error,limit,fix] for name,value,error,limit,fix in zip(parameter_names,values,errors,limits,fixed)]))
+            
+            print('mufit dofit_sequentialrun_multigroup_userpardicts debug: limits {}'.format(self.lastfit.limits))
+            self.lastfit.migrad()
+            self.lastfit.hesse()
+            self.lastfits.append(self.lastfit)
+
+        # write summary on console
+            self.summary_global(start, stop, time[1]-time[0],krun=krun)
+            print('mufit dofit_sequentialrun_multigroup_userpardicts debug: fval {}, ndof {}'.format(self.lastfit.fval,self.number_dof))
+
+            version = self.dashboard["version"]
+            strgrp = stringify_groups(self.suite.groups)
+            modelname = ''.join([component["name"] for component in self.dashboard['model_guess']])
+            file_csv = self.suite.logpath+modelname+'.'+version+'.'+strgrp+'.csv'
+            the_run = self.suite._the_runs_[krun][0]
+            filespec = self.suite.datafile[-3:]
+            header, row = self.prepare_csv(krun=krun)
+            string1, string2 = write_csv(header,row,the_run,file_csv,filespec)
+            self.suite.console(string1)
+            #self.suite.console(string2)
+            self.save_fit_multigroup(krun,string2)
+
+
+            if (chain):
+                values = self.lastfit.values
+                
+                
+        ax.set_xlim(0,4)
+        ax.set_ylim(-0.5,2.7)
+        draw()
 
     def global_fit(self):
         '''
@@ -698,13 +795,6 @@ class mufit(object):
         False for fit types A and B
         '''
         return self.dashboard['model_guess'][0]['pardicts'][0].__contains__('local')
-        
-        
-    def nfixed(self):
-        '''
-        computes number of fixed parameter
-        '''
-        return        
         
     def summary(self,start, stop, dt, kgroup, krun=0):
         '''
@@ -735,7 +825,8 @@ class mufit(object):
 
         names, values, errors = min2int(self.dashboard["model_guess"],
 							        self.lastfit.values,self.lastfit.errors)
-
+        #print('mufit summary debug: values, errors {}'.format([[name,value,error] for name,value,error in zip(names,values,errors)]))
+        #print('mufit summary debug: minvalues, minerrors {}'.format([[name,value,error] for name,value,error in zip(self.lastfit.parameters,self.lastfit.values,self.lastfit.errors)]))        
         with open(file_log,'w') as f:
             f.write(' '+77*'_'+'\n')
             self.suite.console(' '+85*'_')
@@ -868,7 +959,7 @@ class mufit(object):
 
 
 
-    def prepare_csv(self,k = 0):
+    def prepare_csv(self,krun = 0):
         '''
         input: 
             k is index in _the_runs_, default k = 0
@@ -881,22 +972,25 @@ class mufit(object):
         Identifies multigroup as dashboard = False in minparam2_csv::
         '''
         from mujpy.aux.aux import get_title, spec_prec, chi2std, initialize_csv 
-        from mujpy.aux.aux import minparam2_csv, chi2_csv, min2int
-        from mujpy.aux.aux import multigroup_in_components
+        from mujpy.aux.aux import minparam2_csv, chi2_csv, min2int, min2int_multigroup
+        from mujpy.aux.aux import multigroup_in_components, userpars
 
         # print('k = {}, self.nrun = {}'.format(k,[j for j in self.nrun]))
 
 
         filespec = self.suite.datafile[-3:]
-        the_run = self.suite._the_runs_[k][0]
-        # print('debug, k ={} run={}'.format(k,the_run.get_runNumber_int()))
+        the_run = self.suite._the_runs_[krun][0]
+        # print('mufit prepare_csv debug, krun ={} run={}'.format(krun,the_run.get_runNumber_int()))
         chi = self.lastfit.fval /self.number_dof 
         lowchi, hichi = chi2std(self.number_dof)
 
         row = initialize_csv(the_run.get_field(), filespec, the_run) 
 
-        dashboard = False if self.suite.multi_groups() else self.dashboard["model_guess"]
-        row += minparam2_csv(dashboard,self.lastfit.values,self.lastfit.errors)
+        dashcsv = False if self.suite.multi_groups() else self.dashboard["model_guess"]
+        min2dash = min2int_multigroup if (self.suite.multi_groups() and userpars(self.dashboard)) else min2int
+        dashboard =  self.dashboard if (self.suite.multi_groups() and userpars(self.dashboard)) else self.dashboard["model_guess"]
+        
+        row += minparam2_csv(dashcsv,self.lastfit.values,self.lastfit.errors)
         row += chi2_csv(chi,lowchi,hichi,self.suite.groups,self.suite.offset)
         row += '\n'
         # row is formatted with appropriate rounding, write directly
@@ -913,10 +1007,14 @@ class mufit(object):
                 header.append(pardict['name'])
                 header.append('e_'+pardict['name'])
         else:
-            components, _, _ = min2int(self.dashboard["model_guess"],
+            
+            parlists, _, _ = min2dash(dashboard,
 							        self.lastfit.values,self.lastfit.errors)
-            for par_names in components:
-                for parname in par_names:
+            parlists = parlists[0] if isinstance(parlists[0][0],list) else parlists
+            for parlist in parlists:
+                # print('mufit prepare_csv debug: parlist: {}'.format(parlist))
+                for parname in parlist:
+                    # print('mufit prepare_csv debug: parnames: {}'.format(parname))
                     header.append(parname)
                     header.append('e_'+parname)
         header.append('chi2_r')

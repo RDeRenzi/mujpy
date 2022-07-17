@@ -1,4 +1,4 @@
-from numpy import cos, pi, exp, sqrt, real, nan_to_num, inf, ceil, linspace, zeros, empty, ones, hstack, fft, sum, zeros_like
+from numpy import cos, pi, exp, sqrt, real, nan_to_num, inf, ceil, linspace, zeros, empty, ones, hstack, fft, sum, zeros_like, abs, array, where
 from scipy.special import dawsn,erf, j0
 from scipy.constants import physical_constants as C
 from iminuit.util import make_func_code
@@ -186,14 +186,11 @@ class mumodel(object):
         # self._ntruecomponents_ = number of components apart from dalpha 
         self._x_ = x
         self._y_ = y        # self._global_ = True if _nglobals_ is not None else False
-        self._components_ = []
+        self._components_ = components
+        self._ntruecomponents_ = len(components)
         self._add_ = self._add_multigroup_
-        self._ntruecomponents_ = 0
         self._n0truecomponents_ = 0
-
-        for k, val in enumerate(components):
-            self._ntruecomponents_ += 1
-            self._components_.append(val) # store again [method, [key,...,key]], ismin
+        # print('mucomponents _load_data_multigroup_ debug: {} components, n of parameters/component: {}'.format(len(components),[len(par) for group in components for par in group[1]]))
         try:
             if isinstance(e,int):
                 self._e_ = ones((y.shape))
@@ -201,7 +198,7 @@ class mumodel(object):
                 if len(y.shape)>1:
                     # print('_load_data_multigroup_ mucomponents debug: x,y,e not e=1')
                     if e.shape!=y.shape or x.shape[0]!=y.shape[-1]:
-                        print('_load_data_multigroup_ mucomponents debug: x,y,e different shape[0]>1')
+                        # print('_load_data_multigroup_ mucomponents debug: x,y,e different shape[0]>1')
                         raise ValueError('x, y, e have different lengths, {},{},{}'.format(x.shape,
                                                                                        y.shape,
                                                                                        e.shape))          
@@ -212,6 +209,7 @@ class mumodel(object):
                                                                                            e.shape))          
             # print('_load_data_multigroup_ mucomponents debug: defining self._e_')
             self._e_ = e
+            # print('mucomponents _load_data_multigroup_ debug: self._x_ {}, self._y_ {}, self._e_  {}shape'.format(self._x_,self._y_,self._e_) 
         except ValueError as e:
             return False, e       
         return True, '' # no error
@@ -469,21 +467,33 @@ class mumodel(object):
         and produce a n-valued np.array function f, f[k] for y[k],e[k] 
         '''      
 
-        f = zeros((self._y_.shape[0],x.shape[0]))  # initialize a 2D array        
+        f = zeros((self._y_.shape[0],x.shape[0]))  # initialize a 2D array shape (groups,bins)   
         p = argv 
         
         # self._component_ contains [bndkeys,...,bndkeys], as many as the model components (e.g. 2 for mgbl)
         # bndkeys is [method, [keys_1,keys_2]] if there are 2 groups, keys_i is a list of keys for group i=1,2   
         # such that method(x,*par_i),  produce the additive function component for group i
-        # and par_i[k] = eval(keys_i[k])   
-        for j in range(self._n0truecomponents_,self._ntruecomponents_): # all components in model excluding da
-            component = self._components_[j][0]
-            keys = self._components_[j][1] # = [keys_1,keys_2,...]
+        # and par_i[k] = eval(keys_i[k])
+#        j = -1
+#        for method, keys in self._components_:# all components in model 
+#            j +=1
+#            pars = [[key(p) for key in groups_key] for groups_key in keys]
+            # print('mucomponents _add_multigroup_ debug: component {}-th: {}\npars {}'.format(j,method.__doc__,pars))
+        j = -1
+        for method, keys in self._components_:
+            j += 1
+        #j in range(self._n0truecomponents_,self._ntruecomponents_): # all components in model excluding da
+            #component = self._components_[j][0]
+            #keys = self._components_[j][1] # = [keys_1,keys_2,...]
+            
+            
             # keys = [[p0g0, p0g1,...],[p1g0, p1g1, ..],[p2g0, p2,g1,...]..]
             # print('add_multigroup mucomponents debug: key = {}'.format(keys))
-            pars = [[key(p) for key in groups_key] for groups_key in keys]# NEW! spedup, evaluates p[1], p[2] etc.
-            f += component(x,*pars)  # must contain x, 
-                                                 # for plot x != self._x_
+            pars = [[key(p) for key in groups_key] for groups_key in keys]
+            # print('mucomponents _add_multigroup_ debug:component {}-th: {}\npars {}'.format(j,method.__doc__,pars))
+            f += method(x,*pars)
+            # print('mucomponents _add_multigroup_ debug: f[:,0] {}'.format(f[:,0]))
+            # f += component(x,*pars) # x is 1d, component is vstacked, with shape (groups,bins) 
             # remember *p.comp means 'pass as many arguments as required by component, exausting the list p_comp'
 
             # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
@@ -492,6 +502,9 @@ class mumodel(object):
             # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
             # print('add_multigroup mucomponents debug: f.shape = {}, zeros.shape = {}'.format(
             #                                                         f.shape,zeros_like(x).shape))
+#            warn = array(where(abs(f)>1))
+#            if warn.size:
+#                print('Warning, model is getting too big in {}'.format(warn))
         return f     
 
     def _add_calib_multigroup_(self,x,*argv):   
@@ -665,7 +678,8 @@ class mumodel(object):
         x [mus], A, λ [mus-1]
         x need not be self.x (e.g. in plot)
         '''
-        return A*exp(x*λ)
+        λ = -87. if λ < -87. else λ
+        return A*exp(-x*λ)
         bl.func_code = make_func_code(["A","λ"])
 
     def bg(self,x,A,σ): 
@@ -704,8 +718,15 @@ class mumodel(object):
         x [mus], A, B [mT], φ [degrees], λ [mus-1]
         x need not be self.x (e.g. in plot)
         '''
+#        import warnings
+#        warnings.filterwarnings("error")
         # print('a={}, B={}, ph={}, lb={}'.format(asymmetry,field,phase,Lor_rate))
+#        try:
+        λ = -87. if λ < -87. else λ
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)
+#        except RuntimeWarning:
+#            print('debug: λ = {}'.format(λ))
+#            return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)      
         ml.func_code = make_func_code(["A","B","φ","λ"])
 
     def mg(self,x,A,B,φ,σ): 
@@ -854,14 +875,21 @@ class mumodel(object):
         None is default and sum is over all indices::
         ''' 
         # print('_chisquare_ mucomponents debug: {} {} {}'.format(self._x_.shape,self._y_.shape,self._e_.shape))
-        return sum(  ( (self._add_(self._x_,*argv) - self._y_) /self._e_)**2 ,axis=self._axis_ )
+        from numpy import finfo, where, array, abs
+        Mepsi = finfo('d').max/10.
+        num = abs(self._add_(self._x_,*argv) - self._y_)
+        normsquaredev = (num/self._e_)**2
+        divergence = normsquaredev>Mepsi
+#        if divergence.any():
+#            print('Warning: big numbers in chisquare {}'.format(normsquaredev[divergence]))
+        return sum(normsquaredev,axis=self._axis_ )
 
     def _chisquare_single_(self,*argv,k=0,l=None):
         '''
         inputs:
             argv ar single run single group fit parameters
             k[, l] are indices of _y_ and _e_ multidimensional arrays
-        Used only in mufitplot
+        Used only in mufitplot (is it still?)
         Provides partial chisquares over individual runs or groups
         ''' 
         # print('_chisquare_ mucomponents debug: {} {} {}'.format(self._x_.shape,self._y_.shape,self._e_.shape))

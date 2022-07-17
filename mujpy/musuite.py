@@ -564,41 +564,46 @@ class suite(object):
         * and directly in calibration fits (alpha is a parameter)
         * all are 1D numpy arrays
         """
-        import numpy as np
+        from numpy import zeros, array, mean, exp, where
         from mujpy.aux.aux import TauMu_mus
 
         filespec = self.datafile[-3:] # 'bin', 'mdu' or 'nsx'
         if self.loadfirst:
             
-    #       initialize to zero self.histolength
+    #       initialize to zero self.histoLength, maximum available good bins valid for all histos 
             n1 = self.nt0[0] + self.offset # ISIS
             n2 = n1 + self.histoLength # ISIS
-            yforw, ybackw = np.zeros(self.histoLength), np.zeros(self.histoLength) # counts 
+#            print('musuite single_for_back_counts debug: n1 {}, n2 {}, self.histoLength {}'.format(n1,n2,self.histoLength))
+            yforw, ybackw = zeros(self.histoLength), zeros(self.histoLength) # counts 
             background_forw, background_backw = 0., 0. # background estimate
                            
             for j, run in enumerate(runs): # Add runs
                 #print(run)
                 for counter in grouping['forward']: # first good bin, last good bin from data array start
                 
-                    histo = run.get_histo_vector(counter,1) # counter data array in forw group
+                    histo = array(run.get_histo_vector(counter,1)) # counter data array in forw group
+#                    if array(where(histo==0)).size:
+#                        print('musuite single_for_back_counts debug: run {} counter fwd {} contains {}  zeros'.format(run.get_runNumber_int(),counter,array(where(histo==0)).size))
                     if filespec =='bin' or filespec=='mdu': # PSI, counter specific range                  
                         n1 = self.nt0[counter] + self.offset
                         n2 = n1 + self.histoLength 
-                        background_forw += np.mean(histo[self.firstbin:self.lastbin])  # from prepromt estimate
+                        background_forw += mean(histo[self.firstbin:self.lastbin])  # from prepromt estimate
                     yforw += histo[n1:n2]
                         
                 for counter in grouping['backward']: # first good bin, last good bin from data attay start
                 
-                    histo = run.get_histo_vector(counter,1) # counter data array in back group
+                    histo = array(run.get_histo_vector(counter,1)) # counter data array in back group
+#                    if array(where(histo==0)).size:
+#                        print('musuite single_for_back_counts debug: run {} counter bkw {} contains {}  zeros'.format(run.get_runNumber_int(),counter,array(where(histo==0)).size))
                     if filespec=='bin' or filespec=='mdu': #  PSI, counter specific range  
                         n1 = self.nt0[counter] + self.offset
                         n2 = n1 + self.histoLength 
-                        background_backw += np.mean(histo[self.firstbin:self.lastbin])  # from prepromt estimate
+                        background_backw += mean(histo[self.firstbin:self.lastbin])  # from prepromt estimate
                     ybackw += histo[n1:n2]              
 
-            x = np.exp(self.time/TauMu_mus())
-            yfm = np.mean((yforw-background_forw)*x)
-            ybm = np.mean((ybackw-background_backw)*x)
+            x = exp(self.time/TauMu_mus())
+            yfm = mean((yforw-background_forw)*x)
+            ybm = mean((ybackw-background_backw)*x)
             return yforw, ybackw, background_forw, background_backw, yfm, ybm
         else:
             return None, None, None, None, None, None
@@ -642,50 +647,50 @@ class suite(object):
         # rebin eA works for ISIS, must be corrected for PSI        #
         # yfm, ybm depend on binning   
 
-    def single_multigroup_for_back_counts(self,runs,groupings):
-        """
-        * input: 
-        *         runs, runs to add
-        *         grouping, dict with list of detectors 
-                            grouping['forward'] and grouping['backward']
-        * output:
-        *         yforw, ybackw  
-        *                        = sum_{i=for or back}(data_i - background_i), PSI, 
-        *                        = sum_{i=for or back}data_i, ISIS
-        *         background_forw  =
-        *         background_backw = average backgrounds
-        *         yfbmean        = mean of (yforw-bf)*exp(t/TauMu)
-        *         ybackw         = mean of (ybackw-bb)*exp(t/TauMu)
-        * used only by calib multigroups
-        * yforw, ybackw are 2D numpy arrays, the last four output items are arrays 
-        """
-        from numpy import vstack,array
-        bf,bb,yfm,ybm = [],[],[],[]
-        for k,grouping in enumerate(groupings):
-            yforw, ybackw, background_forw, background_backw, yforwm, ybackwm = self.single_for_back_counts(runs,grouping)
-            bf.append(background_forw)
-            bb.append(background_backw)
-            yfm.append(yforwm)
-            ybm.append(ybackwm)
-            if k:
-                yf = vstack((yf,yforw))
-                yb = vstack((yb,ybackw))
-            else:
-                yf = yforw
-                yb = ybackw
-        bf = array(bf)
-        bb = array(bb)
-        yfm = array(yfm)
-        ybm = array(ybm)
-        return yf,yb,bf,bb,yfm,ybm
+#    def single_multigroup_for_back_counts(self,runs,groupings):
+#        """
+#        # unused?!
+#        * input: 
+#        *         runs, runs to add
+#        *         grouping, dict with list of detectors 
+#                            grouping['forward'] and grouping['backward']
+#        * output:
+#        *         yforw, ybackw  
+#        *                        = sum_{i=for or back}(data_i - background_i), PSI, 
+#        *                        = sum_{i=for or back}data_i, ISIS
+#        *         background_forw  =
+#        *         background_backw = average backgrounds
+#        *         yfbmean        = mean of (yforw-bf)*exp(t/TauMu)
+#        *         ybackw         = mean of (ybackw-bb)*exp(t/TauMu)
+#        * used only by calib multigroups
+#        * yforw, ybackw are 2D numpy arrays, the last four output items are arrays 
+#        """
+#        from numpy import vstack,array
+#        bf,bb,yfm,ybm = [],[],[],[]
+#        for k,grouping in enumerate(groupings):
+#            yforw, ybackw, background_forw, background_backw, yforwm, ybackwm = self.single_for_back_counts(runs,grouping)
+#            bf.append(background_forw)
+#            bb.append(background_backw)
+#            yfm.append(yforwm)
+#            ybm.append(ybackwm)
+#            if k:
+#                yf = vstack((yf,yforw))
+#                yb = vstack((yb,ybackw))
+#            else:
+#                yf = yforw
+#                yb = ybackw
+#        bf = array(bf)
+#        bb = array(bb)
+#        yfm = array(yfm)
+#        ybm = array(ybm)
+#        return yf,yb,bf,bb,yfm,ybm
         
-
     def asymmetry_single(self,the_run,kgroup):
         """
         input:
             the_run = list containing the instance[s] of the run[s to be added]
             k = index of self.grouping, a list of dicts 
-                self.grouping[k]['forward'] and ['backward']
+                self.grouping[k]['forward'] and ['backward'] (py-index, i.e "counter 1-Backw" is  0)
                 containing the respective lists of detectors
         * run instances from musr2py/muisis2py  (psi/isis load routine) 
         *
@@ -693,29 +698,46 @@ class suite(object):
             # can be A1 fit, but is also invoked by all others
             asymmetry and asymmetry error (1d)
          """
-        from numpy import exp, sqrt, where
+        from numpy import exp, sqrt, where, array, intersect1d, finfo
         from mujpy.aux.aux import TauMu_mus
 
         if self.loadfirst:
             # print(the_run)
-            alpha = self.grouping[kgroup]['alpha']
+            alpha = self.groups[kgroup]['alpha']
             
             yf, yb, bf, bb, yfm, ybm = self.single_for_back_counts(the_run,self.grouping[kgroup])
             
-            # calculate asymmetry and error
-            denominator = (yfm + alpha*ybm)*exp(-self.time/TauMu_mus())
-            asymm = (yf - alpha*yb - (bf - alpha*bb)) / denominator 
+            # yf, yb >=0 are flaot(int) counts; bf, bb are float average background counts
+            # yfm, ybm are  <(y-b)*exp(t/tau>, could be negative?
+            # Now calculate asymmetry and error, adding inner list runs
+            # self.grouping py-index, i.e "counter 1-Backw" is  0
+            if (yfm + alpha*ybm)<=0:
+                self.console('Too low counts on run {} group {}: negative asymmetry denominator: exiting'.format(the_run[0].get_numberRun_int(),kgroup))
+                return None, None
+            denominator = (yfm + alpha*ybm)*exp(-self.time/TauMu_mus()) # yfm, ybm are mean, not == 0
+            asymm = (yf - alpha*yb - (bf - alpha*bb)) / denominator  # 1d array
             
             #   ey_i in fcn sum_i ((y_i-y_th)/ey_i)**2 cannot be zero, but errexp can
-            errexp = sqrt(yf + alpha**2*yb)
-            errexp[where(errexp==0)] = 1                                                               #
-            #   set to 1 the minimum error (weights less very few points closer to ~ zero) 
-            asyme = errexp / denominator 
+            norma = yf + alpha**2*yb # could be zero, yielding zero error 
+            # norma represents (corrected) total counts, 
+            # its minimum physical value is 1 
+            # a) can be zero when both yf and yb are zeros
+            # b) can be 1 when yf = 1 and yb = 0
+            # c) can be alpha**" when yf = 1 and yb = 0, which are both fine
+            # cure by setting to 1 only case a), others take care of themselves
+            norma[norma==0] = 1.
+            asyme = sqrt(norma) / denominator
+            
+            # further check (effects of funny denominator? Maybe can be removed
+            sqepsi = sqrt(finfo('d').eps)
+            if (array(where(asyme<sqepsi))).size: # should never happen now
+                self.console('suite asymmetry_single debug: run {}, kgroup {} asyme contains {} value(s) < 1.5e-8 This should NOT happen'.format(the_run[0].get_runNumber_int(),kgroup ,(array(where(asyme<sqepsi))).size))
+                asyme[where(asyme<epsi)] = 2*sqepsi
 
             return asymm, asyme
         else:
             return None, None
-            
+                        
     def asymmetry_multirun(self,kgroup):
         """
         input:
@@ -734,6 +756,8 @@ class suite(object):
         if self.loadfirst:
             for k,run in enumerate(self._the_runs_):
                 a,e = self.asymmetry_single(run,kgroup)
+                if a is None: 
+                    return None, None
                 if k==0:
                     asymm, asyme  = a, e
                 else:
@@ -764,6 +788,8 @@ class suite(object):
                 # self.console('Loaded run {}, group {} ({}), alpha = {}'.format(run[0].get_runNumber_int(), kgroup, 
 #                                                  self.groups[kgroup]['forward']+'-'+self.groups[kgroup]['backward'],
 #                                                  self.groups[kgroup]["alpha"]))  
+                if a is None: 
+                    return None, None
                 if kgroup==0:
                     asymm, asyme  = a, e
                 else:
@@ -787,17 +813,19 @@ class suite(object):
         '''
         from numpy import array, vstack
         if self.loadfirst:
-            for k,run in enumerate(self._the_runs_):
+            for krun,run in enumerate(self._the_runs_):
                 for kgroup in range(len(self.grouping)):
                     if kgroup:
                         a,e = self.asymmetry_single(run,kgroup)
-                        asy,ase = vstack((asy,a),axis=0), vstack((ase,e),axis=0)
-                    else:
+                        if a is None: 
+                            return None, None
+                        asy,ase = vstack((asy,a)), vstack((ase,e)) # groups are vstacked
+                    else: # kgroup = 0
                         asy,ase = self.asymmetry_single(run,kgroup)
-                if k:
+                if krun:
                     asymm, asyme  = vstack((asymm,array([asy]))), vstack((asyme,array([ase])))
-                else:
-                    asymm, asyme = array([asy]),array([ase])
+                else: # krun=0
+                    asymm, asyme = array([asy]),array([ase]) # into 2nd dimension
             return asymm, asyme
         else:
             self.console('** CHECK ACCESS to database (or load runs first)') 

@@ -208,12 +208,12 @@ def add_step_limits_to_model(dash_in):
     dash_out = deepcopy(dash_in)   
     # these lists contain all parameter values in the dashboard, including their error steps and limits
 
-    for k, component in enumerate(dash_out['model_guess']):
+    for component in dash_out['model_guess']:
         steps = _errors_(component['name'],available_components)             
         limits = _limits_(component['name'],available_components) 
         for j,pardict in enumerate(component['pardicts']):
-            dash_out['model_guess'][k]['pardicts'][j]['error'] = steps[j]                     
-            dash_out['model_guess'][k]['pardicts'][j]['limits'] = limits[j]                         
+            pardict['error'] = steps[j]                  
+            pardict['limits'] = limits[j]                         
     return dash_out
    
 def _available_components_():
@@ -325,10 +325,6 @@ def int2min(model):
         fixed: True/False for each
         limits: [low, high] limits for each or [None,None]  
         names: name of parameter 'x_label' for each parameter
-    new version must accommodate all, e.g.:
-        single run single group 
-        multi run multi group sequential 
-        multi run multi group global      
     '''
     from mujpy.aux.aux import _nparam
 
@@ -342,21 +338,19 @@ def int2min(model):
     val, err, fix, lim = [], [], [], []           
     names = []
 
-    nint = -1 # initialize
-    for k in range(len(model)):  # scan the model components
-        label = model[k]['label']
-        for j, pardict in enumerate(model[k]['pardicts']):  # list of dictionaries
-            nint += 1  # internal parameter incremented always   
-            # print(pardict)
+    for component in model:  # scan the model components
+        label = component['label']
+        for pardict in component['pardicts']:  # list of dictionaries
             if pardict['flag'] != '=': #  skip functions, only new minuit parameters
+                if pardict['flag'] == '~':
+                    fix.append(False)
+                elif pardict['flag'] == '!':
+                    fix.append(True)
                 val.append(float(pardict['value']))
                 names.append(pardict['name']+'_'+label) 
                 err.append(float(pardict['error']))
                 lim.append(pardict['limits'])
-            if pardict['flag'] == '~':
-                fix.append(False)
-            elif pardict['flag'] == '!':
-                fix.append(True)
+                # print('aux int2min debug: pardict name {} limits {}'.format(names[-1],lim[-1]))
     # self.console('val = {}\nerr = {}\nfix = {}\nlim = {},\npar name = {} '.format(val,err,fix,lim, names)) 
 
     return val, err, fix, lim, names
@@ -375,8 +369,6 @@ def int2min_multigroup(pardicts):
         parameter_name: name of parameter 'x_label' for each parameter
     this works for A2 single fit, multigroup with userpardicts parameters = Minuit parameters
     '''
-    # pardicts = model["userpardicts_guess"]
-    ntot  = len(pardicts)
     
     #####################################################
     # the following variables contain the same as input #
@@ -390,6 +382,9 @@ def int2min_multigroup(pardicts):
         fitval.append(float(pardict['value']))
         parameter_name.append(pardict['name']) 
         fiterr.append(float(pardict[errstd]))
+        if 'error' in pardict.keys():
+            fitlim.append(pardict['limits'])
+            # print('aux debug: par {} limits {}'.format(pardict['name'],pardict['limits']))
         if 'flag' in pardict.keys():
             if pardict['flag'] == '!':
                 fitfix.append(True)
@@ -397,7 +392,6 @@ def int2min_multigroup(pardicts):
                 fitfix.append(False)
             else:
                 return False,_,_,_,_
-            fitlim.append(pardict['limits'])
         # self.console('fitval = {}\nfiterr = {}\nfitfix = {}\nfitlim = {}\ncomp name = {},\npar name = {} '.format(fitval,fiterr,fitfix,fitlim,component_name,parameter_name)) 
     return fitval, fiterr, fitfix, fitlim, parameter_name
 
@@ -517,6 +511,12 @@ def int2_multigroup_method_key(dashboard,the_model,guess=True):
     pardicts = [pardict for component in model for pardict in component['pardicts']]
     mask_function_multi = multigroup_in_components(dashboard)
     # print('int2_multigroup_method_key aux debug: index function_multi {}\npardicts = {}'.format(mask_function_multi,pardicts))
+#    if "userpardicts_guess" in dashboard.keys():
+#        updicts =  dashboard["userpardicts_guess"]
+#        print('int2_multigroup_method_key aux debug: userpardicts ')
+#        for j,pd in enumerate(updicts):
+#            print('{} {} = {}({}), {}, {} '.format(j,pd["name"],pd["value"],
+#                                    pd["error"], pd["flag"],pd["limits"]))
     if sum(mask_function_multi):
         ngroups = len(pardicts[mask_function_multi.index(1)]["function_multi"])
     else:
@@ -524,29 +524,31 @@ def int2_multigroup_method_key(dashboard,the_model,guess=True):
     nint = -1 # initialize the index of the dashboard component parameters
     # p = [1.13,1.05,0.25,0.3,0.8,700,35,125,3.3,680,0.1] # debug delete
     # print('aux int2_multigroup_method_key debug: fake values k, p {}'.format([[k,par] for k,par in enumerate(p)]))
-    for component in model:  # scan the model components
+    bndmthd = {} # to avoid same name
+    for j,component in enumerate(model):  # scan the model components
         name = component['name']
         keys = []
-        # print('name = {}, model = {}'.format(name,self._the_model_))
-        bndmthd = lambda x,*pars : fstack(the_model.__getattribute__(name),x,*pars)
+        bndmthd[name] = lambda x,*pars, name=name : fstack(the_model.__getattribute__(name),x,*pars)
+        bndmthd[name].__doc__ = '"""'+name+'"""'
                             # this is the method to calculate a component, to set alpha, dalpha apart
+        #print('\n\aux int2_multigroup_method_key debug: {}-th component name = {}'.format(j,bndmthd[name].__doc__))
         nint0 = nint
         for l in range(ngroups):
             key = []  
             nint = nint0
-            for j,pardict in enumerate(component['pardicts']): 
+            for pardict in component['pardicts']: 
                 nint += 1  # internal parameter index incremented always 
                 if mask_function_multi[nint]>0:
-                    # print('aux int2_multigroup_method_key debug: l = {}, pardict = {}'.format(l,pardict["function_multi"][l])) 
+#                    print('aux int2_multigroup_method_key debug: {}[{}] = {}'.format(pardict["name"],l,pardict["function_multi"][l])) 
                     key_as_lambda = eval('lambda p:'+pardict["function_multi"][l]) # NEW! speedup
                 else:                
-                    # print('aux int2_multigroup_method_key debug: l = 0&1, pardict = {}'.format(pardict["function"])) 
+#                    print('aux int2_multigroup_method_key debug: {}[{}] = {}'.format(pardict["name"],l,pardict["function"])) 
                     key_as_lambda = eval('lambda p:'+pardict["function"]) # NEW! speedup
                 # print('aux int2_multigroup_method_key debug: key_as_lambda(p) = {} **delete also p!'.format(key_as_lambda(p)))
                 key.append(key_as_lambda) # the function key will be evaluated, key(p), inside mucomponents
             keys.append(key)
-        # print('int2_method aux debug: bndmthd = {}, keys = {}'.format(bndmthd,keys))
-        method_key.append([bndmthd,keys]) # vectorialized method, with keys 
+        #print('int2_method aux debug: appending {}-th bndmthd {} with {} groups x {} keys'.format(j,bndmthd[name].__doc__,len(keys),len(keys[0])))
+        method_key.append([bndmthd[name],keys]) # vectorialized method, with keys 
         # keys = [[strp0g0, strp1g0,...],[strp0g1, strp1g1, ..],[strp0g2, strp1g2,...]..]
         # pars = [[p0g0, p1g0, ...],[p0g1, p1g1, ..],[p0g2, p1g2,...]..]
     return method_key
@@ -566,8 +568,10 @@ def fstack(npfunc,x,*pars):
     from numpy import vstack
     for k,par in enumerate(pars):
         if k:
+            # print('aux fstack debug: npfunc.__doc__: {}'.format(npfunc.__doc__))
             f = vstack((f,npfunc(x,*par)))
         else:
+            # print('aux fstack debug: k=0 npfunc.__doc__: {}'.format(npfunc.__doc__))
             f = npfunc(x,*par)
     return f
     
@@ -985,14 +989,14 @@ def create_model(dashboard):
     starts switchyard for A1,A1,B1, B2, C1, C2 fits
     adds a model of components selected from the available_component tuple of  
     directories
-    with zeroed values, stepbounds from available_components, flags set to '~' and empty functions
+    with zeroed values, stepbounds from available_components, flags set to '~' and zeros functions
     '''
     import string
     from mujpy.aux.aux import modelstrip, addcomponent
 
 
     components
-    self.model_guess = [] # start from empty model
+    self.model_guess = [] # start from zeros model
     for k,component in enumerate(components):
         label = string.ascii_lowercase[k] # was uppercase[k]
         if not addcomponent(component,dashboard):
@@ -1005,7 +1009,7 @@ def addcomponent(name,label):
     addcomponent('ml') # adds e.g. a mu precessing, lorentzian decay, component
     this method adds a component selected from _available_components_(), tuple of directories
     with zeroed values, error and limits from available_components, 
-    flags set to '~' and empty functions
+    flags set to '~' and zeros functions
     [plan also addgroupcomponents and addruncomponents (for A2, B2, C1, C2)]
     '''
     from copy import deepcopy
@@ -1303,6 +1307,7 @@ def initialize_csv(Bstr, filespec, the_run ):
     for ISIS [PSI]
     '''
     nrun = the_run.get_runNumber_int()
+    # print('aux initialize_csv debug: nrun {}'.format(nrun))
     if filespec=='bin' or filespec=='mdu':
         TsTc, eTsTc = the_run.get_temperatures_vector(), the_run.get_devTemperatures_vector()
         n1,n2 = spec_prec(eTsTc[0]),spec_prec(eTsTc[1]) # calculates format specifier precision
@@ -1466,11 +1471,17 @@ def get_title(run,notemp=False,nofield=False):
     title.append((run.get_orient()).rstrip())  
     if not notemp:
         tstr = run.get_temp()
-        temp = float(tstr[:tstr.index('K')])
+        try:
+            temp = float(tstr[:tstr.index('K')])
+        except:
+            temp = float(tstr)
         title.append('{:.1f}K'.format(temp))
     if not nofield:
         field = run.get_field()
-        title.append('{:.0f}mT'.format(float(field[:field.index('G')])/10))
+        try:
+            title.append('{:.0f}mT'.format(float(field[:field.index('G')])/10))
+        except:
+            title.append('{:.0f}mT'.format(float(field)/10))
     return ' '.join(title)    
     
 def get_run_title(the_suite):
@@ -1804,7 +1815,7 @@ def rebin(x,y,strstp,pack,e=None):
 
        xr,yr,eyr = rebin(x,y,strstp,pack,ey) # the 5th is y error
     '''
-    from numpy import floor, sqrt, empty
+    from numpy import floor, sqrt, zeros
 
     start,stop = strstp
     m = int(floor((stop-start)/pack)) # length of rebinned xb
@@ -1813,7 +1824,7 @@ def rebin(x,y,strstp,pack,e=None):
     xx = xx.reshape(m,pack) # temporaty 2d array
     xr = xx.sum(1)/pack # rebinned first ndarray
     if len(y.shape)==1:
-        yb = empty(m)
+        yb = zeros(m)
         yy = y[start:start+mn]  # slice row
         yy = yy.reshape(m,pack)  # temporaty 2d
         yr = yy.sum(1)/pack # rebinned row           
@@ -1823,9 +1834,9 @@ def rebin(x,y,strstp,pack,e=None):
             er = sqrt((ey**2).sum(1))/pack  # rebinned row - only good for ISIS 
     elif len(y.shape)==2:
         nruns = y.shape[0] # number of runs
-        yr = empty((nruns,m))
+        yr = zeros((nruns,m))
         if e is not None:
-            er = empty((nruns,m))
+            er = zeros((nruns,m))
         for k in range(nruns): # each row is a run
             yy = y[k][start:start+mn]  # slice row
             yy = yy.reshape(m,pack)  # temporaty 2d
@@ -1836,9 +1847,10 @@ def rebin(x,y,strstp,pack,e=None):
                 er[k] = sqrt((ey**2).sum(1))/pack  # rebinned row        
     elif len(y.shape)==3:        
         ngroups,nruns = y.shape[0:2] # number of groups, runs
-        yr = empty((ngroups,nruns,m))
+        yr = zeros((ngroups,nruns,m))
+        
         if e is not None:
-            er = empty((ngroups,nruns,m))
+            er = zeros((ngroups,nruns,m))
         for k in range(ngroups): 
             for j in range(nruns):  
                 yy = y[k][j][start:start+mn]  # slice row
@@ -1872,7 +1884,7 @@ def rebin_decay(x,yf,yb,bf,bb,strstp,pack):
 
         xr,yfr, ybr, bfr, bbr, yfmr, ybmr = rebin(x,yf,yb,bf,bb,yfm,ybm,strstp,pack)
     '''
-    from numpy import floor, sqrt, exp, empty, mean
+    from numpy import floor, sqrt, exp, zeros, mean
     from mujpy.aux.aux import TauMu_mus
 
     start,stop = strstp
@@ -1883,8 +1895,8 @@ def rebin_decay(x,yf,yb,bf,bb,strstp,pack):
     xr = xx.sum(1)/pack # rebinned first ndarray
     bfr, bbr = bf*pack, bb*pack
     if len(yf.shape)==1:
-        yfr = empty(m)
-        ybr = empty(m) 
+        yfr = zeros(m)
+        ybr = zeros(m) 
         yfr = yf[start:start+mn]  # slice row
         ybr = yb[start:start+mn]  # slice row
         yfr = yfr.reshape(m,pack)  # temporaty 2d
@@ -1894,8 +1906,8 @@ def rebin_decay(x,yf,yb,bf,bb,strstp,pack):
         yfmr, ybmr = mean((yfr-bfr)*exp(xr/TauMu_mus())), mean((ybr-bbr)*exp(xr/TauMu_mus()))   
     elif len(yf.shape)==2:
         nruns = yf.shape[0] # number of runs
-        yfr = empty((nruns,m))
-        ybr = empty((nruns,m)) 
+        yfr = zeros((nruns,m))
+        ybr = zeros((nruns,m)) 
         for k in range(nruns): # each row is a run, or a group
             yyf = yf[k][start:start+mn]  # slice row
             yyf = yyf.reshape(m,pack)  # temporaty 2d
@@ -1909,8 +1921,8 @@ def rebin_decay(x,yf,yb,bf,bb,strstp,pack):
             
     elif len(yf.shape)==3:        # probably never used unless calib mode becomes a C2 case
         ngroups,nruns = yf.shape[0:2] # number of runs
-        yfr = empty((ngroups,nruns,m))
-        ybr = empty((nruns,m)) 
+        yfr = zeros((ngroups,nruns,m))
+        ybr = zeros((nruns,m)) 
         for k in range(ngroups): 
             for j in range(nruns):  
                 yyf = yf[k][j][start:start+mn]  # slice row

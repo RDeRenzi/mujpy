@@ -3,14 +3,14 @@
   "fit_range": "0,24000,5",
   "offset": 20,
   "userpardicts_guess":[
-    {"name":"f","value":0.75,"flag":"~","error":0.005,"limits":[0,1]},
+    {"name":"f","value":0.25,"flag":"~","error":0.005,"limits":[0,1]},
     {"name":"A12","value":0.25,"flag":"~","error":0.005,"limits":[null,null]},
     {"name":"A34","value":0.25,"flag":"~","error":0.005,"limits":[null,null]},
     {"name":"φ12","value":-55.0,"flag":"~","error":0.005,"limits":[null,null]},
     {"name":"φ34","value":35.0,"flag":"~","error":0.005,"limits":[null,null]},
     {"name":"B_fst","value":10.0,"flag":"~","error":0.005,"limits":[null,null]},
     {"name":"B_slw","value":10.0,"flag":"~","error":0.005,"limits":[null,null]},
-    {"name":"σ_fst","value":5.0,"flag":"~","error":0.005,"limits":[null,null]},
+    {"name":"σ_fst","value":1.0,"flag":"~","error":0.005,"limits":[null,null]},
     {"name":"λ_slw","value":0.1,"flag":"~","error":0.005,"limits":[-87.0,null]}
     ],
   "model_guess": [
@@ -86,12 +86,12 @@
           "flag": "=",
           "function": "",
           "function_multi":[
-            "(1-p[0])*p[1]",
-            "(1-p[0])*p[2]"
+            "p[0]*(1.-p[1])",
+            "p[0]*(1.-p[2])"
            ],
           "error_propagate_multi":[
-            "sqrt(((1-p[0])*e[1])**2+(e[0]*p[1])**2)",
-            "sqrt(((1-p[0])*e[2])**2+(e[0]*p[2])**2)"
+            "sqrt((p[0]*e[1])**2+(e[0]*(1.-p[1]))**2)",
+            "sqrt((p[0]*e[2])**2+(e[0]*(1.-p[2]))**2)"
            ],
           "error": 0.01,
           "limits": [
@@ -132,7 +132,7 @@
           "function": "p[8]",
           "error": 0.01,
           "limits": [
-            -80.0,
+            -87.0,
             null
           ]
         }
