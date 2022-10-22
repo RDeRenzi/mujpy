@@ -739,6 +739,15 @@ class mumodel(object):
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-0.5*(x*σ)**2)
         mg.func_code = make_func_code(["A","B","φ","σ"])
 
+    def md(self,x,A,B,φ,λ,σ): 
+        '''
+        fit component for a precessing muon with Gaussian and Lorentzian independent decaya, 
+        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  (positive parity)
+        x need not be self.x (e.g. in plot)
+        '''
+        return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)*exp(-0.5*(x*σ)**2)
+        mg.func_code = make_func_code(["A","B","φ","λ","σ"])
+
     def ms(self,x,A,B,φ,Λ,β): 
         '''
         fit component for a precessing muon with stretched decay, 
