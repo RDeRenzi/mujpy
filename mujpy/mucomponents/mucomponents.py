@@ -692,6 +692,15 @@ class mumodel(object):
         return A*exp(-0.5*(x*σ)**2)
         bg.func_code = make_func_code(["A","σ"])
 
+    def ba(self,x,A,λ,σ): 
+        '''
+        fit component for a Gaussian decay, 
+        x [mus], A, σ [mus-1] (positive parity)
+        x need not be self.x (e.g. in plot)
+        '''
+        return A*exp(-x*λ)*exp(-0.5*(x*σ)**2)
+        ba.func_code = make_func_code(["A","λ","σ"])
+
     def bs(self,x,A,Λ,β): 
         '''
         fit component for a stretched decay, 
@@ -730,7 +739,7 @@ class mumodel(object):
 #            return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)      
         ml.func_code = make_func_code(["A","B","φ","λ"])
 
-    def mg(self,x,A,B,φ,σ): 
+    def mu(self,x,A,B,φ,σ): 
         '''
         fit component for a precessing muon with Gaussian decay, 
         x [mus], A, B [mT], φ [degrees], σ [mus-1]  (positive parity)
@@ -739,14 +748,14 @@ class mumodel(object):
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-0.5*(x*σ)**2)
         mg.func_code = make_func_code(["A","B","φ","σ"])
 
-    def md(self,x,A,B,φ,λ,σ): 
+    def mu(self,x,A,B,φ,λ,σ): 
         '''
         fit component for a precessing muon with Gaussian and Lorentzian independent decaya, 
         x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  (positive parity)
         x need not be self.x (e.g. in plot)
         '''
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)*exp(-0.5*(x*σ)**2)
-        mg.func_code = make_func_code(["A","B","φ","λ","σ"])
+        mu.func_code = make_func_code(["A","B","φ","λ","σ"])
 
     def ms(self,x,A,B,φ,Λ,β): 
         '''
@@ -793,7 +802,7 @@ class mumodel(object):
         x need not be self.x (e.g. in plot)
         '''
         return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-(x*Λ)**β)
-        jg.func_code = make_func_code(["A","B","φ","Λ","β"])
+        js.func_code = make_func_code(["A","B","φ","Λ","β"])
 
     def _kg(self,t,w,Δ):
         '''
@@ -934,7 +943,7 @@ class mumodel(object):
         x need not be self.x (e.g. in plot)
         '''
         return A*self._kg(x,0,Δ)*exp(-(x*Λ)**β)
-        kd.func_code = make_func_code(["A","Δ","Λ","β"])
+        ks.func_code = make_func_code(["A","Δ","Λ","β"])
         #kd.limits = [[None,None],[0.,None],[None,None]]
         #kd.error = [0.002,0.05,0.05]
 
