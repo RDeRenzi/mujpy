@@ -1,0 +1,74 @@
+{
+  "version": "1",
+  "fit_range": "0,20000,4",
+  "offset": 20,
+  "model_guess": [
+    {
+      "name": "al",
+      "label": "0",
+      "pardicts": [
+        {
+          "name": "α",
+          "error": 0.002,
+          "limits": [
+            0.0,
+            null
+          ],
+          "value": 1.0000,
+          "flag": "~",
+          "function": ""
+        }
+      ]
+    },
+    {
+      "name": "mg",
+      "label": "1",
+      "pardicts": [
+        {
+          "name": "A",
+          "error": 0.002,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.2000,
+          "flag": "~",
+          "function": ""
+        },
+        {
+          "name": "B",
+          "error": 0.05,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 100.0000,
+          "flag": "~",
+          "function": ""
+        },
+        {
+          "name": "φ",
+          "error": 1.0,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.0000,
+          "flag": "~",
+          "function": ""
+        },
+        {
+          "name": "σ",
+          "error": 0.002,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.0000,
+          "flag": "~",
+          "function": ""
+        }
+      ]
+    }
+  ]
+}

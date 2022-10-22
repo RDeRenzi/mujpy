@@ -30,6 +30,12 @@ class mufitplot(object):
 # and calculating chi2.
 # everything can be obtained from the_fit, including dashboard initial guess
 # Maybe make another version that does multiplots from the dashboards
+#
+#
+#  the function that performs the plot is mujpy.aux.aux import set_single_fit, self_sequence_fit 
+#        invoked by self.plot_run in 
+#        plot_singlerun or plot_singlerun_multigroup_sequential or plot_singlerun_multigroup_userpar
+
     def __init__(self,plot_range,the_fit,guess=False,rotating_frame_frequencyMHz = 0.0,fft_range = None,real=True,fig_fit=None,fig_fft=None):
         '''
         input: 
@@ -46,9 +52,10 @@ class mufitplot(object):
         # print('mufitplot __init__ debug: inside')      
         self.lastfits = the_fit.lastfits
         self._the_model_ = the_fit._the_model_                           
-        self.suite = the_fit.suite 
+        self.suite = the_fit.suite
+        self.log = the_fit.log
         if not self.suite.loadfirst: 
-            self.suite.console('Sorry, no access to data... quitting mufitplot')
+            self.log('Sorry, no access to data... quitting mufitplot')
             ok = False
         else:
             ok = True 
@@ -69,7 +76,7 @@ class mufitplot(object):
                 elif "userpardicts_guess" in self.dashboard.keys():   
                     self.model = "model_result"  
                 else:            
-                    self.suite.console('Sorry no fit results yet, plotting guess instead')
+                    # self.log('Sorry no fit results yet, plotting guess instead')
                     self.guess = True
             # print('__init__ mufitplot debug: model = {}, guess = {}'.format(self.model,self.guess))    
            
@@ -79,7 +86,7 @@ class mufitplot(object):
                     self.choosefftplot(fft_range,real)
             else:
                 if fft_range is None:
-                    self.suite.console('Exiting mufitplot: nothing to do.')    
+                    self.log('Exiting mufitplot: nothing to do.')    
                               
   
     def chooseplot(self,plot_range):
@@ -99,7 +106,7 @@ class mufitplot(object):
         from mujpy.aux.aux import multigroup_in_components, userpars, userlocals
         if self.suite.single(): # A1, A20, A21
             if self.suite.multi_groups(): # A20 A21
-                self.suite.console('Multigroup fit animation: toggle pause/resume by clicking on the plot')
+                self.log('Multigroup fit animation: toggle pause/resume by clicking on the plot')
                 if sum(multigroup_in_components(self.dashboard)): # A21
                     ok, msg = self.plot_singlerun_multigroup_userpar(plot_range)
                 else:                          # A20
@@ -107,10 +114,10 @@ class mufitplot(object):
             else:                              # A1
                 ok, msg = self.plot_singlerun(plot_range)
         else: # B1, B2, C1, C2, no calib in this lot
-            self.suite.console('Multirun fit animation: toggle pause/resume by clicking on the plot')
+            self.log('Multirun fit animation: toggle pause/resume by clicking on the plot')
             if self.suite.multi_groups(): # B2, C2
                 if userlocals(self.dashboard): # C2
-                    self.suite.console('No C2 yet. Exiting mufitplot without a plot')
+                    self.log('No C2 yet. Exiting mufitplot without a plot')
                     ok, msg = False, 'C2'
                     pass
                 else: # B2 (means B21 group global, B20 group sequential does not exist)
@@ -118,13 +125,13 @@ class mufitplot(object):
                     pass
             else: # B1, C1
                 if userpars(self.dashboard): # C1
-                    self.suite.console('No B2, C2 yet. Exiting mufitplot without a plot')
+                    self.log('No B2, C2 yet. Exiting mufitplot without a plot')
                     ok, msg = False, 'C1'
                     pass
                 else: # B1
                     ok, msg = self.plot_multirun_singlegroup_sequential(plot_range)       
         if not ok:
-            self.suite.console('Exiting mufitplot without a plot: '+msg)
+            self.log('Exiting mufitplot without a plot: '+msg)
     
     def plot_singlerun(self,plot_range):
         '''
@@ -135,8 +142,9 @@ class mufitplot(object):
         '''
         from mujpy.aux.aux import int2min, mixer, calib
         from numpy import cos, pi
+#        self.log('muplotfit plot_singlerun debug')
         kgroup = 0 # default single group 
-        pars,_,_,_,_ = int2min(self.dashboard[self.model])
+        pars,_,_,_,_,_ = int2min(self.dashboard[self.model])
         if calib(self.dashboard):
             self.suite.grouping[kgroup]['alpha'] = pars[0] # from fit parameter to standard asymmetry mode
             self.suite.groups[kgroup]['alpha'] = pars[0]
@@ -144,7 +152,7 @@ class mufitplot(object):
         if self.rotating_frame_frequencyMHz:
             self.rrf_asymm = mixer(self.suite.time,asymm,self.rotating_frame_frequencyMHz)
             self.rrf_asyme = mixer(self.suite.time,asyme,self.rotating_frame_frequencyMHz)
-        #self.suite.console('mufitplot: Inside single plot; debug mode')
+        #self.log('mufitplot: Inside single plot; debug mode')
         return self.plot_run(plot_range,pars,asymm,asyme)        
 
     def plot_singlerun_multigroup_userpar(self,plot_range):
@@ -159,7 +167,7 @@ class mufitplot(object):
         userpardicts = (self.dashboard["userpardicts_guess"] if self.guess else 
                         self.dashboard["userpardicts_result"])
         pardict = self.dashboard["model_guess"][0]["pardicts"][0]
-        pars,_,_,_,_ = int2min_multigroup(userpardicts)
+        pars,_,_,_,_,_ = int2min_multigroup(userpardicts)
         p = pars
         if calib(self.dashboard):
             for kgroup,group in enumerate(self.suite.groups):
@@ -175,7 +183,7 @@ class mufitplot(object):
                     time = vstack((time,self.suite.time))
             self.rrf_asymm = mixer(time,asymm,self.rotating_frame_frequencyMHz)
             self.rrf_asyme = mixer(time,asyme,self.rotating_frame_frequencyMHz)
-        #self.suite.console('mufitplot: Inside single plot; debug mode')
+        #self.log('mufitplot: Inside single plot; debug mode')
         return self.plot_run(plot_range,pars,asymm,asyme)        
 
     def plot_multirun_multigrup_userpar(self,plot_range):
@@ -190,7 +198,7 @@ class mufitplot(object):
         userpardicts = (self.dashboard["userpardicts_guess"] if self.guess else 
                         self.dashboard["userpardicts_result"])
         pardict = self.dashboard["model_guess"][0]["pardicts"][0]
-        pars,_,_,_,_ = int2min_multigroup(userpardicts)
+        pars,_,_,_,_,_ = int2min_multigroup(userpardicts)
 # no calib mode!
 #        p = pars
 #        if calib(self.dashboard):
@@ -211,7 +219,7 @@ class mufitplot(object):
                     time = vstack(time,array([tim]))                      
             self.rrf_asymm = mixer(time,asymm,self.rotating_frame_frequencyMHz)
             self.rrf_asyme = mixer(time,asyme,self.rotating_frame_frequencyMHz)
-        #self.suite.console('mufitplot: Inside single plot; debug mode')
+        #self.log('mufitplot: Inside single plot; debug mode')
         return self.plot_run(plot_range,pars,asymm,asyme)        
    
     def plot_singlerun_multigroup_sequential(self,plot_range):
@@ -239,14 +247,14 @@ class mufitplot(object):
             self.rrf_asymm = mixer(time,asymm,self.rotating_frame_frequencyMHz)
             self.rrf_asyme = mixer(time,asyme,self.rotating_frame_frequencyMHz)
         pars = []
-        # self.suite.console('mufitplot single_plot_multi_sequential debug')
+        # self.log('mufitplot single_plot_multi_sequential debug')
         for kgroup in range(asymm.shape[0]):
             if self.model == "model_result":
                 #print('single_plot_multi_sequential mufitplot debug: self model = {}',format(self.dashboard[self.model][kgroup]))
                 values = self.lastfits[kgroup].values                
             else:
                 #print('single_plot_multi_sequential mufitplot debug: self model = {}',format(self.dashboard[self.model]))
-                values,_,_,_,_ = int2min(self.dashboard[self.model])                
+                values,_,_,_,_,_ = int2min(self.dashboard[self.model])                
             pars.append(values) # here pars is list of list!!
         return self.plot_run(plot_range,pars,asymm,asyme)        
 
@@ -263,7 +271,7 @@ class mufitplot(object):
         kgroup = 0 # default single 
         # dashboard must become a suite thing: each sequential fit has its own
         pars = []
-        # self.suite.console('mufitplot: Inside sequential plot; debug mode')
+        # self.log('mufitplot: Inside sequential plot; debug mode')
         for k,lastfit in enumerate(self.lastfits):
             values = lastfit.values
             
@@ -315,13 +323,14 @@ class mufitplot(object):
             run_title = [title + ": "+string+"guess values" for title in run_title]
         else:
             run_title = [title + ": "+string+"fit results" for title in run_title]
-        plottup = derange(plot_range,self.suite.histoLength)
+        plottup,ermsg = derange(plot_range,self.suite.histoLength)
+#        self.log('mufitplot plot_run debug: plot_range {}, plottup {}'.format(plot_range,plottup))
         #############################
         # rebinning of data as in fit 
         # this works for single 
         # and for sequential
         #############################
-        fittup = derange(self.dashboard["fit_range"],self.suite.histoLength) # range as tuple
+        fittup,ermsg = derange(self.dashboard["fit_range"],self.suite.histoLength) # range as tuple
         fit_pack = 1
         if len(fittup)==3: # plot start stop pack
             fit_start, fit_stop, fit_pack = fittup[0], fittup[1], fittup[2]
@@ -400,8 +409,8 @@ class mufitplot(object):
                 start, stop, pack = plottup
             elif len(plottup)==2: # plot start stop
                 start, stop = plottup
-#        self.suite.console('plot_range= {}'.format(plot_range))
-#        self.suite.console('start, stop, pack = {},{},{}'.format(start, stop, pack))
+#        self.log('plot_range= {}'.format(plot_range))
+#        self.log('start, stop, pack = {},{},{}'.format(start, stop, pack))
 
         t,y,ey = rebin(self.suite.time,asymm,[start,stop],pack,e=asyme)
         # rebinned single or early slices 
@@ -454,7 +463,7 @@ class mufitplot(object):
                             w_early,w_late]
         else:
             data_late, chi_dof_late = None, None
-        # self.suite.console('Debug-mufitplot: set_figure  = {}'.format(set_figure_fit))
+        # self.log('Debug-mufitplot: set_figure  = {}'.format(set_figure_fit))
         self.fig = set_figure_fit(  self.fig,self.model_name(),
                                     early_late,
                                     data,
@@ -532,7 +541,7 @@ class mufitplot(object):
                         chicchi.append(chi2)
                     chi2=chicchi
             else: 
-                self.suite.console(msg)
+                self.log(msg)
                 return None, None, None            
         return nu,f,chi2
         
@@ -575,7 +584,7 @@ class mufitplot(object):
                 # print('mufitplot chi_2 debug: pars {}'.format(pars))
                 f = self.fstack(t,*pars)
             else:
-                self.suite.console(msg)
+                self.log(msg)
                 return None, None, None
             # print('mufitplot chi_2 debug: len(pars) {}'.format(len(pars)))
             for k in range(len(self.lastfits)): # works only for 2d cases
@@ -618,33 +627,33 @@ class mufitplot(object):
         if self.suite.single():
             if self.suite.multi_groups(): # A2
                 # print('mufitplot choosefftplot debug: A2')
-                self.suite.console('Multigroup fft animation: toggle pause/resume by clicking on the plot')
+                self.log('Multigroup fft animation: toggle pause/resume by clicking on the plot')
                 if sum(multigroup_in_components(self.dashboard)): # A21 single chi2
                     userpars = "userpardicts_guess" if self.guess else "userpardicts_results"
                     pardicts = self.dashboard[userpars]
-                    pars,_,_,_,_ = int2min_multigroup(pardicts)
+                    pars,_,_,_,_,_ = int2min_multigroup(pardicts)
                     # ok = self.single_fft_plot_multi_global(fft_range,pars,real)
                 else: # A20 as many chi2 as groups now results are saved in single group dashboards
                     if self.model=="model_result":
                         pars = [array(lastfit.values) for lastfit in self.lastfits]
                         # print('mufitplot choosefftplot debug: A20 fit pars = {}'.format(pars))
                     else:
-                        par,_,_,_,_ = int2min(self.dashboard[self.model])                    
+                        par,_,_,_,_,_ = int2min(self.dashboard[self.model])                    
                         pars = [array(par) for k in range(len(self.suite.groups))]
                         # print('mufitplot choosefftplot debug: A20 guess pars = {}'.format(pars))
                     # ok = self.single_fft_plot_multi_sequential(fft_range,pars,real)
                 asymm, asyme = self.suite.asymmetry_multigroup()
             else:  # A1 simple single plot
-                pars,_,_,_,_ = int2min(self.dashboard[self.model])
+                pars,_,_,_,_,_ = int2min(self.dashboard[self.model])
                 # ok = self.single_fft_plot(fft_range,pars,real)
                 asymm, asyme = self.suite.asymmetry_single(self.suite._the_runs_[0],0)
         else: 
             if userpars(self.dashboard):
                 if not self.suite.multi_groups(): # C1, userpardicts no multigroup
-                    self.suite.console('Multirun fft animation: toggle pause/resume by clicking on the plot')
+                    self.log('Multirun fft animation: toggle pause/resume by clicking on the plot')
                     pass# not yet
                 else: 
-                    self.suite.console('Multi group and run fft animation: toggle pause/resume by clicking on the plot')
+                    self.log('Multi group and run fft animation: toggle pause/resume by clicking on the plot')
                     if userlocals(self.dashboard): # C2
                         pass# not yet
                     else: # B21 userpardicts, multigroup_in_components no tilde_incomponents
@@ -658,12 +667,12 @@ class mufitplot(object):
                 if self.suite.multi_groups(): 
                     for run in get_nruns(self.suite): # B1 no multigroup
                         for group in self.suite.groups: # or B20 no userpardicts multigroup
-                            par,_,_,_,_ = int2min(self.dashboard[self.model])
+                            par,_,_,_,_,_ = int2min(self.dashboard[self.model])
                             pars.append(par)
                             asymm, asyme = self.suite.asymmetry_multirun_multigroup()
                 else:
                     for run in get_nruns(self.suite): # B1 no multigroup
-                        par,_,_,_,_ = int2min(self.dashboard[self.model])
+                        par,_,_,_,_,_ = int2min(self.dashboard[self.model])
                         pars.append(par)
                     asymm, asyme = self.suite.asymmetry_multirun(0)
                 # ok = self.sequential_fft_plot(fft_rangepars,real)
@@ -717,7 +726,7 @@ class mufitplot(object):
         # this works for single 
         # and for sequential
         #############################
-        fittup = derange(self.dashboard["fit_range"],self.suite.histoLength) # range as tuple
+        fittup,ermsg = derange(self.dashboard["fit_range"],self.suite.histoLength) # range as tuple
         fit_pack = 1
         if len(fittup)==3: # plot start stop pack
             fit_start, fit_stop, fit_pack = fittup[0], fittup[1], fittup[2]
@@ -798,7 +807,7 @@ class mufitplot(object):
             if len(y_fit.shape)==1:
                 fftf_amplitude[start:stop], p0, p1, out = autops(fftf_amplitude[start:stop],'acme') # fix phase on theory 
                 out = out[:out.index('\n')]
-                self.suite.console('Autophase: '+out)
+                self.log('Autophase: '+out)
                 fft_amplitude[start:stop] = ps(fft_amplitude[start:stop], p0=p0 , p1=p1).real 
                 ap = deepcopy(fft_amplitude[start:stop].real)
                 apf = deepcopy(fftf_amplitude[start:stop].real)            
@@ -807,7 +816,7 @@ class mufitplot(object):
                     fftf_amplitude[k,start:stop], p0, p1, out = autops(
                                               fftf_amplitude[k,start:stop],'acme') # fix phase on theory 
                     out = out[:out.index('\n')]
-                    self.suite.console('Autophase {}: '.format(k)+out)
+                    self.log('Autophase {}: '.format(k)+out)
                     # fft_amplitude[k,start:stop], p0, p1, out = autops(fft_amplitude[k,start:stop],'acme') # fix phase on theory 
                     fft_amplitude[k,start:stop] = ps(fft_amplitude[k,start:stop],p0=p0,p1=p1).real # same correction as theory
                 ap = deepcopy(fft_amplitude[:,start:stop].real)

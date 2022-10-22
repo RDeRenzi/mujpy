@@ -2,8 +2,8 @@
 from setuptools import setup
     
 setup(name='mujpy',
-      version='1.0.1b',
-      description='A Python MuSR data analysis graphical interface based on classes, designed for jupyter.',
+      version='2.0.1',
+      description='A Python MuSR data analysis program designed for jupyter.',
       author='Roberto De Renzi, Pietro Bonfa',
       author_email='roberto.derenzi@unipr.it',
       url='https://github.com/RDeRenzi/mujpy',
@@ -11,17 +11,17 @@ setup(name='mujpy',
                 'mujpy.aux',
                 'mujpy.logo',
                 'mujpy.mucomponents',
-                'mujpy.musr2py',
                 ],
       include_package_data=True,
       package_dir={'mujpy': 'mujpy' },
       install_requires=[
             'numpy >= 1.6',
-            'ipywidgets >= 7.0',
+            'ipywidgets >= 7.5.1',
             'iminuit >= 1.2',
             'matplotlib >= 2.0'
+            'musr2py >= 0.0.1'
       ],
-      long_description='A Python MuSR data analysis graphical interface, based on classes, designed for jupyter, making use of ipywidgets.'
+      long_description='A Python MuSR data analysis program designed for jupyter.'
       license = 'MIT',
       classifiers=[
             'Development Status :: 4 - Beta',
@@ -33,5 +33,5 @@ setup(name='mujpy',
     # that you indicate whether you support Python 2, Python 3 or both.
     'Programming Language :: Python :: 3',
 ],
-      install_requires=['iminuit,ipywidgets,jupiter,numpy,scipy,matplotlib,dill'],
+      install_requires=['iminuit,ipywidgets,jupiter,numpy,scipy,matplotlib'],
 )

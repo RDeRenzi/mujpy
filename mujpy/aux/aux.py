@@ -219,16 +219,23 @@ def add_step_limits_to_model(dash_in):
 def _available_components_():
     '''
     returns a list of template dictionaries (one per fit component):
+    retreived magically from the mucomponents mumodel class.
 
     Each dictionary contains 'name' and 'pardicts', 
-    'pardicts' = list of parameter dictionaries, keys: 'name','error,'limits'
-
-    ::  ({'name':'bl','pardicts':[{'name':'A','error':0.01,'limits'[0,0]},
-
-                              {'name':'λ','error':0.01,'limits'[0,0]}}, 
-                              ...)
-
-    retreived magically from the mucomponents mumodel class.
+           'pardicts' = list of parameter dictionaries, 
+                        keys: 
+                          'name',
+                          'error,
+                          'limits'
+           errore are used by minuit as initial steps
+           limits are 
+               [None,None] for uncostrained parameters A,B,φ,λ
+               [0,None] for positive parity parameters Δ,σ
+                        and for positive defined parameters 'α','β','Λ','ν'
+               [0,0] for fake parameter BL
+    ::  ({'name':'bl','pardicts':[{'name':'A','error':0.01,'limits'[None,None]},
+                                  {'name':'λ','error':0.01,'limits'[None,None]}}, 
+                                  ...)
     '''
     from mujpy.mucomponents.mucomponents import mumodel
     from iminuit import describe
@@ -238,21 +245,58 @@ def _available_components_():
         pars = describe(mumodel.__dict__[name])[2:]            #  [12:] because the first two arguments are self, x
         _pars = [] 
         # print('pars are {}'.format(pars))
+        tip = eval('mumodel.'+name+'.__doc__')
+        positive_defined = ['α','β','Λ','ν']
+        positive_parity = ['Δ','σ']
         for parname in pars:
         # parname, error, limits
         # In this template only
         #   {'name':'amplitude','error':0.01,'limits':[0, 0]}
         # parameter name will get a label later 
-            error, limits = 0.01, [None, None] # defaults
-            if parname == 'B' or parname == 'φ' or parname == 'Bd': error = 1.0
-            if parname == 'β': error,limits = 0.05, [0, None]
-            if parname == 'α': error,limits = 0.01, [0, None]
+            error, limits = 0.002, [None, None] # defaults for 'A', 'λ', 'Γ'
+            if parname == 'B' or parname == 'Bd': error = 0.05
+            if parname == 'BL': error, limits = 0, [0,0]
+            if parname == 'φ': error = 1.0
+            if parname in positive_defined+positive_parity: limits = [0., None]
             # add here special cases for errors and limits, e.g. positive defined parameters
             _pars.append({'name':parname,'error':error,'limits':limits})
-        available_components.append({'name':name,'pardicts':_pars})
+        available_components.append({'name':name,'pardicts':_pars,'tip':tip})
     # [available_components[i]['name'] for i in range(len(available_components))] 
     # list of just mucomponents method names
     return available_components
+    
+def validmodel(model):
+    '''
+    checks valid simple name "almlmg"
+    '''
+    from mujpy.aux.aux import _available_components_
+    # print('validmodel: {}'.format(model))
+    available_components =_available_components_() # creates list automagically from mucomponents
+    component_names = [available_components[i]['name'] 
+                            for i in range(len(available_components))]
+    components = [model[i:i+2] for i in range(0, len(model), 2)]
+    # print('valid model, available components: ',*component_names)
+    if not components: # empty model
+        return False
+    for component in components: 
+        if component in component_names:
+            pass
+        else:
+            return False
+    if 'al' in components: # check that model has only one 'al' at the beginning
+        if model.count('al')>1 or model.index('al')>0:
+            return False      
+    return True
+
+def get_fit_range(string):
+    '''
+    transform a valid string for fit_range
+    into a list of integers
+    '''
+    fit_range = []
+    for chan in string.split(','):
+        fit_range.append(int(chan))
+    return fit_range
 
 def checkvalidmodel(name,component_names):
     '''
@@ -293,6 +337,66 @@ def checkvalidmodel(name,component_names):
             return False, error_msg # error code, message
     return True, None
 
+######################
+# GET_TOTALS
+######################
+def get_totals(suite):
+    '''
+    calculates the grand totals and group totals 
+    of a single run 
+    to move to aux, need to pass self.suite
+    returns strings totalcounts groupcounts nsbin maxbin
+
+    '''
+    import numpy as np
+    # called only by self.suite after having loaded a run or a run suite
+
+    ###################
+    # grouping set 
+    # suite.grouping['forward'] and suite.grouping['backward'] are np.arrays of integers
+    # initialize totals
+    ###################
+    
+    for k,d in enumerate(suite.grouping):
+        if not k:
+            gr = np.concatenate((suite.grouping[k]['forward'],suite.grouping[k]['backward']))
+        else:
+            gr = np.concatenate((gr,np.concatenate((suite.grouping[k]['forward'],suite.grouping[k]['backward']))))
+    ts,gs =  [],[]
+
+    for k,runs in enumerate(suite._the_runs_):
+        tsum, gsum = 0, 0
+        for j,run in enumerate(runs): # add values for runs to add
+            n1 = suite.offset+suite.nt0[0]
+            for counter in range(run.get_numberHisto_int()):
+                if suite.datafile[-3:]=='bin' or suite.datafile[-3:]=='mdu':
+                    n1 = suite.offset+suite.nt0[counter] 
+                histo = np.array(run.get_histo_vector(counter,1)).sum() 
+                tsum += histo
+                if counter in gr:
+                    gsum += histo
+        ts.append(tsum)
+        gs.append(gsum)
+        # print('In get totals inside loop,k {}, runs {}'.format(k,runs))
+
+    #######################
+    # strings containing 
+    # individual run totals
+    #######################
+    # self.tots_all.value = '\n'.join(map(str,np.array(ts)))
+    # self.tots_group.value = '       '.join(map(str,np.array(gs)))
+
+    # print('In get totals outside loop, ts {},gs {}'.format(ts,gs))
+    #####################
+    # display values for self._the_runs_[0][0] 
+#        self.totalcounts.value = str(ts[0])
+#        self.groupcounts.value = str(gs[0])
+        # self.console('Updated Group Total for group including counters {}'.format(gr)) # debug 
+#        self.nsbin.value = '{:.3}'.format(self._the_runs_[0][0].get_binWidth_ns())
+#        self.maxbin.value = str(self.histoLength)
+    return str(int(ts[0])), str(int(gs[0])), '{:.3}'.format(suite._the_runs_[0][0].get_binWidth_ns()), str(suite.histoLength)
+
+
 def _nparam(model):
     '''
     input: dashboard['model_guess']
@@ -308,7 +412,8 @@ def _nparam(model):
     return ntot, nmintot, nfree
     
 ##################################################################
-# int2min methods: generate guess values of minuit parameters
+# int2min methods: generate guess values, errors and limits
+#                  of minuit parameters
 #  int2min : 
 #  int2min_multigroup : assumes all parameters are in userpardicts
 ##################################################################
@@ -325,6 +430,7 @@ def int2min(model):
         fixed: True/False for each
         limits: [low, high] limits for each or [None,None]  
         names: name of parameter 'x_label' for each parameter
+        pospar: parameter for which component is positive parity, eg s in e^{-(s*t)^2/2}
     '''
     from mujpy.aux.aux import _nparam
 
@@ -334,14 +440,17 @@ def int2min(model):
     # the following variables contain the same as input #
     # parameters to iMinuit, removing '='s (functions)  #
     #####################################################
-                                                        
+    
+    positive_parity = ['Δ','σ']                                                    
     val, err, fix, lim = [], [], [], []           
     names = []
+    pospar = [] # contains index of positive parity parameters, to rerun with no limits
 
     for component in model:  # scan the model components
         label = component['label']
-        for pardict in component['pardicts']:  # list of dictionaries
+        for k,pardict in enumerate(component['pardicts']):  # list of dictionaries
             if pardict['flag'] != '=': #  skip functions, only new minuit parameters
+                if pardict["name"] in positive_parity: pospar.append(k)
                 if pardict['flag'] == '~':
                     fix.append(False)
                 elif pardict['flag'] == '!':
@@ -353,7 +462,7 @@ def int2min(model):
                 # print('aux int2min debug: pardict name {} limits {}'.format(names[-1],lim[-1]))
     # self.console('val = {}\nerr = {}\nfix = {}\nlim = {},\npar name = {} '.format(val,err,fix,lim, names)) 
 
-    return val, err, fix, lim, names
+    return val, err, fix, lim, names, pospar
 
 def int2min_multigroup(pardicts):
     '''
@@ -362,11 +471,12 @@ def int2min_multigroup(pardicts):
             either dashboard["userpardicts_guess"] if guess = True
             or  dashboard["userpardicts_result"] if gues = False
     output: a list of lists:  
-        fitvalues: minuit parameter values, either guess of result
-        fiterrors: their steps
-        fitfixed: True/False for each
-        fitlimits: [low, high] limits for each or [None,None]  
-        parameter_name: name of parameter 'x_label' for each parameter
+        values: minuit parameter values, either guess of result
+        errors: their steps
+        fixed: True/False for each
+        limits: [low, high] limits for each or [None,None]  
+        name: name of parameter 'x_label' for each parameter
+        pospar: parameter for which component is positive parity, eg s in e^{-(s*t)^2/2}
     this works for A2 single fit, multigroup with userpardicts parameters = Minuit parameters
     '''
     
@@ -375,25 +485,28 @@ def int2min_multigroup(pardicts):
     # parameters to iMinuit, removing '='s (functions)  #
     #####################################################
                                                         
-    fitval, fiterr, fitfix, fitlim = [], [], [], []           
-    parameter_name = []
-    for pardict in pardicts:  # scan the model components
+    val, err, fix, lim = [], [], [], []           
+    name = []
+    pospar = [] # contains index of positive parity parameters, to rerun with no limits
+
+    for k,pardict in enumerate(pardicts):  # scan the model components
+        if 'positive_parity' in pardict.keys(): pospar.append(k)
         errstd = 'error' if 'error' in pardict.keys() else 'std'
-        fitval.append(float(pardict['value']))
-        parameter_name.append(pardict['name']) 
-        fiterr.append(float(pardict[errstd]))
+        val.append(float(pardict['value']))
+        name.append(pardict['name']) 
+        err.append(float(pardict[errstd]))
         if 'error' in pardict.keys():
-            fitlim.append(pardict['limits'])
+            lim.append(pardict['limits'])
             # print('aux debug: par {} limits {}'.format(pardict['name'],pardict['limits']))
         if 'flag' in pardict.keys():
             if pardict['flag'] == '!':
-                fitfix.append(True)
+                fix.append(True)
             elif pardict['flag'] == '~':
-                fitfix.append(False)
+                fix.append(False)
             else:
-                return False,_,_,_,_
-        # self.console('fitval = {}\nfiterr = {}\nfitfix = {}\nfitlim = {}\ncomp name = {},\npar name = {} '.format(fitval,fiterr,fitfix,fitlim,component_name,parameter_name)) 
-    return fitval, fiterr, fitfix, fitlim, parameter_name
+                return False,_,_,_,_,_,_
+        # self.console('val = {}\nerr = {}\nfix = {}\nlim = {}\ncomp name = {},\npar name = {} '.format(val,err,fix,lim,name)) 
+    return val, err, fix, lim, name, pospar
 
 def int2fft(model):
     '''
@@ -702,7 +815,7 @@ def min2int(model_guess,values_in,errors_in):
     nmin = -1
     lmin = []
     flag = [pardict['flag'] for component in model_guess for pardict in component['pardicts']]
-    flag = [pardict['flag'] for component in model_guess for pardict in component['pardicts']]
+#    flag = [pardict['flag'] for component in model_guess for pardict in component['pardicts']]
     for k,component in enumerate(model_guess):  # scan the model
         component_name = component['name']
         name, value, error = [], [], []
@@ -711,7 +824,7 @@ def min2int(model_guess,values_in,errors_in):
         for j,pardict in enumerate(model_guess[k]['pardicts']): # list of dictionaries, par is a dictionary
             nint += 1  # internal parameter incremented always
             if j==0:
-                name.append('{}: {}_{}'.format(component_name,pardict['name'],label))
+                name.append('{}{}_{}'.format(component_name,pardict['name'],label))
             else:
                 name.append('{}_{}'.format(pardict['name'],label))
             if flag[nint] != '=': #  skip functions, they are not new minuit parameter
@@ -980,31 +1093,42 @@ def modelstrip(name):
 # MUGUI AUX ?
 ##############
 
-def create_model(dashboard):
+def name_of_model(model_components,model):
+    '''
+    check if model_components list of dictionaries correstponds to model
+    '''
+    content = []
+    for component in model_components:
+        content.append(component["name"])
+    return True if ''.join(content) == model else False
+
+def create_model(model):
     '''
     create_model('daml') # adds e.g. the two component 'da' 'ml' model
     this method 
     does not check syntax (prechecked by checkvalidmodel)
-    separates nexternals number from model name (e.g. '3mgml' -> 'mgml', 3)
-    starts switchyard for A1,A1,B1, B2, C1, C2 fits
+       ? separates nexternals number from model name (e.g. '3mgml' -> 'mgml', 3)
+       ?  starts switchyard for A1,A1,B1, B2, C1, C2 fits
     adds a model of components selected from the available_component tuple of  
     directories
     with zeroed values, stepbounds from available_components, flags set to '~' and zeros functions
     '''
     import string
-    from mujpy.aux.aux import modelstrip, addcomponent
-
-
-    components
-    self.model_guess = [] # start from zeros model
-    for k,component in enumerate(components):
-        label = string.ascii_lowercase[k] # was uppercase[k]
-        if not addcomponent(component,dashboard):
-            return False
+    from mujpy.aux.aux import addcomponent, _available_components_
+    # print('create_model: {}'.format(model))
+    components = [model[i:i+2] for i in range(0, len(model), 2)]
+    model_guess = [] # start from empty model
+    for k,component_name in enumerate(components):
+        component, emsg = addcomponent(component_name) # input a component name, output a component dictionary
+        if component:
+            model_guess.append(component) # list of dictionaries                
         # self.console('create model added {}'.format(component+label))
-    return True
+        else:
+             return False, emsg
 
-def addcomponent(name,label):
+    return model_guess, '' # list of component dictionaries
+
+def addcomponent(name):
     '''
     addcomponent('ml') # adds e.g. a mu precessing, lorentzian decay, component
     this method adds a component selected from _available_components_(), tuple of directories
@@ -1020,18 +1144,27 @@ def addcomponent(name,label):
     if name in component_names:
         k = component_names.index(name)
         npar = len(available_components[k]['pardicts']) # number of pars
-        pars = deepcopy(self.available_components[k]['pardicts']) # list of dicts for 
+        pars = deepcopy(available_components[k]['pardicts']) # list of dicts for 
         # parameters, {'name':'asymmetry','error':0.01,'limits':[0, 0]}
 
         # now remove parameter name degeneracy                   
         for j, par in enumerate(pars):
-            pars[j]['name'] = par['name']+label
-            pars[j].update({'value':0.0})
+            pars[j]['name'] = par['name']
+            if par['name']=='α':
+                pars[j].update({'value':1.0}) # initilize
+            elif par['name']=='A':
+                pars[j].update({'value':0.1}) # initialize to not zero
+            elif par['name']=='B':
+                pars[j].update({'value':2.}) # initialize to TF20
+            else:
+                pars[j].update({'value':0}) # does not need initialization
             pars[j].update({'flag':'~'})
             pars[j].update({'function':''}) # adds these three keys to each pars dict
+            pars[j]['error'] = par['error']
+            pars[j]['limits'] = par['limits']                    
             # they serve to collect values in mugui
         # self.model_guess.append()
-        return {'name':name,'pardicts':pars}, None # OK code, no message
+        return {'name':name,'label':'','pardicts':pars}, None # OK code, no message
     else:
         # self.console(
         error_msg = '\nWarning: '+name+' is not a known component. Not added.'
@@ -1078,56 +1211,51 @@ def calib(dashboard):
     True if the first component is 'al'
     '''
     return dashboard['model_guess'][0]['name']=='al'
-        
-def derange(string,vmax,int_or_float='int'):
+            
+def derange(string,vmax,pack=1):
     '''
-    derange(string) 
-
+    derange(string,vmax,pack=1) 
     reads string 
-    assuming 2, 3, 4 or 5 csv or space separated values, either int (default) or floats (specify type='float')::
+    assumes it contains 2, 3, 4 or 5 csv or space separated values
+    uses isinstance(vmax,float) to distinguish floats (fft) from integers (fit and plot) 
 
-        5: start, stop, packe, last, packl
-        4: start, stop, last, packl (packe is 1)
+        5: start, stop, packe, last, packl       # for plot
+        4: start, stop, last, packl              # for plot (packe is 1) 
         3: start, stop, pack
-        2: start, stop
+        2: start, stop (pack is added, pack default is 1)
 
     returns 2, 3, 4 or 5 floats or int, or 
-    two negative values, if fails either::
-
-        validity check (stop>start and bin <stop-start) 
-        check for sanity (last value less then a vmax)
-
+    default values, 0,vmax,pack, if fails validity check (stop>start, bin <stop-start, last < vmax) 
+    errmsg = '' in ok, a string indicates errors       
     '''
-#    print('In derange')
-    try:  
-        try:
-            if int_or_float=='float':
-                values = [float(x) for x in string.split(',')]
-            else:
-                values = [int(x) for x in string.split(',')]
+    
+    # print('In derange, string = {}'.format(string))
+    errmsg = ''
+    x_range = string.split(',') # assume ',' is the separator
+    if len(x_range)==1: # try ' ' as separator
+        x_range = string.split(' ')
+    if len(x_range)==1: # wrong syntax
+        x_range = [vmax-vmax,vmax,pack] # default, int for int vmax, float for float vmax
+        errmsg = 'no range'
+    if not errmsg:
+        try: # three items are they integers floats or misprints?
+            if isinstance(vmax,float): # should be three floats
+                x_range = [float(chan) for chan in x_range] # breaks if non digits in x_range 
+            else: # should be three integers
+                x_range = [int(chan) for chan in x_range] # breaks if non digits in x_range 
+            if len(x_range)==2: # guarantees three items
+                x_range.append(pack)
+            if x_range[2]>(x_range[1]-x_range[0])//2: # True for fit_range[1]<fit_range[0]  or too large pack
+                raise Exception
         except:
-            print(string)
-        if len(values)==5: # start, stop, packe, last, packl
-            if values[3]<values[1] or values[4]>values[3]-values[1] or values[2]>values[1]-values[0] or values[1]<values[0] or sum(n<0 for n in values)>0 or values[3]>vmax:
-                
-                return -5,-5
-            return values[0],values[1],values[2],values[3],values[4] # start, stop, packe, last, packl
-        elif len(values)==4: # start, stop, last, packl
-            if values[2]<values[1] or values[3]>values[2]-values[1] or values[1]<values[0] or sum(n<0 for n in values)>0 or values[2]>vmax:
-                return -4,-4
-            return values[0],values[1],1,values[2],values[3] # start, stop, packe, last, packl
-        elif len(values)==3: # start, stop, packe
-            if values[2]>values[1] or values[1]<values[0] or sum(n<0 for n in values)>0 or values[1]>vmax:
-                return -3,-3
-            return values[0],values[1],values[2] # start, stop, pack
-        elif len(values)==2: # start, stop
-            if values[1]<values[0] or sum(n<0 for n in values)>0 or values[1]>vmax:
-                return -2,-2
-            return values[0],values[1] # start, stop
-    except:
-        # print(string,vmax,int_or_float)
-        return -10,-10
-
+            x_range = [vmax-vmax,vmax,pack] # default
+            errmsg = 'Syntax error, reset range to default. '
+    # to re-compose a correct string use
+    # string = ','.join([str(val) for val in x_range])
+    # print('aux derange: x_range = {}'.format(x_range))
+        
+    return x_range, errmsg # a list of values (int or float as appropriate)
+    
 def derun(string):
     '''
     parses string, producing a list of runs; 
@@ -1238,11 +1366,23 @@ def get_datafilename(datafile,run):
         datafilename = datafileprefix+run+dot_suffix
     return datafilename
 
+def get_datafile_path_ext(datafile,run):
+    '''
+    datafilename = template, e.g. '/fullpath/deltat_gps_tdc_0935.bin'
+    run = string of run digits, e.g. '1001'
+    returns '/fullpath/deltat_gps_tdc_1001.bin'
+    '''
+    import os
+    path = datafile[:datafile.rfind(os.path.sep)+1] # e.g. /afs/psi.ch/projec/bulkmusr/data/gps/d2022/tdc/', works in  WIN with '\' as separator
+    fileprefix = datafile[datafile.rfind(os.path.sep)+1:datafile.rfind('.')]
+    ext = datafile[datafile.rfind['.']+1-len(datafile)] # e.g. 'bin' or 'nxs'
+    return path, fileprefix, ext
+
 def get_grouping(groupcsv):
     """
     name = 'forward' or 'backward'
 
-    * grouping(name) is an np.array wth detector indices
+    * grouping(name) is an np.array with detector indices
     * group.value[k] for k=0,1 is a shorthand csv like '1:3,5' or '1,3,5' etc.
     * index is present mugui.mainwindow.selected_index
     * out is mugui._output_ for error messages
@@ -1358,7 +1498,58 @@ def minparam2_csv(dashboard,values_in,errors_in):
             form += 'f}'
             row += form.format(parvalue,parerror)
     return row
+    
+def nextrun(datapath):
+    '''
+    assume datapath is path+fileprefix+runnumber+extension
+    datafile is next run, runnumber incremented by one
+    if datafile exists return next run, datafile
+    else return runnumber and datapath
+    '''
+    import os
+    from mujpy.aux.aux import muzeropad
 
+    path, ext = os.path.splitext(datapath)
+    lastchar = len(path)
+    for c in reversed(path):
+        try:
+            int(c)
+            lastchar -= 1
+        except:
+            break
+    run = path[lastchar:]
+    runnext = str(int(run)+1)
+    datafile = path[:lastchar]+muzeropad(runnext)+ext
+    run = runnext if os.path.exists(datafile) else run
+    datafile = datafile if os.path.exists(datafile) else datapath                         
+    return run, datafile
+
+def prevrun(datapath):
+    '''
+    assume datapath is path+fileprefix+runnumber+extension
+    datafile is prev run, runnumber decremented by one
+    if datafile exists return prev run, datafile
+    else return runnumber and datapath
+    '''
+    import os
+    from mujpy.aux.aux import muzeropad
+
+    path, ext = os.path.splitext(datapath)
+    lastchar = len(path)
+    for c in reversed(path):
+        try:
+            int(c)
+            lastchar -= 1
+        except:
+            break
+    run = path[lastchar:]
+    runprev = str(int(run)-1)
+    datafile = path[:lastchar]+muzeropad(runprev)+ext                            
+    run = runprev if os.path.exists(datafile) else run
+    datafile = datafile if os.path.exists(datafile) else datapath                         
+
+    return run, datafile
+    
 def chi2_csv(chi2,lowchi2,hichi2,groups,offset):
     '''
     input:
@@ -1418,7 +1609,7 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
         try: # the file exists
             lineout = [] # is equivalent to False
             with open(file_csv,'r') as f_in:
-                notexistent = True # the line dows not exist
+                notexistent = True # the line doefs not exist
                 for nline,line in enumerate(f_in.readlines()):
                     if nline==0:
                         if header!=line: # different headers, substitute present one
@@ -1428,6 +1619,7 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
                     elif float(line.split(" ")[csv_index]) < rowvalue: # append line first
                         lineout.append(line)
                     elif float(line.split(" ")[csv_index]) == rowvalue: # substitute an existing fit
+                        lineout.append(row) # insert before last existing fit
                         notexistent = False
                     else: 
                         if notexistent:
@@ -1541,7 +1733,75 @@ def muvalid(string):
         except Exception as e:
             error_message = 'Function: {}. Tested: {}. Wrong or not allowed syntax: {}'.format(string,test,e)
     return error_message
+    
+def p2x(instring):
+    '''
+    replaces parameters e.g. p[2] with variable x2 in string
+    returns substitude string and list of indices (ascii)
+    '''
+    import re
+    patterna = re.compile(r"p\[(\d+)\]") # find all patterns p[*] where * is digits
+    n = patterna.findall(instring) # all indices of parameters
+    outstring = instring
+    for k in n:
+        strin = r"p\["+re.escape(k)+"\]"
+        patternb = re.compile(strin)
+        stri = r"x"+re.escape(k)  # variable
+        outstring = patternb.sub(stri,outstring)
+    return outstring, n
+    
+def errorpropagate(string,p,e):
+    '''
+    parse function in string 
+    
+    substitute p[n] with xn, with errors en
+    calculate the partial derivative pdn = partial f/partial xn 
+    return the sqrt of the sum of (pdn*en)**2
+    '''
+    from jax import grad
+    import numpy as np
+    funct,n = p2x(string) # from parameters p[n] to variables xn
+    s = 'lambda '
+    ss = ['x'+k+',' for k in n]
+    args = ''.join(ss)[:-1]
+    s = s + args + ': '+funct[1:] # removes the '='
+    #  s = 'lambda xn,xm,... : expression of xn, xm, ...'
+    f = eval(s) # defines a function of the parameters, called xn, xm, 
+    variance = 0
+    for k in n:
+        exec('x'+k+'= p['+k+']')   # this assigns p[n] value to xn 
+        d = grad(f,argnums=int(k)) # this is the derivative with respect to the k-th variable
+        ss
+        exec('variance += (d('+args+')*e['+k+'])**2')
+    return np.sqrt(variance)
+    
+def group_shorthand(grouping):
+    '''
+    group_calib is the list of gorup dictionaries
+    '''
+    shorthand = []
+    for group in grouping:
+        fwd = '_'.join([str(s) for s in group['forward']])
+        bkd = '_'.join([str(s) for s in group['backward']])
+        shorthand.append(fwd+'-'+bkd)
+    return '+'.join(shorthand)
 
+def json_name(model,datafile,grouping,version,g=False):
+    '''
+    model is e.g. 'mlmg'
+    datafile is e.g. '/afs/psi.ch/bulkmusr/data/gps/d2022/tdc/deltat_gps_tdc_1233.bin'
+       must have a single '.'
+    grp_calib is the list of dictionaries defining the groups
+    g = True for global
+    version is a label
+    returns a unique name for the json dashboard file
+    '''    
+    from re import findall
+    from mujpy.aux.aux import group_shorthand
+    run = findall(r'(\d+)\.',datafile)[0]
+    label = 'gg_'+version if g else version
+    return model+'.'+run+'.'+group_shorthand(grouping)+'.'+label+'.json'
+    
 def muvaluid(string):
     '''
     Run suite fits: muvaluid returns True/False
@@ -1615,12 +1875,9 @@ def path_file_dialog(path,spec):
     import tkinter
     from tkinter import filedialog
     import os
-    here = os.getcwd()
-    os.chdir(path)
     tkinter.Tk().withdraw() # Close the root window
     spc, spcdef = '.'+spec,'*.'+spec
     in_path = filedialog.askopenfilename(initialdir = path,filetypes=((spc,spcdef),('all','*.*')))
-    os.chdir(here)
     return in_path
 
 def path_dialog(path,title):
@@ -1816,8 +2073,8 @@ def rebin(x,y,strstp,pack,e=None):
        xr,yr,eyr = rebin(x,y,strstp,pack,ey) # the 5th is y error
     '''
     from numpy import floor, sqrt, zeros
-
     start,stop = strstp
+#    print('aux rebin debug: start, stop, pack = {}, [], []'.format(start, stop, pack))
     m = int(floor((stop-start)/pack)) # length of rebinned xb
     mn = m*pack # length of x slice 
     xx =x[start:start+mn] # slice of the first 1d array
@@ -2105,3 +2362,72 @@ def value_error(value,error):
         else:
             form = '"{}(0)".format(value)' # too small error
     return eval(form)
+    
+    
+def results():
+    '''
+    generate a notebook with some results
+    '''
+    import subprocess
+    # write a python script
+    script = '# Single Run Single Group Fit'
+    script = script + '\n'#!/usr/bin/env python3'
+    script = script + '\n# -*- coding: utf-8 -*-'
+    script = script + '%matplotlib tk'
+    script = script + '\n%cd /home/roberto.derenzi/git/mujpy/'
+    script = script + '\nfrom mujpy.musuite import suite'	
+    script = script + '\nimport json, re'
+    script = script + '\nfrom os.path import isfile'
+    script = script + '\nfrom mujpy.mufit import mufit'
+    script = script + '\nfrom mujpy.mufitplot import mufitplot'
+    script = script + "\njsonsuffix = '.json'\n"
+    # notice: the new cell is produced by the \n at the end of the previous line followed by \n#
+    script = script + '\n# Define log and data paths,   '
+    script = script + '\n# detector grouping and its calibration  '
+    script = script + '\nlogpath = "/home/roberto.derenzi/git/mujpy/log/"'
+    script = script + '\ndatafile = "/home/roberto.derenzi/musrfit/MBT/gps/run_05_21/data/deltat_tdc_gps_0822.bin"'
+    script = script + '\nrunlist = "822" # first run first'
+    script = script + '\nmodelname = "mgml"'
+    script = script + '\nversion = "1"'
+    script = script + "\ngrp_calib = [{'forward':'3', 'backward':'4', 'alpha':1.13}]"
+    script = script + "\ngroupcalibfile = '3-4.calib'"
+    script = script + "\ninputsuitefile = 'input.suite'"
+    script = script + "\ndashboard = modelname+'.'+re.search(r'\d+', runlist).group()+'.'+groupcalibfile[:groupcalibfile.index('.')]+'.'+version+jsonsuffix"
+    script = script + '\nif not isfile(logpath+dashboard):' 
+    script = script + "\n    print('Model definition dashboard file {} does not exist. Make one.'.format(logpath+dashboard))\n"
+    script = script + "\n#  Can add 'scan': 'T' or 'B' for orderinng csv for increasing T, B, otherwise increasing nrun"
+    script = script + "\ninput_suite = {'console':'print',"
+    script = script + "\n               'datafile':datafile,"
+    script = script + "\n               'logpath':logpath,"
+    script = script + "\n               'runlist':runlist,"
+    script = script + "\n               'groups calibration':groupcalibfile,"
+    script = script + "\n               'offset':20"
+    script = script + "\n              }  # 'console':logging, for output in Log Console, 'console':print, for output in notebook"
+    script = script + '\nwith open(logpath+inputsuitefile,"w") as f:'
+    script = script + "\n    json.dump(input_suite,f)"
+    script = script + '\nwith open(logpath+groupcalibfile,"w") as f:'
+    script = script + "\n    json.dump(grp_calib,f)"
+    
+    script = script + "\nthe_suite = suite(logpath+inputsuitefile,mplot=False) # the_suite implements the class suite according to input.suite\n"
+    script = script + "\n# End of suite definition, this suiete is a single run"
+    script = script + "\n# Now let's fit it according to the dashboard"
+    script = script + "\nthe_fit = mufit(the_suite,logpath+dashboard)\n"
+    script = script + "\n# Let's now plot the fit result"
+    script = script + "\n# We plot the fit result, not the guess, over a single range"
+    script = script + "\nfit_plot= mufitplot('0,20000,40',the_fit)#,guess=True) # '0,1000,4,24000,100' # two range plot"
+    # save it in cache/notebook.py
+    with open('/tmp/notebook.py',"w") as f:
+        f.write(script)
+    # compose notebook filename = 'xxyy.label.group.ipynb'
+    bashCommand = 'p2j -o -t /home/roberto.derenzi/git/mujpy/getstarted/Delendo/xxyy.label.group.ipynb /tmp/notebook.py'
+    process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
+    output, error = process.communicate()
+    # issue os command 'p2j cache/notebook.py '+filename
+    
+def lognb():
+    '''
+    write in a txt file and position it at the bottom
+    connect it to suite.console
+    generate a notebook
+    '''
+    

@@ -28,7 +28,9 @@ class mumodel(object):
                      'fm':r'FMuF: $\mbox{asymmetry}/6[3+\cos 2*\pi\gamma_\mu\mbox{dipfield}\sqrt{3}\, t + \
                (1-1/\sqrt{3})\cos \pi\gamma_\mu\mbox{dipfield}(3-\sqrt{3})\,t + \
                (1+1/\sqrt{3})\cos\pi\gamma_\mu\mbox{dipfield}(3+\sqrt{3})\,t ]\exp(-\mbox{Lor_rate}\,t)$', 
-                     'kg':r'Gauss Kubo-Toyabe: static and dynamic, in zero or longitudinal field by G. Allodi [Phys Scr 89, 115201]'}
+                     'kg':r'Gauss Kubo-Toyabe: static and dynamic, in zero or longitudinal field by G. Allodi [Phys Scr 89, 115201]',
+                     'kl':r'Lorentz Kubo-Toyabe: static, in zero or longitudinal field by G. Allodi [Phys Scr 89, 115201]',
+                     'kd':r'Lorentz Kubo-Toyabe: static, in zero field, multiplied by Lorentz decay, by G. Allodi [Phys Scr 89, 115201]'}
         self._axis_ = None # for self._chisquare_ when set 0,1 sums only along that axis
     # ---- end generic __init__
     
@@ -669,8 +671,7 @@ class mumodel(object):
         # empty method  (could remove x from argument list ?)
         # print('al = {}'.format(α))
         return []
-        al.func_code = make_func_code(["α"])
-                
+        al.func_code = make_func_code(["α"])                
            
     def bl(self,x,A,λ): 
         '''
@@ -678,27 +679,27 @@ class mumodel(object):
         x [mus], A, λ [mus-1]
         x need not be self.x (e.g. in plot)
         '''
-        λ = -87. if λ < -87. else λ
+        # λ = -87. if λ < -87. else λ
         return A*exp(-x*λ)
         bl.func_code = make_func_code(["A","λ"])
 
     def bg(self,x,A,σ): 
         '''
         fit component for a Gaussian decay, 
-        x [mus], A, σ [mus-1]
+        x [mus], A, σ [mus-1] (positive parity)
         x need not be self.x (e.g. in plot)
         '''
         return A*exp(-0.5*(x*σ)**2)
         bg.func_code = make_func_code(["A","σ"])
 
-    def bs(self,x,A,λ,β): 
+    def bs(self,x,A,Λ,β): 
         '''
         fit component for a stretched decay, 
-        x [mus], A, λ [mus-1], β (>0)
+        x [mus], A, Λ [mus-1] (>0), β (>0)
         x need not be self.x (e.g. in plot)
         '''
-        return A*exp(-(x*λ)**β)
-        bs.func_code = make_func_code(["A","λ","β"])
+        return A*exp(-(x*Λ)**β)
+        bs.func_code = make_func_code(["A","Λ","β"])
 
     def da(self,x,dα):
         '''
@@ -722,7 +723,7 @@ class mumodel(object):
 #        warnings.filterwarnings("error")
         # print('a={}, B={}, ph={}, lb={}'.format(asymmetry,field,phase,Lor_rate))
 #        try:
-        λ = -87. if λ < -87. else λ
+        # λ = -87. if λ < -87. else λ
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)
 #        except RuntimeWarning:
 #            print('debug: λ = {}'.format(λ))
@@ -732,20 +733,20 @@ class mumodel(object):
     def mg(self,x,A,B,φ,σ): 
         '''
         fit component for a precessing muon with Gaussian decay, 
-        x [mus], A, B [mT], φ [degrees], σ [mus-1]
+        x [mus], A, B [mT], φ [degrees], σ [mus-1]  (positive parity)
         x need not be self.x (e.g. in plot)
         '''
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-0.5*(x*σ)**2)
         mg.func_code = make_func_code(["A","B","φ","σ"])
 
-    def ms(self,x,A,B,φ,λ,β): 
+    def ms(self,x,A,B,φ,Λ,β): 
         '''
         fit component for a precessing muon with stretched decay, 
-        x [mus], A, B [mT], φ [degrees], λ [mus-1], β (>0)
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
         x need not be self.x (e.g. in plot)
         '''
-        return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-(x*λ)**beta)
-        ms.func_code = make_func_code(["A","B","φ","λ","β"])
+        return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-(x*Λ)**β)
+        ms.func_code = make_func_code(["A","B","φ","Λ","β"])
 
     def fm(self,x,A,B,λ):
         '''
@@ -770,11 +771,20 @@ class mumodel(object):
     def jg(self,x,A,B,φ,σ): 
         '''
         fit component for a Bessel j0 precessing muon with Gaussian decay, 
-        x [mus], A, B [mT], φ [degrees], σ [mus-1]
+        x [mus], A, B [mT], φ [degrees], σ [mus-1] (positive parity)
         x need not be self.x (e.g. in plot)
         '''
         return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-0.5*(x*σ)**2)
         jg.func_code = make_func_code(["A","B","φ","σ"])
+
+    def js(self,x,A,B,φ,Λ,β): 
+        '''
+        fit component for a Bessel j0 precessing muon with Gaussian decay, 
+        x [mus], A, B [mT], φ [degrees], σ [mus-1]
+        x need not be self.x (e.g. in plot)
+        '''
+        return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-(x*Λ)**β)
+        jg.func_code = make_func_code(["A","B","φ","Λ","β"])
 
     def _kg(self,t,w,Δ):
         '''
@@ -799,6 +809,33 @@ class mumodel(object):
             f = (1. + 2.*(1-DDtt)*exp(-.5*DDtt))/3.
         return f
 
+    def _kl(self,t,w,Δ):
+        '''
+        static Lorentzian Kubo Toyabe in longitudinal field, 
+        t [mus], w [mus-1], Δ [mus-1], note that t can be different from self._x_
+        w = 2*pi*gamma_mu*L_field
+        '''
+        Dt = Δ*t
+        wt = w*t
+        dt = t[1]-t[0]
+        Dtt = Δ*t[1:] # eliminate first point when singular at t=0
+        wtt = w*t[1:] # eliminate first point when singular at t=0
+        if w*Δ: # non-vanishing Longitudinal Field
+            if abs(w/Δ)<2e-9:
+                f = (1. + 2.*(1-Dt)*exp(-Dt))/3.
+            else:
+                
+                if t[0]: # singularity at t=0
+                    c = Δ/wtt**2.*(1+Dtt) 
+                    f =append(-2/3*Δ, exp(-Dtt)*(sin(wtt)/wtt*(c-Δ)-c*cos(wtt))) # put back first point
+                else: # no singularities
+                    c = Δ/wt**2.*(1+Dt)
+                    f = exp(-Dt)*(sin(wt)/wt*(c-Δ)-c*cos(wt))
+                f = 2*cumsum(f*dt)+1 # simplified integral, accuracy < 1e-3;
+        else:
+            f = (1. + 2.*(1-Dt)*exp(-Dt))/3.
+        return f
+
     def _kgdyn(self,x,w,Δ,ν,*argv):
         ''' 
         auxiliary dynamization of Gaussian Kubo Toyabe 
@@ -806,7 +843,7 @@ class mumodel(object):
         N: number of sampling points;
         dt: time interval per bin [i.e. time base is t = dt*(0:N-1)]
         w [mus-1], Δ [mus-1], ν [MHz] 
-        (longitudinal field freq, dGaussian distribution, scattering frequency 
+        (longitudinal field freq, Gaussian distribution, scattering frequency 
         % alphaN: [optional argument] weighting coefficient alpha times N. Default=10 
         '''
         alphaN = 10. if not argv else argv[0] # default is 10.
@@ -829,14 +866,14 @@ class mumodel(object):
         #   t = t[0:intN-1]
         return dkt
          
-    def kg(self,x,A,B,Δ,ν):
+    def kg(self,x,A,BL,Δ,ν):
         '''
-        Gaussian Kubo Toyabe in longitudinal field, static or dynamic
-        x [mus], A, B [T], Δ [mus-1], ν (MHz)
+        Gaussian Kubo Toyabe in (fixed) longitudinal field, static or dynamic
+        x [mus], A, BL [mT], Δ [mus-1] (positive parity), ν (MHz)
         x need not be self.x (e.g. in plot)
         '''
         N = x.shape[0]
-        w = 2*pi*B*self._gamma_Mu_MHzper_mT
+        w = 2*pi*BL*self._gamma_Mu_MHzper_mT
         if ν==0: # static 
            f = self._kg(x,w,Δ) # normalized to 1. In this case t = x
         else :            # dynamic
@@ -858,7 +895,39 @@ class mumodel(object):
         # multiply by amplitude
         f = A*real(f[0:N])
         return f
-        kg.func_code = make_func_code(["A","B","Δ","ν"])
+        kg.func_code = make_func_code(["A","BL","Δ","ν"])
+
+    def kl(self,x,A,BL,Γ):
+        '''
+        Lorentzian Kubo Toyabe in (fixed) longitudinal field, static (dynamic makes no sense)
+        x [mus], A, BL [mT], Γ [mus-1] 
+        x need not be self.x (e.g. in plot)
+        '''
+        w = 2*pi*BL*self._gamma_Mu_MHzper_mT
+        return A*self._kl(x,w,Γ)
+        kl.func_code = make_func_code(["A","BL","Γ"])
+
+    def kd(self,x,A,Δ,λ):
+        '''
+        static Gaussian Kubo Toyabe times an (independent) exponential decay
+        x [mus], A, B [T], Δ [mus-1], ν (MHz)
+        x need not be self.x (e.g. in plot)
+        '''
+        return A*self._kg(x,0,Δ)*exp(-x*λ)
+        kd.func_code = make_func_code(["A","Δ","λ"])
+        #kd.limits = [[None,None],[0.,None],[None,None]]
+        #kd.error = [0.002,0.05,0.05]
+
+    def ks(self,x,A,Δ,Λ,β):
+        '''
+        static Gaussian Kubo Toyabe times an (independent) stretched exponential decay
+        x [mus], A, B [T], Δ [mus-1], ν (MHz)
+        x need not be self.x (e.g. in plot)
+        '''
+        return A*self._kg(x,0,Δ)*exp(-(x*Λ)**β)
+        kd.func_code = make_func_code(["A","Δ","Λ","β"])
+        #kd.limits = [[None,None],[0.,None],[None,None]]
+        #kd.error = [0.002,0.05,0.05]
 
     def _chisquare_(self,*argv):
         '''

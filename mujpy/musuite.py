@@ -1,16 +1,17 @@
 class suite(object):
     '''
     A suite class, 
-    self._init_ reads input from JSON suite_input_file, that can be edited, including
-        runlist, datatemplatefile, logpath, 
-        groups_calibration file, offset and a console method 
+    self._init_ reads input fixed variables
+        console, runlist, datafile 
+        grp_calib, offset 
         (console(string) must print string somewhere)
         t0 parameters are fixed depending on bin or mdu spec
     
-    loads grp.calib JSON file containing a list of dictionaries for groups and their alpha values
-        (future global fits with different asymmetry functions, to start with only single)
-        self.alpha value for normal fit (in future can be list for multi fits)
-        as opposed to fits producing calibration files
+    Self.groups = grp.calib contains a list of dictionaries for groups and their alpha values
+        where groups may be in shorthand notation
+        self.alpha value used for normal fit 
+        as opposed to calibration fits where alpha is a fit parameter
+    self.grouping is the same with groups as lists of indices (aux get_grouping does the translation)
 
     imports musr2py or muisis2py and loads it as instance for each data set
     which can be an individual run or the sum of several runs
@@ -33,97 +34,99 @@ class suite(object):
     self.etc methods for suite, multi suite,  global suite and global multi suite
             to be done
     Notes   NB mujpy is python3 only
+        Output ends up in notebook, below cell, and 
+        sys.__stdout__ is <_io.TextIOWrapper name='<stdout>' mode='w' encoding='utf-8'>
+        sys.__stderr__ is <_io.TextIOWrapper name='<stderr>' mode='w' encoding='utf-8'>
     ''' 
-    def __init__(self,suite_input_file = 'input.suite',mplot=True):
-        # print('__init__ now ...')
+    def __init__(self, datafile , runlist , grp_calib , offset , startuppath, console = 'print',dash=None, mplot=False):
                  
-        self.firstbin = 0
-        self._initialise_suite(suite_input_file,mplot)       
-
-    def _initialise_suite(self,suite_input_file,mplot):
         '''
         * Initiates an instance of suite, 
         * inputs: 
             the suite_input_file a dict containing
-                    runlist, datatemplatefile, logpath, offset
-                    the group[s]_calibration file, console method  
-        * the group[s] calibration file is a JSON file containing
-          a list of dictionaries (minimum one)
+                    consile, runlist, datafile, offset
+                    grp_calib  
+        * grp_calib is a list of dictionaries (minimum one)
           {'forward':stringfw,'backward':stringbw,'alpha':alpha}
           strings are translated into np.arrays of histograms by aux get_grouping
         * upon initialization automatically
-                checks input
+                checks input, stores paths
                 load_runs(): stores data load instance(s) in self._the_runs_
                 store_groups() stores list of dicts in self.grouping, each containing
                                'forward' and 'backward' lists of detector indices
                 promptfit(): determines t0
-                timebase(): stores self.time (1d)                               
+                timebase(): stores self.time (1d)  
+        if dash = None and cosole = 'print' self.console will exec print(string)
+        if dash = self in mudash calls to suite, and console = 'self.dash.log'   
+              self.console will exec self.dash.log(string), i.e. write on board output                           
         '''
         from mujpy.aux.aux import derun
         import json
         import os
-        # read suite_input
-        self.loadfirst = False
+        from mujpy import __file__ as MuJPyName
+        # print('__init__ now ...')
+        self.firstbin = 0
+        self.loadfirst = False  
         self._the_runs_ = [] # initialized 
         self.grouping = [] # reproduce the same with arrays of histogram numbers
-        with open(suite_input_file,"r") as f:
-            suite_input_json = f.read()
-            suite_input = json.loads(suite_input_json)
-        self.console_method = suite_input["console"]
+#        with open(suite_input_file,"r") as f:
+#            suite_input_json = f.read()
+#            suite_input = json.loads(suite_input_json)
+        self.dash = dash
+        self.console_method = console
         try:
-            self.console('******************* SUITE *********************')
+            if not dash: # not a call from a mudash instance
+                self.console('******************* SUITE *********************')
+            else:
+                self.console('')
         except:
-            return False # with no console error message, it means no console
+            print('no suite.console!')
+            return  # with no console error message, it means no console
         # determine number of runs, filenames etc.
             #######################
             # decode the run string
             #######################           
-        self.runs, errormessage = derun(suite_input['runlist']) # self.runs is a list of lists of run numbers (string)
+        self.runs, errormessage = derun(runlist) # self.runs is a list of lists of run numbers (string)
         if errormessage is not None: # derun error
-            self.console('Run syntax error: {}. You typed: {}'.format(errormessage,suite_input['runlist']))
-            return False  # with console error message
-        if os.path.isfile(suite_input['datafile']):
-            self.datafile = suite_input['datafile']
+            self.console('Run syntax error: {}. You typed: {}'.format(errormessage,runlist))
+            return  # with console error message
+        if os.path.isfile(datafile):
+            self.datafile = datafile
             if self.datafile[-3:]=='bin': 
                 self.thermo = 1 # sample thermometer is 1 on gps (check or adapt to other instruments)
-                self.prepostpk = [7, 7]
+                self.prepostpk = [50, 50]
             elif self.datafile[-3:]=='mdu':
                 self.thermo = 1 # sample thermometer is 1 on gps (check for hifi)
                 self.prepostpk = [70, 70]
             self.loadfirst = True
         else:
-            self.console('File {} not found'.format(suite_input['datafile']))
-            return False  # with console error message
-        if os.path.isdir(suite_input['logpath']):
-            self.logpath = suite_input['logpath']
-        else:
-            self.console('Log path {} not found'.format(suite_input['logpath']))   
-            return False # with console error message
-        if os.path.isfile(self.logpath+suite_input['groups calibration']):
-            grpcalib_file = self.logpath+suite_input['groups calibration']
-        else:
-            self.console('Calibration file {} not found'.format(suite_input['groups calibration']))  
-            return False  # with console error message             
-        # load groups calibration file
-        with open(grpcalib_file,"r") as f:
-            grpin = f.read()
-            try:
-                self.groups = json.loads(grpin)
-            except:
-                self.console('Groups calibration file {} is not proper JSON'.format(suite_input['groups calibration']))  
-                return False  #  with console error message                             
-            # groups_in is in dashboard jargon
-        self.logpath = suite_input_file[:suite_input_file.rfind('/')+1]
-        self.offset = suite_input['offset']
-        # initialization automatically implies also loading data and groups
-        #try:
-        self.load_runs() #               load data instances in self._the_runs_
+            self.console('* File {} not found'.format(datafile))
+            self.console('* CHECK YOUR ACCESS (e.g. klog)')
+            self.console('**************************************')
+            return None  # with console error message
+        try: # working directory, in which, in case, to find mujpy_setup.pkl 
+            self.__startuppath__ = startuppath 
+        except:
+            self.__startuppath__ = os.getcwd()
+        # implement new folder policy, see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy.Dashboard
+        self.__path__ = os.path.dirname(MuJPyName) # mujpy path
+        self.__templatepath__ = os.path.abspath(os.path.join(os.path.dirname(MuJPyName), '..', 'templates'))
+        if not os.path.exists(self.__startuppath__+'/fit/'):
+            os.mkdir(self.__startuppath__+'/fit/')
+        self.__fitpath__ = self.__startuppath__+'/fit/'
+        if not os.path.exists(self.__startuppath__+'/csv/'):
+            os.mkdir(self.__startuppath__+'/csv/')
+        self.__csvpath__ = self.__startuppath__+'/csv/'
+        if not os.path.exists(self.__startuppath__+'/cache/'):
+            os.mkdir(self.__startuppath__+'/cache/')
+        self.__cachepath__ = self.__startuppath__+'/cache/'
+        self.groups = grp_calib
+        # grp_calib is a list of dictionaries, one per group, with keys 'forwar,'backward','alpha'
+        self.offset = int(offset) # offset belongs to suite, that needs it for asymmetries
+        self.load_runs() #           load data instances in self._the_runs_
         self.store_groups() #        in self.grouping
-        self.promptfit(mplot)   # make switch for ISIS
+        self.promptfit(mplot)   #    to be done: make switch for ISIS
         self.timebase()
-        #except Exception as e:
-        #    self.console('*** suite: something went wrong, ask RDR ***')
-        #    self.console('* {} *'.format(e))
         # self.console('... end of initialize suite')
 
     def add_runs(self,k):
@@ -156,8 +159,11 @@ class suite(object):
                     read_ok = False
             if read_ok==True:
                 self._the_runs_.append(runadd) # 
-               	self.console('Run {} loaded'.format(path_and_filename))
-               	self.console(' {}'.format(get_title(self._the_runs_[-1][0])))
+               	self.console('{} loaded'.format(path_and_filename))
+               	self.console('Run {}: {}'.format(run,get_title(self._the_runs_[-1][0])))
+#                import sys
+#                self.console('sys.__stdout__ is {}, sys.__stderr__ is {}'.format(sys.__stdout__,sys.__stderr__))
+
                 if k>0:
                     ok = [self._the_runs_[k][0].get_numberHisto_int() == 
                           self._the_runs_[0][0].get_numberHisto_int(),
@@ -279,7 +285,7 @@ class suite(object):
                 # fig_counters,ax_counters = P.subplots(3,3,figsize=(9.5,9.5),dpi=dpi)
                 kwargs = {'figsize':(9.5,9.5),'dpi':dpi}
                 title = 'HIFI start histo guess'
-            elif self.filespecs[1].value=='nxs': # ISIS
+            elif self.datafile[-3:]=='nxs': # ISIS
                 nrow, ncol = 3,3
                 ###################
                 #  set figure, axes 
@@ -450,7 +456,7 @@ class suite(object):
             self.nt0 = x0 # bin of peak, nd.array of shape run.get_numberHisto_int() 
             self.dt0 = zeros(x0.shape) # fraction of bin, nd.array of shape run.get_numberHisto_int()
 
-        elif self.filespecs[1].value=='nxs': # ISIS
+        elif self.datafile[-3:]=='nxs': # ISIS
             histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
             for counter in range(self._the_runs_[0][0].get_numberHisto_int()):
                 for k in range(len(self._the_runs_[0])): # may add runs
@@ -488,10 +494,11 @@ class suite(object):
         if mplot:   # show results                  
             fig_counters.canvas.manager.window.tkraise()
             P.draw()
-            self.console('Succesfully completed prompt Minuit fit, check plots')
+#            self.console('Succesfully completed prompt Minuit fit, check plots')
         else:
-            self.console('Succesfully completed prompt Minuit fit, check nt0, dt0 ')
-        self.console('****************END OF SUITE*****************')
+            pass
+#            self.console('Succesfully completed prompt Minuit fit, check nt0, dt0 ')
+#        self.console('****************END OF SUITE*****************')
 
 ##########################
 # ASYMMETRY
@@ -520,7 +527,7 @@ class suite(object):
         * and must standardize to a common length 
         
         # Time definition for center of bin n: 
-        #          time = (n - self.nt0 + self.offset.value + self.dt0)*binWidth_ns/1000.
+        #          time = (n - self.nt0 + self.offset + self.dt0)*binWidth_ns/1000.
         # 1) Assume the prompt is entirely in bin self.nt0. (python convention, the bin index is 0,...,n,... 
         # The content of bin self.nt0 will be the t=0 value for this case and self.dt0 = 0.
         # The center of bin self.nt0 will correspond to time t = 0
@@ -537,7 +544,7 @@ class suite(object):
         ##################################################################################################
 
         time_bins = np.arange(self.offset,self._the_runs_[0][0].get_histoLength_bin() - 
-                               self.nt0.max(),dtype=float)   # 1D np.array
+                               self.nt0.max())   # 1D np.array
         binwidth_mus = self._the_runs_[0][0].get_binWidth_ns()/1000.
         self.histoLength = self._the_runs_[0][0].get_histoLength_bin() - self.nt0.max() - self.offset
 
@@ -703,7 +710,7 @@ class suite(object):
 
         if self.loadfirst:
             # print(the_run)
-            alpha = self.groups[kgroup]['alpha']
+            alpha = self.grouping   [kgroup]['alpha']
             
             yf, yb, bf, bb, yfm, ybm = self.single_for_back_counts(the_run,self.grouping[kgroup])
             

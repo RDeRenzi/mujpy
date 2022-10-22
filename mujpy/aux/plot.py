@@ -1025,8 +1025,13 @@ def plot_chi2(ax,dy_fit,nu_fit,dy_early,w_early,dy_late,w_late):
 def draw(fig):
     '''
     '''
-    from matplotlib.pyplot import draw as draw_now
+    import matplotlib.pyplot as P
 
-    fig.canvas.manager.window.tkraise()# fig.canvas.manager.window.raise_()
-    draw_now()
+    cfm = P.get_current_fig_manager()
+    cfm.window.attributes('-topmost', True) # Tkinter backend
+    cfm.window.attributes('-topmost', False)
+    #cfm.window.activateWindow()
+    #cfm.window.raise_()
+    #fig.canvas.manager.window.tkraise()# fig.canvas.manager.window.raise_()
+    P.draw()
     
