@@ -16,16 +16,19 @@ class mumodel(object):
         self._gamma_Mu_MHzperT = 3.183345142*C['proton gyromag. ratio over 2 pi'][0]  # numbers are from Particle Data Group 2017
         self._gamma_mu_ = 135.5
         self._gamma_Mu_MHzper_mT = self._gamma_Mu_MHzperT*1e-3
-        self._help_ = {'bl':r'Lorentz decay: $\mbox{asymmetry}\exp(-\mbox{Lor_rate}\,t)$',
-                     'bg':r'Gauss decay: $\mbox{asymmetry}\exp(-0.5(\mbox{Gau_rate}\,t)^2)$',
-                     'bs':r'Gauss decay: $\mbox{asymmetry}\exp(-0.5(\mbox{rate}\,t)^\beta)$',
+        self._help_ = {'bl':r'Lorentz decay: $A\exp(-\lambda\,t)$',
+                     'bg':r'Gauss decay: $A\exp(-0.5(\sigma\,t)^2)$',
+                     'bs':r'stretched decay: $A\exp(-0.5(\Lambda\,t)^\beta)$',
+                     'ba':r'Lorenz and Gauss decay: $A\exp(-\lambda\,t)\exp(-0.5(\sigma\,t)^2)$
                      'da':r'Linearized dalpha correction: $f = \frac{2f_0(1+\alpha/\mbox{dalpha})-1}{1-f_0+2\alpha/dalpha}$',
-                     'mg':r'Gauss decay: $\mbox{asymmetry}\cos[2\pi(\gamma_\mu \mbox{field}\, t +\mbox{phase}/360)]\exp(-0.5(\mbox{Gau_rate}\,t)^2)$',
-                     'ml':r'Gauss decay: $\mbox{asymmetry}\cos[2\pi(\gamma_\mu \mbox{field}\, t +\mbox{phase}/360)]\exp(-\mbox{Lor_rate}\,t)$',
-                     'ms':r'Gauss decay: $\mbox{asymmetry}\cos[2\pi(\gamma_\mu \mbox{field}\, t +\mbox{phase}/360)]\exp(-(\mbox{rate}\,t)^\beta)$',
-                     'jg':r'Gauss Bessel: $\mbox{asymmetry} j_0[2\pi(\gamma_\mu \mbox{field}\, t +\mbox{phase}/360)]\exp(-0.5(\mbox{Lor_rate}\,t)^2)$',
-                     'jl':r'Lorentz Bessel: $\mbox{asymmetry}j_0[2\pi(\gamma_\mu \mbox{field}\, t +\mbox{phase}/360)]\exp(-0.5(\mbox{Lor_rate}\,t)^2)$',
-                     'fm':r'FMuF: $\mbox{asymmetry}/6[3+\cos 2*\pi\gamma_\mu\mbox{dipfield}\sqrt{3}\, t + \
+                     'ml':r'Lorentz decay: $A\cos[2\pi(\gamma_\mu B\, t +\phi/360)]\exp(-\lambda\,t)$',
+                     'mg':r'Lorentz and Gauss decay: $A\cos[2\pi(\gamma_\mu B\, t +\phi/360)]\exp(-\lambda\,t)\exp(-0.5(\sigma\,t)^2)$',
+                     'mu':r'Gauss decay: $A\cos[2\pi(\gamma_\mu B\, t +\phi/360)]\exp(-0.5(\sigma\,t)^2)$',
+                     'ms':r'Gauss decay: $A\cos[2\pi(\gamma_\mu B\, t +\phi/360)]\exp(-(\Lambda\,t)^\beta)$',
+                     'jl':r'Lorentz Bessel: $Aj_0[2\pi(\gamma_\mu B\, t +\phi/360)]\exp(-\lambda\,t)$',
+                     'jg':r'Gauss Bessel: $A j_0[2\pi(\gamma_\mu B\, t +\phi/360)]\exp(-0.5(\sigma\,t)^2)$',
+                     'js':r'Gauss Bessel: $A j_0[2\pi(\gamma_\mu B\, t +\phi/360)]\exp(-(\Lambda\,t)^\beta)$',
+                     'fm':r'FMuF: $A/6[3+\cos 2*\pi\gamma_\mu\mbox{dipfield}\sqrt{3}\, t + \
                (1-1/\sqrt{3})\cos \pi\gamma_\mu\mbox{dipfield}(3-\sqrt{3})\,t + \
                (1+1/\sqrt{3})\cos\pi\gamma_\mu\mbox{dipfield}(3+\sqrt{3})\,t ]\exp(-\mbox{Lor_rate}\,t)$', 
                      'kg':r'Gauss Kubo-Toyabe: static and dynamic, in zero or longitudinal field by G. Allodi [Phys Scr 89, 115201]',
@@ -179,7 +182,7 @@ class mumodel(object):
                 produced by int2_method() from mujpy.aux.aux
                 where method is an instantiation of a component, e.g. self.ml 
                 and value = eval(key) produces the parameter value (the inner key list is for different groups)
-            _add_multigroup_ must produce an 2d function f.shape(ngroup,nbins)
+            _add_multigroup_ must produce a 2d function f.shape(ngroup,nbins)
             therefore _components_ must be a np.vectorize of ngroup copies of the method 
             method da not allowed here, no need for alpha
             no fft of residues
@@ -317,6 +320,50 @@ class mumodel(object):
                                                                                        e.shape))          
         except ValueError as e:
             return False, e 
+        return True, '' # no error
+        
+    def __load_data_multirun_user_(self,x,y,components,e=1):
+        '''
+        input: 
+            x, y, e are numpy arrays, y, e are 2d 
+            e = 1 or missing yields unitary errors 
+            components is a list [[method,[key,...,key]],...,[method,[key,...,key]]], 
+                produced by int2_multirun_user_method_key() from mujpy.aux.aux
+                where method is an instantiation of a component, e.g. self.ml 
+                and value = eval(key) produces the parameter value
+            _add_multirun_ must produce a 2d function f.shape(ngroup,nbins)
+            therefore _components_ must be a np.vectorize of nrun copies of the method 
+            method da not allowed here, no need for alpha
+            no fft of residues   
+        '''
+        self._x_ = x
+        self._y_ = y        # self._global_ = True if _nglobals_ is not None else False
+        self._components_ = components
+        self._ntruecomponents_ = len(components)
+        self._add_ = self._add_multirun_user_
+        self._n0truecomponents_ = 0
+        # print('mucomponents _load_data_multirun_user_ mucomponents debug: {} components, n of parameters/component: {}'.format(len(components),[len(par) for group in components for par in group[1]]))
+        try:
+            if isinstance(e,int):
+                self._e_ = ones((y.shape))
+            else:
+                if len(y.shape)>1:
+                    # print('_load_data_multirun_user_ mucomponents debug: x,y,e not e=1')
+                    if e.shape!=y.shape or x.shape[0]!=y.shape[-1]:
+                        # print('_load_data_multirun_user_ mucomponents debug: x,y,e different shape[0]>1')
+                        raise ValueError('x, y, e have different lengths, {},{},{}'.format(x.shape,
+                                                                                       y.shape,
+                                                                                       e.shape))          
+                elif e.shape!=y.shape or e.shape[0]!=x.shape[0]:
+                    # print('_load_data_multirun_user_ mucomponents debug: x,y,e different shape[0]=1')
+                    raise ValueError('x, y, e have different lengths, {},{},{}'.format(x.shape,
+                                                                                           y.shape,
+                                                                                           e.shape))          
+            # print('_load_data_multigroup_ mucomponents debug: defining self._e_')
+            self._e_ = e
+            # print('mucomponents _load_data_multigroup_ debug: self._x_ {}, self._y_ {}, self._e_  {}shape'.format(self._x_,self._y_,self._e_) 
+        except ValueError as e:
+            return False, e       
         return True, '' # no error
 
 #####################################################################################################
@@ -493,6 +540,55 @@ class mumodel(object):
             # print('add_multigroup mucomponents debug: key = {}'.format(keys))
             pars = [[key(p) for key in groups_key] for groups_key in keys]
             # print('mucomponents _add_multigroup_ debug:component {}-th: {}\npars {}'.format(j,method.__doc__,pars))
+            f += method(x,*pars)
+            # print('mucomponents _add_multigroup_ debug: f[:,0] {}'.format(f[:,0]))
+            # f += component(x,*pars) # x is 1d, component is vstacked, with shape (groups,bins) 
+            # remember *p.comp means 'pass as many arguments as required by component, exausting the list p_comp'
+
+            # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
+            # pars = [[eval(key) for key in groups_key] for groups_key in keys]
+            # print('add_multigroup mucomponents debug: y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
+            # print('add_multigroup mucomponents debug: pars = {}'.format(pars))
+            # print('add_multigroup mucomponents debug: f.shape = {}, zeros.shape = {}'.format(
+            #                                                         f.shape,zeros_like(x).shape))
+#            warn = array(where(abs(f)>1))
+#            if warn.size:
+#                print('Warning, model is getting too big in {}'.format(warn))
+        return f     
+    def _add_multirun_user_(self,x,*argv):   
+        '''
+         input: 
+            x       time array
+            *argv   passed as a variable number of parameter values 
+                    val0,val1,val2,val3,val4,val5, ... at this iteration 
+                    argv is a list of values [val0,val1,val2,val3,val4,val5, ...]
+
+        _add_multirun_user_ DISTRIBUTES THESE PARAMETER VALUES::
+
+              asymmetry fit with fixed alpha
+              order driven by 
+              first global user parameters 
+              then local run parameters, first user local and then "~","!" pars in model, e.g. mgbl 
+        must loop over runs, whose number n = y.shape[0]
+        and produce a n-valued np.array function f, f[k] for y[k],e[k] 
+        '''      
+
+        f = zeros((self._y_.shape[0],x.shape[0]))  # initialize a 2D array shape (groups,bins)   
+        p = argv 
+        
+        # self._component_ contains [bndkeys,...,bndkeys], as many as the model components (e.g. 2 for mgbl)
+        # bndkeys is [method, keys]   
+        # such that par[k] = eval(keys[k]) and method(x,*par)  produces the additive component for run
+        # print('mucomponents _add_multirun_user_ mucomponents debug: component {}-th: {}\npars {}'.format(j,method.__doc__,pars))
+        j = -1 # what is j for?
+#            self._components_ is a list [[method,[key,...,key]],...,[method,[key,...,key]]], 
+#                produced by int2_multirun_user_method_key() from mujpy.aux.aux
+#                where method is an instantiation of a component, e.g. self.ml 
+#                and value = eval(key) produces the parameter value
+        for method, keys in self._components_:
+            j += 1
+            pars = [key(p) for key in keys]
+            # print('mucomponents _add_multirun_user_ mucomponents debug: component {}-th: {}\npars {}'.format(j,method.__doc__,pars))
             f += method(x,*pars)
             # print('mucomponents _add_multigroup_ debug: f[:,0] {}'.format(f[:,0]))
             # f += component(x,*pars) # x is 1d, component is vstacked, with shape (groups,bins) 
@@ -739,7 +835,7 @@ class mumodel(object):
 #            return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)      
         ml.func_code = make_func_code(["A","B","φ","λ"])
 
-    def mu(self,x,A,B,φ,σ): 
+    def mg(self,x,A,B,φ,σ): 
         '''
         fit component for a precessing muon with Gaussian decay, 
         x [mus], A, B [mT], φ [degrees], σ [mus-1]  (positive parity)
