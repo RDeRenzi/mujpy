@@ -19,7 +19,7 @@ class mumodel(object):
         self._help_ = {'bl':r'Lorentz decay: $A\exp(-\lambda\,t)$',
                      'bg':r'Gauss decay: $A\exp(-0.5(\sigma\,t)^2)$',
                      'bs':r'stretched decay: $A\exp(-0.5(\Lambda\,t)^\beta)$',
-                     'ba':r'Lorenz and Gauss decay: $A\exp(-\lambda\,t)\exp(-0.5(\sigma\,t)^2)$
+                     'ba':r'Lorentz and Gauss decay: $A\exp(-\lambda\,t)\exp(-0.5(\sigma\,t)^2)$',
                      'da':r'Linearized dalpha correction: $f = \frac{2f_0(1+\alpha/\mbox{dalpha})-1}{1-f_0+2\alpha/dalpha}$',
                      'ml':r'Lorentz decay: $A\cos[2\pi(\gamma_\mu B\, t +\phi/360)]\exp(-\lambda\,t)$',
                      'mg':r'Lorentz and Gauss decay: $A\cos[2\pi(\gamma_\mu B\, t +\phi/360)]\exp(-\lambda\,t)\exp(-0.5(\sigma\,t)^2)$',
