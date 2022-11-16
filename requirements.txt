@@ -1,17 +1,16 @@
-iminuit>=2.7
-ipykernel>=5.3.4
-ipywidgets>=7.5.1
-jupyter-client>=6.1.7
-jupyter-core>=4.6.3
-matplotlib>=3.4.3
-nbconvert>=6.07
-nbformat>=5.0.8
-notebook>=6.1.5
-numpy>=1.19.4
-scipy>=1.5.4
+iminuit>=2.17
+ipykernel>=8.5.0
+ipywidgets>=8.0.2
+jupyter-client>=7.4.3
+jupyter-core>=4.11.1
+matplotlib>=3.6
+nbconvert>=7,2
+nbformat>=5.7
+notebook>=6.5.1
+numpy>=1.23
+scipy>=1.9.3
 widgetsnbextension>=3.5.1
-jupyterlab 3.1.14
-musr2py 0.0.1
+jupyterlab 3.5.0b0
 NeXus 4.4.1
 nexusformat 0.5.3
 python-nexus 2.0.1

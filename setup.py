@@ -2,7 +2,7 @@
 from setuptools import setup
     
 setup(name='mujpy',
-      version='2.0.1',
+      version='2.1.0',
       description='A Python MuSR data analysis program designed for jupyter.',
       author='Roberto De Renzi, Pietro Bonfa',
       author_email='roberto.derenzi@unipr.it',

@@ -752,10 +752,12 @@ class dash(object):
                 if self.userpar:
                     # fill self.userpar from list_text_userparvalue[k], list_text_userparstd.value
                     for k,par in enumerate(self.userpar):
-                        par['value'] = list_text_userparvalue[k].value
+                        par['value'] = float(ist_text_userparvalue[k].value)
                         par['flag'] = '~'
-                        par['error'] = list_text_userparstd[k].value
-                        par['limits'] = [ list_text_userparlim0[k].value, list_text_userparlim1[k].value ]
+                        par['error'] = float(list_text_userparstd[k].value)
+                        lim0 = None if list_text_userparlim0[k].value == 'None' else float(list_text_userparlim0[k].value)
+                        lim1 = None if list_text_userparlim1[k].value == 'None' else float(list_text_userparlim1[k].value)
+                        par['limits'] = [lim0, lim1]
                 model_guess = []
                 nint = len(self.userpar)-1
                 for k,comp in enumerate(self.model_components):  # scan the model, already has component "name" and a basic "pardicts"
@@ -766,7 +768,7 @@ class dash(object):
                     pardicts = []
                     for j,pardict in enumerate(self.model_components[k]['pardicts']): # update and complete the pardict for each parameter 
                         nint += 1
-                        pardict["value"] = list_parvalue[nint].value
+                        pardict["value"] = float(list_parvalue[nint].value) # is a float
                         pardict["flag"] = list_flag[nint].value
                         fun = list_function[nint].value.split(";") # already checked for sanity
                         if len(fun)>1:
@@ -934,17 +936,6 @@ class dash(object):
                 tk.mainloop()
                             
                 
-                if answer:
-                    self.userpar.pop(k)
-                    list_userparname.pop(k) 
-                    list_text_userparvalue.pop(k) 
-                    list_text_userparstd.pop(k)
-                    list_text_userparlim0.pop(k)
-                    list_text_userparlim1.pop(k)
-                #version = change.value
-                fit_range = str2lst('['+text_fit_range.value+']')
-                fit(fit_range=fit_range) # keeps existing text_fit_range.value
-
             def on_remove_userpar(change):
                 '''
                 remove the clicked user parameter
@@ -1289,13 +1280,13 @@ class dash(object):
                                      layout=Layout(width='4%'),
                                       continuous_update=False))                          # 22%
 
-                    value = None if not 'limits' in self.userpar[k] else self.userpar[k]['limits'][0]
+                    value = 'None' if not 'limits' in self.userpar[k] else self.userpar[k]['limits'][0]
                     list_text_userparlim0.append( 
-                                     FloatText(value=value,
+                                     Text(value=value,
                                      layout=Layout(width='4%'),
                                       continuous_update=False))                          # 26%
 
-                    value = None if not 'limits' in self.userpar[k] else self.userpar[k]['limits'][2]
+                    value = 'None' if not 'limits' in self.userpar[k] else self.userpar[k]['limits'][2]
                     list_text_userparlim0.append( 
                                      FloatText(value=value,
                                      layout=Layout(width='4%'),
@@ -1404,12 +1395,16 @@ class dash(object):
                                             disabled=True)                               # 7%
                     name = self.model_components[j]['pardicts'][k]['name']
                     baloon = ''
-                    if 'field' in name:
+                    rates = ['Δ','Γ','λ','σ']
+                    fields = ['B','BL']
+                    if name in fields:
                         baloon = '[mT]'
-                    elif 'rate' in name:
+                    elif name in rates:
                         baloon = '[mus-1]'
-                    elif 'phase' in name:
+                    elif 'φ' in name:
                         baloon = '[deg]'
+                    elif 'ν' in name:
+                        baloon = '[MHz]'
                     list_parname.append( 
                                         Text(value=name,
                                           description_tooltip=baloon,

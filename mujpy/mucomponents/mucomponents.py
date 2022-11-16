@@ -1,4 +1,4 @@
-from numpy import cos, pi, exp, sqrt, real, nan_to_num, inf, ceil, linspace, zeros, empty, ones, hstack, fft, sum, zeros_like, abs, array, where
+from numpy import cos, pi, exp, sqrt, real, nan_to_num, inf, ceil, linspace, zeros, empty, ones, hstack, fft, sum, zeros_like, abs, array, where, arctan, pi
 from scipy.special import dawsn,erf, j0
 from scipy.constants import physical_constants as C
 from iminuit.util import make_func_code
@@ -14,7 +14,7 @@ class mumodel(object):
         '''
         self._radeg_ = pi/180.
         self._gamma_Mu_MHzperT = 3.183345142*C['proton gyromag. ratio over 2 pi'][0]  # numbers are from Particle Data Group 2017
-        self._gamma_mu_ = 135.5
+        self._gamma_mu_ = 135.538817
         self._gamma_Mu_MHzper_mT = self._gamma_Mu_MHzperT*1e-3
         self._help_ = {'bl':r'Lorentz decay: $A\exp(-\lambda\,t)$',
                      'bg':r'Gauss decay: $A\exp(-0.5(\sigma\,t)^2)$',
@@ -41,11 +41,21 @@ class mumodel(object):
 # General structure:
 # _load_... loads data and defines which _add_... method
 # _add_... distributes Minuit parameters to components, adds components into model function
+# organized by mufit dofit_...which invokes aux methods:
+# int2min_... to pass guess values as
+#        int2min val err fix lim names pospar are lists
+#        int2min_multigroup >> >> 
+#        int2min_userpar >> are 
+# int2_..._method_key to prepare
+#       bndmthd methods that take k = key_as_lambda functions 
+#       such that          bndmthd(x,*eval('k(p)'))  is the component value
+# fstack to vectorize muligroup, multirun to produce ngroups, nruns component values
+#
 # calib is dealt differently in fit where 
 #                    alpha is a parameter and asymmetry,errors must be recalculated
 #                    and in plot where alpha is used to caclulate asymmetry, error data
 # fft has its own
-
+        
     def _load_data_(self,x,y,_components_,e=1):
         '''
         input: 
@@ -85,14 +95,15 @@ class mumodel(object):
                     if e.shape!=y.shape or x.shape[0]!=e.shape[-1]:
                         raise ValueError('x, y, e have different lengths, {},{},{}'.format(x.shape,
                                                                                        y.shape,
-                                                                                       e.shape))          
+                                                                                          e.shape))
+                    self._e_ = e     
+#                    print('mucomponents _load_data_ debug: {}'.format(self._e_))
                 elif e.shape!=y.shape or e.shape[0]!=x.shape[0]:
                         raise ValueError('x, y, e have different lengths, {},{},{}'.format(x.shape,
                                                                                        y.shape,
                                                                                        e.shape))          
                 else:
                     self._e_ = e
-                    # print('mucomponents _load_data_ debug: {}'.format(self._e_))
         except ValueError as err:
             return False, err       
         return True, '' # no error
@@ -322,7 +333,7 @@ class mumodel(object):
             return False, e 
         return True, '' # no error
         
-    def __load_data_multirun_user_(self,x,y,components,e=1):
+    def _load_data_multirun_user_(self,x,y,components,e=1):
         '''
         input: 
             x, y, e are numpy arrays, y, e are 2d 
@@ -336,11 +347,13 @@ class mumodel(object):
             method da not allowed here, no need for alpha
             no fft of residues   
         '''
+        from numpy import vstack
+            
         self._x_ = x
         self._y_ = y        # self._global_ = True if _nglobals_ is not None else False
         self._components_ = components
         self._ntruecomponents_ = len(components)
-        self._add_ = self._add_multirun_user_
+        self._add_ = self._add_multirun_
         self._n0truecomponents_ = 0
         # print('mucomponents _load_data_multirun_user_ mucomponents debug: {} components, n of parameters/component: {}'.format(len(components),[len(par) for group in components for par in group[1]]))
         try:
@@ -369,12 +382,13 @@ class mumodel(object):
 #####################################################################################################
 # add methods:
 # the 'time' array is x, not self._x_ because they are invoked by plot with different t vectors
-#  _add_single_ :           single run, single group (still has da)
+#  _add_single_ :           single run, single group 
 #  _add_calib_single_ :     single run single group with recalculation of asymmetry and errors
 #  _add_single_calib_ :     single run single group for calib plot (normal asymmetry)
 #                                  use _add_single_ after _load_data_calib_
-#  _add_multigroup_ :       single run multigroup global (for single chisquare)
+#  _add_multigroup_ :       single run multigroup global (a unique chisquare)
 #  _add_calib_multigroup_ : single run multigroup global with recalculation of asymmetry and errors
+#  _add_multirun_   :       multi run single group global (a unique chisquare)
 #  _add_fft_ : single run, single group for partial residues
 #####################################################################################################
 
@@ -405,6 +419,7 @@ class mumodel(object):
             keys = self._components_[j][1] 
             # print('add_single mucomponents debug: keys = {}'.format(keys))
             pars = [key(p) for key in keys] # NEW! spedup, evaluates p[1], p[2] etc.
+            # print('debug mumodel add_single: pars = {}'.format(pars))
             # print('y:{},x:{},f:[]'.format(self._y_.shape,x.shape,f.shape))
             # print('pars = {}'.format(pars))
             # print('f.shape = {}, zeros.shape = {}'.format(f.shape,zeros_like(x).shape))
@@ -554,8 +569,9 @@ class mumodel(object):
 #            warn = array(where(abs(f)>1))
 #            if warn.size:
 #                print('Warning, model is getting too big in {}'.format(warn))
-        return f     
-    def _add_multirun_user_(self,x,*argv):   
+        return f  
+           
+    def _add_multirun_(self,x,*argv):   
         '''
          input: 
             x       time array
@@ -563,7 +579,7 @@ class mumodel(object):
                     val0,val1,val2,val3,val4,val5, ... at this iteration 
                     argv is a list of values [val0,val1,val2,val3,val4,val5, ...]
 
-        _add_multirun_user_ DISTRIBUTES THESE PARAMETER VALUES::
+        _add_multirun_ (user is implicit, since sequential ses _add_) DISTRIBUTES THESE PARAMETER VALUES::
 
               asymmetry fit with fixed alpha
               order driven by 
@@ -571,7 +587,8 @@ class mumodel(object):
               then local run parameters, first user local and then "~","!" pars in model, e.g. mgbl 
         must loop over runs, whose number n = y.shape[0]
         and produce a n-valued np.array function f, f[k] for y[k],e[k] 
-        '''      
+        '''    
+        
 
         f = zeros((self._y_.shape[0],x.shape[0]))  # initialize a 2D array shape (groups,bins)   
         p = argv 
@@ -579,16 +596,25 @@ class mumodel(object):
         # self._component_ contains [bndkeys,...,bndkeys], as many as the model components (e.g. 2 for mgbl)
         # bndkeys is [method, keys]   
         # such that par[k] = eval(keys[k]) and method(x,*par)  produces the additive component for run
-        # print('mucomponents _add_multirun_user_ mucomponents debug: component {}-th: {}\npars {}'.format(j,method.__doc__,pars))
+        # print('mucomponents _add_multirun_ mucomponents debug: component {}-th: {}\npars {}'.format(j,method.__doc__,pars))
         j = -1 # what is j for?
-#            self._components_ is a list [[method,[key,...,key]],...,[method,[key,...,key]]], 
-#                produced by int2_multirun_user_method_key() from mujpy.aux.aux
-#                where method is an instantiation of a component, e.g. self.ml 
-#                and value = eval(key) produces the parameter value
+#            self._components_ is a list [[method,keys],...,[method,keys]], 
+#                produced by int2_multirun_method_key() from mujpy.aux.aux
+#                where method is a vectorised instantiation of a component, e.g. ml 
+#                                  producing one value per run
+#                keys is a list of lists [[key,..,key],...,[key,...,key]]
+#                value = eval(key) produces one parameter value for one run
+#                the  inner list is over the parameters of the component (e.g. ml) 
+#                the outer list os over runs 
         for method, keys in self._components_:
+            # each method in the model is a vstack of nrun methods prepared by aux fstack
+            # expecting a list of lists of parameters, with parameters for the k-th run in the k-th inner list  
             j += 1
-            pars = [key(p) for key in keys]
-            # print('mucomponents _add_multirun_user_ mucomponents debug: component {}-th: {}\npars {}'.format(j,method.__doc__,pars))
+#            for run_keys in keys: 
+#                print('key(p) is {}'.format([key(p) for key in run_keys]))
+            pars = [[key(p) for key in run_keys] for run_keys in keys]
+            #print('mucomponents _add_multirum_ mucomponents debug: component {}-th: {}\npars {}'.format(j,method.__doc__,pars))
+            #print('mucomponents _add_multirum_ mucomponents debug: x.shape: {}, f.shape: {}\npars.shape {}'.format(x.shape,f.shape,array(pars).shape,))
             f += method(x,*pars)
             # print('mucomponents _add_multigroup_ debug: f[:,0] {}'.format(f[:,0]))
             # f += component(x,*pars) # x is 1d, component is vstacked, with shape (groups,bins) 
@@ -760,9 +786,9 @@ class mumodel(object):
 
     def al(self,x,α):
         '''
-        fit component for alpha calibration 
-        x [mus], dα
-        x for compatibility, here it is dummy anyway
+        alpha calibration 
+        x [mus], α
+        x dummy, for compatibility
         '''
         # empty method  (could remove x from argument list ?)
         # print('al = {}'.format(α))
@@ -771,59 +797,47 @@ class mumodel(object):
            
     def bl(self,x,A,λ): 
         '''
-        fit component for a Lorentzian decay, 
+        Lorentzian decay, 
         x [mus], A, λ [mus-1]
-        x need not be self.x (e.g. in plot)
         '''
+        # x need not be self.x (e.g. in plot)
         # λ = -87. if λ < -87. else λ
         return A*exp(-x*λ)
         bl.func_code = make_func_code(["A","λ"])
 
     def bg(self,x,A,σ): 
         '''
-        fit component for a Gaussian decay, 
+        Gaussian decay, 
         x [mus], A, σ [mus-1] (positive parity)
-        x need not be self.x (e.g. in plot)
         '''
+        # x need not be self.x (e.g. in plot)        
         return A*exp(-0.5*(x*σ)**2)
         bg.func_code = make_func_code(["A","σ"])
 
     def ba(self,x,A,λ,σ): 
         '''
-        fit component for a Gaussian decay, 
-        x [mus], A, σ [mus-1] (positive parity)
-        x need not be self.x (e.g. in plot)
+        Lorentzian times Gaussian decay, 
+        x [mus], A, λ [mus-1], σ [mus-1] (positive parity)
         '''
+        # x need not be self.x (e.g. in plot)
         return A*exp(-x*λ)*exp(-0.5*(x*σ)**2)
         ba.func_code = make_func_code(["A","λ","σ"])
 
     def bs(self,x,A,Λ,β): 
         '''
-        fit component for a stretched decay, 
+        stretched decay, 
         x [mus], A, Λ [mus-1] (>0), β (>0)
-        x need not be self.x (e.g. in plot)
         '''
+        # x need not be self.x (e.g. in plot)
         return A*exp(-(x*Λ)**β)
         bs.func_code = make_func_code(["A","Λ","β"])
 
-    def da(self,x,dα):
-        '''
-        fit component for linearized alpha correction
-        x [mus], dα
-        x for compatibility, here it is dummy anyway
-        '''
-        # the returned value will not be used, correction in _add_
-        # print('dα = {}'.format(dα))
-        return [] # zeros(self.x.shape[0]) # alternatively, return [], remove x from argument list
-        da.func_code = make_func_code(["dα"])
-
-
     def ml(self,x,A,B,φ,λ): 
         '''
-        fit component for a precessing muon with Lorentzian decay, 
-        x [mus], A, B [mT], φ [degrees], λ [mus-1]
-        x need not be self.x (e.g. in plot)
+        precession times Lorentzian decay, 
+        x [mus], A, B [mT], φ [deg], λ [mus-1]
         '''
+#        x need not be self.x (e.g. in plot)
 #        import warnings
 #        warnings.filterwarnings("error")
         # print('a={}, B={}, ph={}, lb={}'.format(asymmetry,field,phase,Lor_rate))
@@ -837,37 +851,39 @@ class mumodel(object):
 
     def mg(self,x,A,B,φ,σ): 
         '''
-        fit component for a precessing muon with Gaussian decay, 
+        precession times Gaussian decay, 
         x [mus], A, B [mT], φ [degrees], σ [mus-1]  (positive parity)
-        x need not be self.x (e.g. in plot)
         '''
+        # x need not be self.x (e.g. in plot)
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-0.5*(x*σ)**2)
         mg.func_code = make_func_code(["A","B","φ","σ"])
 
     def mu(self,x,A,B,φ,λ,σ): 
         '''
-        fit component for a precessing muon with Gaussian and Lorentzian independent decaya, 
-        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  (positive parity)
-        x need not be self.x (e.g. in plot)
+        precession times Gaussian times Lorentzian decays, 
+        x [mus], A, B [mT], φ [degrees], 
+        λ [mus-1], σ [mus-1]  (positive parity)
         '''
+        # x need not be self.x (e.g. in plot)
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)*exp(-0.5*(x*σ)**2)
         mu.func_code = make_func_code(["A","B","φ","λ","σ"])
 
     def ms(self,x,A,B,φ,Λ,β): 
         '''
-        fit component for a precessing muon with stretched decay, 
+        precession times stretched decay, 
         x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
-        x need not be self.x (e.g. in plot)
         '''
+        # x need not be self.x (e.g. in plot)
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-(x*Λ)**β)
         ms.func_code = make_func_code(["A","B","φ","Λ","β"])
 
     def fm(self,x,A,B,λ):
         '''
-        fit component for FmuF (powder average)
+        FmuF (powder average)
         x [mus], A, B [mT], λ [mus-1]
-        x need not be self.x (e.g. in plot)
+        B is Bdip
         '''
+        # x need not be self.x (e.g. in plot)
         return A/6.0*( 3.+cos(2*pi*self._gamma_Mu_MHzper_mT*B*sqrt(3.)*x)+
                (1.-1./sqrt(3.))*cos(pi*self._gamma_Mu_MHzper_mT*Bd*(3.-sqrt(3.))*x)+
                (1.+1./sqrt(3.))*cos(pi*self._gamma_Mu_MHzper_mT*Bd*(3.+sqrt(3.))*x) )*exp(-x*λ)
@@ -875,37 +891,38 @@ class mumodel(object):
 
     def jl(self,x,A,B,φ,λ): 
         '''
-        fit component for a Bessel j0 precessing muon with Lorentzian decay, 
+        Bessel j0 precession times Lorentzian decay, 
         x [mus], A, B [mT], φ [degrees], λ [mus-1]
-        x need not be self.x (e.g. in plot)
         '''
+        # x need not be self.x (e.g. in plot)
         return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)
         jl.func_code = make_func_code(["A","B","φ","λ"])
 
     def jg(self,x,A,B,φ,σ): 
         '''
-        fit component for a Bessel j0 precessing muon with Gaussian decay, 
+        Bessel j0 precession times Gaussian decay, 
         x [mus], A, B [mT], φ [degrees], σ [mus-1] (positive parity)
-        x need not be self.x (e.g. in plot)
         '''
+        # x need not be self.x (e.g. in plot)
         return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-0.5*(x*σ)**2)
         jg.func_code = make_func_code(["A","B","φ","σ"])
 
     def js(self,x,A,B,φ,Λ,β): 
         '''
-        fit component for a Bessel j0 precessing muon with Gaussian decay, 
-        x [mus], A, B [mT], φ [degrees], σ [mus-1]
-        x need not be self.x (e.g. in plot)
+        Bessel j0 precession times stretched decay, 
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
         '''
+        # x need not be self.x (e.g. in plot)
         return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-(x*Λ)**β)
         js.func_code = make_func_code(["A","B","φ","Λ","β"])
 
     def _kg(self,t,w,Δ):
         '''
         auxiliary component for a static Gaussian Kubo Toyabe in longitudinal field, 
-        t [mus], w [mus-1], Δ [mus-1], note that t can be different from self._x_
+        t [mus], w [mus-1], Δ [mus-1], 
         w = 2*pi*gamma_mu*L_field
         '''
+        # note that t can be different from self._x_
         Dt = Δ*t
         DDtt = Dt**2
         DD = Δ**2
@@ -926,9 +943,10 @@ class mumodel(object):
     def _kl(self,t,w,Δ):
         '''
         static Lorentzian Kubo Toyabe in longitudinal field, 
-        t [mus], w [mus-1], Δ [mus-1], note that t can be different from self._x_
+        t [mus], w [mus-1], Δ [mus-1], 
         w = 2*pi*gamma_mu*L_field
         '''
+        # note that t can be different from self._x_
         Dt = Δ*t
         wt = w*t
         dt = t[1]-t[0]
@@ -982,10 +1000,10 @@ class mumodel(object):
          
     def kg(self,x,A,BL,Δ,ν):
         '''
-        Gaussian Kubo Toyabe in (fixed) longitudinal field, static or dynamic
+        Gauss Kubo Toyabe in (fixed) long field, static or dynamic
         x [mus], A, BL [mT], Δ [mus-1] (positive parity), ν (MHz)
-        x need not be self.x (e.g. in plot)
         '''
+        # x need not be self.x (e.g. in plot)
         N = x.shape[0]
         w = 2*pi*BL*self._gamma_Mu_MHzper_mT
         if ν==0: # static 
@@ -1013,20 +1031,21 @@ class mumodel(object):
 
     def kl(self,x,A,BL,Γ):
         '''
-        Lorentzian Kubo Toyabe in (fixed) longitudinal field, static (dynamic makes no sense)
+        Lorent Kubo Toyabe in (fixed) long field, static 
         x [mus], A, BL [mT], Γ [mus-1] 
-        x need not be self.x (e.g. in plot)
         '''
+        # x need not be self.x (e.g. in plot)
+        # (dynamic makes no sense)
         w = 2*pi*BL*self._gamma_Mu_MHzper_mT
         return A*self._kl(x,w,Γ)
         kl.func_code = make_func_code(["A","BL","Γ"])
 
     def kd(self,x,A,Δ,λ):
         '''
-        static Gaussian Kubo Toyabe times an (independent) exponential decay
+        Gauss Kubo Toyabe static times Lorentz decay
         x [mus], A, B [T], Δ [mus-1], ν (MHz)
-        x need not be self.x (e.g. in plot)
         '''
+        # x need not be self.x (e.g. in plot)
         return A*self._kg(x,0,Δ)*exp(-x*λ)
         kd.func_code = make_func_code(["A","Δ","λ"])
         #kd.limits = [[None,None],[0.,None],[None,None]]
@@ -1034,10 +1053,10 @@ class mumodel(object):
 
     def ks(self,x,A,Δ,Λ,β):
         '''
-        static Gaussian Kubo Toyabe times an (independent) stretched exponential decay
-        x [mus], A, B [T], Δ [mus-1], ν (MHz)
-        x need not be self.x (e.g. in plot)
+        Gauss Kubo Toyabe times stretched decay
+        x [mus], A, B [T], Δ [mus-1], Λ [mus-1] (>0), β (>0)
         '''
+        # x need not be self.x (e.g. in plot)
         return A*self._kg(x,0,Δ)*exp(-(x*Λ)**β)
         ks.func_code = make_func_code(["A","Δ","Λ","β"])
         #kd.limits = [[None,None],[0.,None],[None,None]]
@@ -1058,11 +1077,11 @@ class mumodel(object):
         None is default and sum is over all indices::
         ''' 
         # print('_chisquare_ mucomponents debug: {} {} {}'.format(self._x_.shape,self._y_.shape,self._e_.shape))
-        from numpy import finfo, where, array, abs
-        Mepsi = finfo('d').max/10.
+        from numpy import abs # finfo, where, array, 
+        # Mepsi = finfo('d').max/10.
         num = abs(self._add_(self._x_,*argv) - self._y_)
         normsquaredev = (num/self._e_)**2
-        divergence = normsquaredev>Mepsi
+        # divergence = normsquaredev>Mepsi
 #        if divergence.any():
 #            print('Warning: big numbers in chisquare {}'.format(normsquaredev[divergence]))
         return sum(normsquaredev,axis=self._axis_ )

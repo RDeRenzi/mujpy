@@ -416,6 +416,8 @@ def _nparam(model):
 #                  of minuit parameters
 #  int2min : 
 #  int2min_multigroup : assumes all parameters are in userpardicts
+#  int2min_multirun : assumes both userpardicts and active parameters
+#                    must generate daughters for local parameters
 ##################################################################
 
 def int2min(model):
@@ -469,7 +471,7 @@ def int2min_multigroup(pardicts):
     input: 
         pardicts 
             either dashboard["userpardicts_guess"] if guess = True
-            or  dashboard["userpardicts_result"] if gues = False
+            or  dashboard["userpardicts_result"] if guess = False
     output: a list of lists:  
         values: minuit parameter values, either guess of result
         errors: their steps
@@ -505,8 +507,121 @@ def int2min_multigroup(pardicts):
                 fix.append(False)
             else:
                 return False,_,_,_,_,_,_
-        # self.console('val = {}\nerr = {}\nfix = {}\nlim = {}\ncomp name = {},\npar name = {} '.format(val,err,fix,lim,name)) 
+        # self.console('val = {}\nerr = {}\nfix = {}\nlim = {}\python list with more repeated valuesncomp name = {},\npar name = {} '.format(val,err,fix,lim,name)) 
     return val, err, fix, lim, name, pospar
+
+def int2min_multirun(dashboard,runs):
+    '''
+    input: 
+        dashboar for single group multirun
+            containins both
+               dashboard["userpardicts_guess"] or dashboard["userpardicts_result"]
+               dashboard["model_guess"] (after add_step_limits_to_model) or dashboard["model_result"]
+        runs = list of run numbers
+    output: a list of lists, each list containing minuit internal parameters for a run 
+        values: minuit parameter values, either guess of result
+        errors: their steps
+        fixed: True/False for each
+        limits: [low, high] limits for each or [None,None]  
+        names: name of parameter 'x_label' for each parameter
+        pospar: parameter for which component is positive parity, eg s in e^{-(s*t)^2/2}
+    Note: this method knows the model, hence it can generate only minuit parameters
+          mucomponents, i.e. the cost function, needs to feed also non minuit parameters to the components
+          e.g. mg with A global B1 local phi global s1 global will have only two minuit parameters per run
+          , the second and the fourth, and it must know which value to use for the first and third
+          This is accomplished by _add_multirun_singlegroup_ in mucomponents, using self._components_
+    '''
+    #####################################################
+    # the following variables contain the same as input #
+    # parameters to iMinuit, removing '='s (functions)  #
+    #####################################################
+                                                        
+    positive_parity = ['Δ','σ']                                                    
+    val, err, fix, lim = [], [], [], []           
+    name = []
+    user_local = []
+    pospar = [] # contains index of positive parity parameters, to rerun with no limits
+
+    # first scan the global and local user parameters 
+    
+    pardicts = dashboard["userpardicts_result"] if "userpardicts_result" in dashboard.keys() else dashboard["userpardicts_guess"]    
+    # REMIND: insert plot guess option for _result dashboard
+    model = dashboard["model_result"] if "model_result" in dashboard.keys() else dashboard["model_guess"]
+    for k,pardict in enumerate(pardicts):  # scan the model components
+        if pardict["name"] in positive_parity: 
+            pospar.append(k)
+            pardict['limits'][0] = 0. 
+            # print('debug aux int2min_multirun: pospar {} lim({}) = {}'.format(pardict["name"],k, pardict['limits']))
+        errstd = 'error' if 'error' in pardict.keys() else 'std'
+        if pardict["local"]: # the local key is set to False by default
+            user_local.append(pardict) # set aside this parameter for the loop over runs
+        else: # the first n parameters are the global user parameters
+            val.append(pardict['value'])
+            name.append(pardict['name'])
+            err.append(pardict[errstd])
+            if 'error' in pardict.keys():
+                lim.append(pardict['limits'])
+                # print('aux debug: par {} limits {}'.format(pardict['name'],pardict['limits']))
+            if 'flag' in pardict.keys():
+                if pardict['flag'] == '!':
+                    fix.append(True)
+                elif pardict['flag'] == '~':
+                    fix.append(False)
+                else:
+                    return False,_,_,_,_,_,_     
+
+    kloc = k-1
+#    print('debug aux int2min_multirun: kloc = {}, len(fix) is {}'.format(kloc,len(fix)))
+#    print('first the userpars\nval = {}\nerr = {}\nfix = {}\nlim = {}\ncomp name = {},\npar name = {} '.format(val,err,fix,lim,name)) 
+        
+    # now scan the runs andcreate as many replicas of the local paratmeters
+    for krun,run in enumerate(runs): # run[0] is a string with the run number
+        # "value" may be a single guess value for all or a list of guess values, one per run, checked at start
+        for usr in user_local: # first the local user parameter names 
+            kloc += 1
+            fix.append(False) # can only be not-fixed 
+            if type(usr["value"])==list: 
+                # print('list = {}, krun = {}'.format(usr["value"],krun))
+                val.append(usr["value"][krun])
+            else:
+                val.append(usr["value"])
+            name.append(usr["name"]+'_'+run[0])
+            errstd = 'error' if 'error' in usr.keys() else 'std'
+            if type(usr[errstd])==list: 
+                err.append(usr[errstd][krun]) 
+            else: 
+                err.append(usr[errstd])
+            lim.append(usr['limits'])
+            
+        for component in model:  # then scan the model components and add only non "="-flag parameters
+            label = component['label']
+            for k,pardict in enumerate(component['pardicts']):  # list of dictionaries
+                if pardict['flag'] != '=': # minuit parameter
+                    kloc += 1
+                    if pardict["name"][0] in positive_parity: 
+                        pospar.append(kloc)
+                        pardict['limits'][0] = 0.
+                        # print('debug aux int2min_multirun: pospar {} lim({}) = {}'.format(pardict["name"],k, pardict['limits']))
+                    if pardict['flag'] == '~':
+                        fix.append(False)
+                    elif pardict['flag'] == '!':
+                        fix.append(True)
+#                    else:
+#                        print('debug aux int2min_multirun: kloc = {}, pardict["flag"] is {}'.format(kloc,pardict['flag']))
+                    if type(pardict["value"])==list: 
+                        #print('val = {}, krun = {}'.format(pardict["value"],krun))
+                        val.append(pardict["value"][krun]) 
+                    else: 
+                        val.append(pardict["value"])
+                    name.append(pardict['name']+'_'+label+'_'+run[0]) 
+                    errstd = 'error' if 'error' in pardict.keys() else 'std'
+                    if type(pardict[errstd])==list: 
+                        err.append(pardict[errstd][krun])
+                    else: 
+                        err.append(pardict[errstd])
+                    lim.append(pardict['limits'])
+#    print('debug aux int2min_multirun: kloc = {}, len(fix) is {}'.format(kloc,len(fix)))
+    return val, err, fix, lim, name, pospar # all simple lists of sequential parameters, minuit order 
 
 def int2fft(model):
     '''
@@ -533,7 +648,7 @@ def int2fft(model):
 #                           and parameter key for eval(key) in _add_
 #   int2_method_key :                single run single group 
 #   int2_multigroup_method_key :     single run multi group
-
+#   int2_multirun_user_method_key :  multirun single group user
 
 def int2_method_key(dashboard,the_model):
     '''
@@ -550,7 +665,7 @@ def int2_method_key(dashboard,the_model):
     dashboard "function" is written in terms of the internal parameter index,
     while Minuit parameter index skips shared or formula-determined ('=') parameters  
     '''
-    from mujpy.aux.aux import translate
+    from mujpy.aux.aux import translate, set_key
 
     model_guess = dashboard['model_guess']  # guess surely exists
 
@@ -575,13 +690,13 @@ def int2_method_key(dashboard,the_model):
                 # nint must be translated into nmin 
                 string = translate(nint,lmin,pardict['function']) # here is where lmin is used
                 # translate substitutes lmin[n] where n is the index read in the function (e.g. p[3])
-                key_as_lambda = eval('lambda p:'+string) # NEW! speedup
+                key_as_lambda = set_key(string) # NEW! calculates simple functions and speedup
                 keys.append(key_as_lambda) # the function key in keys will be evaluated, key(p), inside mucomponents
                 # isminuit.append(False)
                 lmin.append(0)
             else:# flag[j] == '~' or flag[j] == '!'
                 nmin += 1
-                key_as_lambda = eval('lambda p:'+'p['+str(nmin)+']') # NEW! speedup
+                key_as_lambda = set_key('p['+str(nmin)+']') # NEW! calculates simple functions and speedup
                 keys.append(key_as_lambda) # the function key in keys will be evaluated, key(p), inside mucomponents
                 lmin.append(nmin) # 
                 # isminuit.append(True)
@@ -589,7 +704,7 @@ def int2_method_key(dashboard,the_model):
         method_key.append([bndmthd,keys]) 
     return method_key
 
-def int2_multigroup_method_key(dashboard,the_model,guess=True):
+def int2_multigroup_method_key(dashboard,the_model):
     '''
     input: 
         dashboard, the dashboard dict structure
@@ -615,8 +730,8 @@ def int2_multigroup_method_key(dashboard,the_model,guess=True):
     since the correspondence with Minuit parameters
     is given directly either by "function" or by "function_multi"
     '''
-    from mujpy.aux.aux import multigroup_in_components, fstack
-
+    from mujpy.aux.aux import multigroup_in_components, fstack, setkey
+    
     model = dashboard['model_guess']  # guess surely exists
     # these are the only Minuit parameters [p[k] for k in range (nuser)]
     ntot = sum([len(model[k]['pardicts']) for k in range(len(model))])
@@ -653,10 +768,10 @@ def int2_multigroup_method_key(dashboard,the_model,guess=True):
                 nint += 1  # internal parameter index incremented always 
                 if mask_function_multi[nint]>0:
 #                    print('aux int2_multigroup_method_key debug: {}[{}] = {}'.format(pardict["name"],l,pardict["function_multi"][l])) 
-                    key_as_lambda = eval('lambda p:'+pardict["function_multi"][l]) # NEW! speedup
+                    key_as_lambda = set_key(pardict["function_multi"][l]) # NEW! calculates simple functions and speedup
                 else:                
 #                    print('aux int2_multigroup_method_key debug: {}[{}] = {}'.format(pardict["name"],l,pardict["function"])) 
-                    key_as_lambda = eval('lambda p:'+pardict["function"]) # NEW! speedup
+                    key_as_lambda = set_key(pardict["function"][l]) # NEW! calculates simple functions and speedup
                 # print('aux int2_multigroup_method_key debug: key_as_lambda(p) = {} **delete also p!'.format(key_as_lambda(p)))
                 key.append(key_as_lambda) # the function key will be evaluated, key(p), inside mucomponents
             keys.append(key)
@@ -665,19 +780,140 @@ def int2_multigroup_method_key(dashboard,the_model,guess=True):
         # keys = [[strp0g0, strp1g0,...],[strp0g1, strp1g1, ..],[strp0g2, strp1g2,...]..]
         # pars = [[p0g0, p1g0, ...],[p0g1, p1g1, ..],[p0g2, p1g2,...]..]
     return method_key
+
+def int2_multirun_user_method_key(dashboard,the_model,nruns):
+    '''
+    input: 
+        dashboard, the dashboard dict structure
+        the_model is fit._the_model_ i.e. an instance of mumodel 
+        nruns is the numer of runs in the suite
+    output: a list of methods and a list of lists of keys, [[key,...,key],...,[key,..,key]]
+    the internal list is same parameter, different runs
+    the model components 
+            for the use of mumodel._add_multirun_.
+            method is a component function 
+            accepting time and a list of parameters, e.g mumodel.bl(x,A,λ)
+            key is string defining a lambda function that produces one method parameter for a specific run, 
+            the list is for the same parameter over diffenet runs 
+            keys is a list of lists for all the parameters (any flag) of the component
+            the list of [binding,keys] is over the components of the model
+    This list of [binding, keys] allows mumodel _add_multirun_ to use the minuit p list
+    (n_globals global user values, followed by nruns replica of 
+     n_locals local user values and a model specific number of local (~,!) component par values)
+    to produce component-driven vectorized values, as many values in the vector as the runs
+    In this way minuit fcn is a vector, one fcn per run,
+    likewise asymm, asyme are vectors (see suite for multirun)
+    and mumodel._chisquare_ cost function sums over individual runs for a unique global chisquare
+    Invoked by the iMinuit initializing call
+             self._the_model_._load_data_multirun_user_
+    just before submitting migrad
+    '''
+    from mujpy.aux.aux import multigroup_in_components, fstack, translate_multirun, set_key
+#            self._components_ is a list [[method,[key,...,key]],...,[method,[key,...,key]]], 
+#                produced by int2_multirun_user_method_key() from mujpy.aux.aux
+#                where method is an instantiation of a component, e.g. self.ml 
+#                and value = eval(key) produces the parameter value
+    model = dashboard['model_guess']  # guess surely exists, it is a list of component dicts, e.g. for mgbl 2 dicts
+    method_key = []
+    bndmthd = {} # to avoid same name
+    n_locals =  [pardict["local"] for pardict in dashboard["userpardicts_guess"]].count(True)
+    n_globals = len(dashboard["userpardicts_guess"])-n_locals
+    kloc = n_globals+n_locals
+    kk = kloc -1
+    functions_in = []
+    for component in model:  # scan the model components (as for the first run)
+        flags = [pardict["flag"] for pardict in component["pardicts"]] # these are the flags in the present component
+        function_in = [pardict["function"] for pardict in component["pardicts"]] # these are the original function (some are empty)
+        # print('debug aux int2_multirun_user_method_key function_in  {}'.format(function_in))
+        for k,flag in enumerate(flags):
+            if flag!="=": # this parameter is among the minuit parameters
+                kk += 1 # this is the minuit index of the current first run parameter
+                # suppose mg with n_globals = 5 (0,1,2,3,4), n_locals = 1 (5)
+                #   6 A = f(p[1],p[5]) 7 B = p[6] 8 φ = p[2] 9 σ = p[7] 
+                # k     kk          n_equals
+                # 0     -              1
+                # 1   5+1+1-1=6        -
+                # 2     -              2
+                # 3   5+1+3-2=7        -
+                function_in[k] = 'p['+str(kk)+']' # write a fake "function" to eval this parameter as 'p[kk]'
+        functions_in.append(function_in)
+
+    # now translate function_in (single run for all components) into a list of lists of lists of 
+    # functions_out 
+    #               list of lists of lists of functions
+    #                with minuit indices,
+    #                outer list is components of the model, 
+    #                middle list is runs,
+    #                inner list is component parameter functions  
+    # print('\ndebug aux int2_multirun_user_method_key explicit functions_in  {}'.format(functions_in))
+    functions_out = translate_multirun(functions_in,n_locals,kloc,nruns)   
     
+
+    # print('\n\ndebug aux int2_multirun_user_method_key functions_out = {}'.format(functions_out))
+    for j,component in enumerate(model):  # scan the model components (as for the first run)
+        name = component['name']
+        keys = []
+        # this method uses pars, a list of lists (runs) of parameter for this component, obtained by key(p) from minuit p
+        bndmthd[name] = lambda x,*pars, name=name : fstack(the_model.__getattribute__(name),x,*pars)
+        bndmthd[name].__doc__ = '"""'+name+'"""'
+                            # no alpha in global multirun!
+        # its pars are generated as a list of lists of the key_as_lambda functions
+        for funcs in functions_out[j]: # this is a run, in the suite of runs
+            key = []
+            for func in funcs: # this is a parameter for this run, in the component parameters 
+#                print('debug aux int2_multirun_user_method_key func = {}'.format(func))
+                key_as_lambda = set_key(func) # NEW! calculates simple functions and speedup
+                # function key will be evaluated as key(p) inside mucomponents
+                key.append(key_as_lambda) # collect parameter key(s) of the component  
+            keys.append(key) # create outer list adding component parameters for this run
+        method_key.append([bndmthd[name],keys]) # vectorialized method, with its keys list of lists
+        # appended to a list of [method,
+        # print('debug aux int2_multirun_user_method_key: locals =\n{}'.format(globals()))
+    return method_key
+
+def set_key(string):   
+    """
+    input: the function string from the json or the mudash dashboard
+         e.g. that written in the json file as 'function':'p[0]*(0.5+1/pi*arctan(p[2])'
+              or typed into mudash text widget as 'p[0]*(0.5+1/pi*arctan(p[2])'
+    output: key, a python method, such that in mumodel mucomponents _add_ the command 
+            key(p) evaluates the formula 
+            the evaluation knows simple numpy functions, see the import in string code, below
+    """
+    code = """
+from numpy import cos, sin, tan, sinh, cosh, tanh, pi, exp, sqrt, real, abs, arctan
+def foo():
+"""
+    string = '"lambda p: '+string+'")'
+    string = "    key = eval("+string
+    # print('string ={}'.format(string))
+    code = code + string + """
+    return key
+"""
+    # print('code = {}'.format(code))
+    exec(code,globals(),globals())
+    key = foo()
+    return key   
+        
 def fstack(npfunc,x,*pars):
     '''
     vectorialize npfunc
     input: 
         npfunc numpy function with input (x,*argv)
         x time
-        *argv is variable number of lists of parameters, list len is the output_function_array.shape[0]
+        *pars is a list of lists of parameters, 
+              list len is the output_function_array.shape[0]
     output:
         output_function_array
             stacks vertically n replica of npfunc distributing parameters as in
             (x, *argv[i]) for each i-th replica 
     '''
+    # fstack reproduces the parameter input of a component according to         
+    # self._components_ = [[method,[key,...,key]],...,[method,[key,...,key]]], and eval(key) produces the parmeter value
+    # where the outer list a replica of the same component method 
+    # either over several groups (multigroup) or over several runs (multirun)
+    # as of now this method does not work for the multirun multigroup userpar case (C2)
+
     from numpy import vstack
     for k,par in enumerate(pars):
         if k:
@@ -847,12 +1083,75 @@ def min2int(model_guess,values_in,errors_in):
         errors_out.append(error)
     return names, values_out, errors_out # list of parameter values 
 
+def min2int_multirun(dashboard,p,e,nruns):
+    '''
+    input:
+        dashboard;  userpardicts_guess and model_guess from 
+            used only to retrieve "function" or "function_multi" 
+            and "error_propagation_multi"
+        p,e Minuit best fit parameter values and std
+        nruns = number of runs in suite
+    output: for all parameters
+        names list of lists of parameter names
+        pars list of lists ofparameter values
+        epars list of lists of parameter errors
+    used only in summary_multirun_global that prints name value(error) 
+        one or more lines of global user parameters (the first list in the inner lists)
+        one line per run local user parameters and local component parameters (the others)
+    '''
+    # 
+    # initialize
+    #
+    from mujpy.aux.aux import multigroup_in_components
+
+    names, pars, epars = [], [], []
+    nameloc, npars, n_locals = [], -1, 0# inner list, components
+    name, par, epar = [], [], []
+    for k, pardict in enumerate(dashboard['userpardicts_guess']):
+        if not pardict['local']:
+            name.append(pardict['name'])
+            par.append(p[k])
+            epar.append(e[k])
+            npars += 1 
+        else:
+            n_locals += 1
+            nameloc.append(pardict['name'])
+    names.append(name)
+    pars.append(par)
+    epars.append(epar)
+    model = dashboard['model_guess']
+    for run in range(nruns):
+        name, par, epar = [], [], []# inner list, components
+        for k in range(n_locals):
+            npars += 1
+            name.append(nameloc[k]+str(run))
+            par.append(p[npars])
+            epar.append(e[npars])
+        for component in model:  # scan the model components
+            component_name = component['name']
+            label = component['label']
+            first = True
+            for j,pardict in enumerate(component['pardicts']): 
+                if not pardict['flag']=='=': 
+                    npars += 1  # internal parameter index incremented always
+                    if first:
+                        name.append('{}{}_{}{}'.format(component_name,pardict['name'],label,str(run)))
+                        first = False
+                    else:
+                        name.append('{}_{}{}'.format(pardict['name'],label,str(run)))
+                    par.append(p[npars]) 
+                    epar.append(e[npars])
+        names.append(name)
+        pars.append(par)
+        epars.append(epar) 
+    return names, pars, epars  # list of lists of parameter names, values, errors
+
 def min2int_multigroup(dashboard,p,e):
     '''
     input:
         userpardicts_guess from dashboard 
             (each dict corresponds to a Minuit parameter)
-            used only to retrieve "function" or "function_multi" 
+x\            used only to retrieve "function" 
             and "error_propagation_multi"
             p,e Minuit best fit parameter values and std
     output: for all parameters
@@ -910,9 +1209,106 @@ def min2int_multigroup(dashboard,p,e):
         namesg.append(names)
         parsg.append(pars)
         eparsg.append(epars) 
-    return namesg, parsg, eparsg  # list of parameter values 
-
-def print_components(names,values,errors):
+    return namesg, parsg, eparsg  # list of parameter values
+    
+def minglobal2sequential(p_out,p_in,method_keys,dashboard):
+    '''
+    translate global best fit results (values) into nruns equivalent sequential fits
+    for plotting purposes: mufitplot(plot_range,the_fit) will access
+    self.fit.lastfits and self.fit.dashboard_single if self.fit.C1 is True
+    input:
+       p_out is global best fit minuit parameters self.lastfit
+       p_in is global fit minuit guess parameters values_in
+       method_key is produced by int2_multirun_user_method_key
+       dashboard is the fit global dashboard
+       results toggles between plotting result of guess
+    output:
+       lastfits,  list of lists of best fits, in the style of multirun sequential single group (B1)
+       dashboard_single (a dashboard that produces a single run best fit function for animated plots) 
+    '''
+    from copy import deepcopy    
+    # values are: 
+    #     first the user globals, 
+    #     then the run replica: first the user locals, then the free model parameters 
+    # for each run must reconstruct a simple model_guess, model_result dashboard (no userpardicts)
+    # with its '=' flag parameters translated in '!' flag with value calculated by key (from function)
+    lastfits = []
+    userpars_g, userpars_r = dashboard["userpardicts_guess"],dashboard["userpardicts_result"]
+    n_locals =  [pardict["local"] for pardict in userpars_g].count(True)
+    n_globals = len(userpars_g)-n_locals
+    # could also simply transfer p = self.fit.lastfit.values
+#    for krun in range(len(values[1:])): # i.e. in range(n_runs)
+    par = [] # list of single-run equivalent best fit parameters
+    # scan method_keys = [[mthd,[[key,...,key],...,[key,,...,key]]],..,[mthd,[[key,...,key]...]]]
+    #                   outer components, middle runs, inner component parameters
+    dash = deepcopy(dashboard)
+    dash.pop("userpardicts_guess")
+    if "userpardicts_result" in dash.keys(): dash.pop("userpardicts_result")
+    model_in, model_out = [],[]
+    if "model_result" not in dash.keys():
+        dash["model_result"] = dash["model_guess"] # make sure model_result exists in dash
+    for jcomp,method_key in enumerate(method_keys): # components
+        method, keys = method_key # component method and run-by-run list of keys
+        model_guess_component = dash["model_guess"][jcomp]
+        model_result_component = dash["model_result"][jcomp] 
+        pars_in, pars_out = [], []
+        for krun, runkeys in enumerate(keys): # single run                    
+            par_in, par_out = [],[] # each run has its set of parameters
+            for kpar,key in enumerate(runkeys):
+                par_in.append(key(p_in))
+                par_out.append(key(p_out))
+                # transform all keys in "~" or "!"
+                if model_guess_component["pardicts"][kpar]["flag"]=='=': # turn them in "!"
+                    model_guess_component["pardicts"][kpar]["flag"] = '!'
+                    model_result_component["pardicts"][kpar]["flag"] = '!' 
+                if type(model_guess_component["pardicts"][kpar]["value"]) is list: 
+                    model_guess_component["pardicts"][kpar]["value"] = model_guess_component["pardicts"][kpar]["value"][0]
+                    model_result_component["pardicts"][kpar]["value"] = model_result_component["pardicts"][kpar]["value"][0]
+                if type(model_guess_component["pardicts"][kpar]["error"]) is list: 
+                    model_guess_component["pardicts"][kpar]["error"] = model_guess_component["pardicts"][kpar]["error"][0]
+                    model_result_component["pardicts"][kpar]["error"] = model_result_component["pardicts"][kpar]["error"][0]
+            pars_in.append(par_in) # list of run lists has its set of parameters
+            pars_out.append(par_out) 
+        dash["model_guess"][jcomp] = model_guess_component
+        dash["model_result"][jcomp] = model_result_component
+        model_in.append(pars_in)
+        model_out.append(pars_out)
+# model is in [model [run [component]]] nesting order
+    pars_in, pars_out, p_in, p_out = [], [], [], []
+    n_runs = len(model_in[0]) #
+    n_components = len(model_in)      
+    for component_in,component_out in zip(model_in,model_out): # component contains all runs
+        for krun in range(n_runs):       
+            pars_in.append(component_in[krun]) # 
+            pars_out.append(component_out[krun])
+    for krun in range(n_runs):
+        par_in, par_out  = [], []
+        for component in range(n_components):
+            par_in += pars_in[krun+component] 
+            par_out += pars_out[krun+component] 
+        p_in.append(par_in)
+        p_out.append(par_out)
+    #print('debug aux minglobal2sequential: p_in = {}'.format(p_in))
+       
+# now the list is in the [run [model [component]]] nesting order
+    return p_in,p_out, dash
+            
+def len_print_components(names,values,errors):
+	'''
+	input: for a component
+		parameter names 
+		parameter values 
+		parameter errors 
+	output:
+	    max length of string to print, e.g.
+	    "bl.A_fast 0.123(4) bl.λ_fast 12.3(4) bl.σ_fast 0(0)"
+	'''
+	from mujpy.aux.aux import value_error
+	out = [' '.join([names[k],'=',value_error(values[k],errors[k])]) for k in range(len(names))]
+	maxlen = len(max(out,key=len))
+	return maxlen
+    
+def print_components(names,values,errors,maxlen):
 	'''
 	input: for a component
 		parameter names 
@@ -924,6 +1320,7 @@ def print_components(names,values,errors):
 	'''
 	from mujpy.aux.aux import value_error
 	out = [' '.join([names[k],'=',value_error(values[k],errors[k])]) for k in range(len(names))]
+	out = [out[k]+(maxlen-len(out[k]))*' ' for k in range(len(out))]
 	return " ".join(out)
 	
 def mixer(t,y,f0):
@@ -1469,35 +1866,66 @@ def initialize_csv(Bstr, filespec, the_run ):
         form += 'f} {}' #".format(value)
         return form.format(nrun, Ts[0], Bstr[:Bstr.find('G')])
 
-def minparam2_csv(dashboard,values_in,errors_in):
+def minparam2_csv(dashboard,values_in,errors_in,multirun=0):
     '''
+    transforms Minuit values Minuit errors in cvs format
     input:
-        dashboard dashboard[model_guess"], for single group or None, for multi group
-        multigroup True/False
-        Minuit values
-        Minuit errors
+        dashboard 
+                 dashboard["model_guess"], for single group 
+                 None, for multi group
+                 dashboard, for single group multirun user (C1) 
+        values_in, errors_in are  Minuit values Minuit errors
+        if multirun is nruns !=0  (True) uses 
+           min2int_multirun(dashboard,values_in,errors_in,multirun_nruns)
+        else (multirun = 0 (False) uses 
+           min2int(dashboard,values_in,errors_in)
     output:
-        cvs partial row with parameters and errors
+        cvs partial row with parameters and errors for A1, A20 and B1, or A21
+            list of partial rows (one per run) for C1
     '''
-    from mujpy.aux.aux import min2int, spec_prec
+    from mujpy.aux.aux import min2int, min2int_multirun, spec_prec
 
-    # Minuit and user parameters coincide
-    (_, values, errors) = (min2int(dashboard,values_in,errors_in) if dashboard else
-                                                        (None, [values_in], [errors_in]))
-        
+    if multirun:
+        _, values, errors = min2int_multirun(dashboard,values_in,errors_in,multirun)
+        # must write rows with single run
+        gvalues,gerrors = values[0],errors[0]
+        rows = []
+        for parvalues,parerrors in zip(values[1:],errors[1:]): #locals
+            row = ''
+            for parvalue,parerror in zip(parvalues,parerrors):
+                n1 = spec_prec(parerror) # calculates format specifier precision
+                form = ' {:.'
+                form += '{}'.format(n1)
+                form += 'f}  {:.'
+                form += '{}'.format(n1)
+                form += 'f}'
+                row += form.format(parvalue,parerror)
+            for parvalue,parerror in zip(values[0],errors[0]): # globals replicated in every row
+                n1 = spec_prec(parerror) # calculates format specifier precision
+                form = ' {:.'
+                form += '{}'.format(n1)
+                form += 'f}  {:.'
+                form += '{}'.format(n1)
+                form += 'f}'
+                row += form.format(parvalue,parerror)
+            rows.append(row) # these are as many rows as runs     
+    else:
+        (_, values, errors) = (min2int(dashboard,values_in,errors_in) if dashboard else
+                                                        (None, [values_in], [errors_in]))    
         # from minuit parameters to component parameters
-    # output is lists (components) of lists (parameters) 
-    row = ''
-    for parvalues, parerrors in zip(values,errors): 
-        for parvalue,parerror in zip(parvalues,parerrors):
-            n1 = spec_prec(parerror) # calculates format specifier precision
-            form = ' {:.'
-            form += '{}'.format(n1)
-            form += 'f}  {:.'
-            form += '{}'.format(n1)
-            form += 'f}'
-            row += form.format(parvalue,parerror)
-    return row
+        # output is lists (components) of lists (parameters) 
+        # else dashboard false (multigroup user) Minuit and user parameters coincide
+        rows = '' # this is a single row, really
+        for parvalues, parerrors in zip(values,errors): 
+            for parvalue,parerror in zip(parvalues,parerrors):
+                n1 = spec_prec(parerror) # calculates format specifier precision
+                form = ' {:.'
+                form += '{}'.format(n1)
+                form += 'f}  {:.'
+                form += '{}'.format(n1)
+                form += 'f}'
+                rows += form.format(parvalue,parerror)
+    return rows
     
 def nextrun(datapath):
     '''
@@ -2278,6 +2706,82 @@ def tlog_exists(path,run,ndigits):
     ok = os.path.exists(os.path.join(path,filename_psibulk)) # or os.path.exists(os.path.join(paths,filename_isis))
     return ok
 
+
+def translate_multirun(functions_in,n_locals,kloc,nruns):
+    '''
+    functions_in  = a list of lists of function strings 
+                    for the model components of a single run
+                    with "~","!" parameter dummy functions = 'p[k]'
+                    where k is their dash progressive index
+    n_locals      = number of user_local parameters
+    kloc          = index of first component first parameter 
+                    in the single run model
+                    (kloc-n_locals is the index of the first user_locals) 
+    nruns         = number of runs in the suite
+    functions_out = list of lists of lists of functions
+                    with minuit indices,
+                    outer list is components of the model, 
+                    middle list is runs,
+                    inner list is component parameter functions 
+    '''
+    # print('debug aux translate_multirun functions_in = {}'.format(functions_in))
+    fso = []
+    korig = kloc # minuit index of nex minuit parameter, the first user local in the first run
+    npar_run = n_locals # these are local parameters in each run
+    # extact this from functions: first scan a single run model to find how many parameters reference themeselves
+    for funcs in functions_in: # list of functions for a component
+        for func in funcs: # individual function for one parameter
+            parloc = 'p['+str(korig)+']' #  original parameter
+#            print('debug aux translate_multirun korig = {}, parloc = {}, func =  {}'.format(korig, parloc, func))
+            if func.find(parloc)>=0: # if present this parameter references itself i.e. it is a "~" local parameter i.e. a free minuit parameter
+             # (non-local are determines by user parameters)
+#                print('debug aux translate_multirun found! korig = {}, func =  {}'.format(korig, func))
+                korig += 1    # increment the minuit index
+                npar_run +=1 # increment the number of local parameters per run
+#    print('debug aux translate_multirun local parameters per run npar_run = {} minuit parameters =  {}'.format(npar_run, korig))
+
+# sbagliato, deve produrre components fuori, runs middle, component inner
+    knew = kloc-n_locals
+    for krun in range(nruns):
+        funcs_out = []  # list of component lists of translated functions
+        korig = kloc # index for first run free parameter index in model, starts after user local replicas 
+        knew += n_locals # minuit index includes run user local replicas
+        for funcs in functions_in: # funcs is list of functions for a component
+            func_out = [] # list of translated functions for one component
+            for k, func in enumerate(funcs): # individual function for one parameter
+                parloc = 'p['+str(korig)+']' #  original parameter
+                parnew = 'p['+str(knew)+']' # parameter for this run
+                # print('debug aux translate_multirun knew = {}, parloc = {} parnew {}'.format(knew,parloc,parnew))
+                if func.find(parloc)>=0: # if present
+                    # print('debug aux translate_multirun func = {} becomes {}'.format(func,func.replace(parloc,parnew)))
+                    func_out.append(func.replace(parloc,parnew)) # it is translated and appended
+                    knew += 1 # increment the minuit index
+                    korig +=1 # increment the first run model index
+                else: # otherwise
+                    func_out.append(func) # it is appended untranslated
+                    # either way func_out[k] is appended  
+                # now check for every parameter if contains user_local parameters                  
+                for j in range(n_locals): # assign local index to user_local parameters
+                    kuserorig = kloc-j-1 # index of user_local parameter for first run
+                    parloc = 'p['+str(kuserorig)+']' # this is a user_local parameter
+                    kusernew =  kloc+krun*npar_run-j-1 # index of user_local parameter for present run
+                    parnew = 'p['+str(kusernew)+']' # this is the value for present run
+                    if func_out[k].find(parloc)>=0: # if present
+                        # print('debug aux translate_multirun func_out = {} becomes {}'.format(func_out[k],func_out[k].replace(parloc,parnew)))
+                        func_out[k] = func_out[k].replace(parloc,parnew) # it is translated
+            funcs_out.append(func_out) # adds list to list of lists
+        fso.append(funcs_out) # adds list of lists of functions for a run
+        # now reshuffle with model components, runs, component
+        functions_out = []
+        ncomponents = len(fso[0]) # middle list is components
+        for jcomp in range(ncomponents):
+            frun = []
+            for krun,run in enumerate(fso): # run is list of lists  for run krun
+                frun.append(run[jcomp]) # run[jcomp] is the jcomp component functions for run krun
+            functions_out.append(frun) # nw run is middle        
+    return functions_out    
+    
+
 def translate(nint,lmin,function_in):
     '''
     input: 
@@ -2423,11 +2927,4 @@ def results():
     process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
     # issue os command 'p2j cache/notebook.py '+filename
-    
-def lognb():
-    '''
-    write in a txt file and position it at the bottom
-    connect it to suite.console
-    generate a notebook
-    '''
-    
+        

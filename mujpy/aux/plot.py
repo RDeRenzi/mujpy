@@ -1026,10 +1026,10 @@ def draw(fig):
     '''
     '''
     import matplotlib.pyplot as P
-
     cfm = P.get_current_fig_manager()
-    cfm.window.attributes('-topmost', True) # Tkinter backend
-    cfm.window.attributes('-topmost', False)
+    if hasattr(cfm.window,'attributes'):
+        cfm.window.attributes('-topmost', True) # Tkinter backend
+        cfm.window.attributes('-topmost', False)
     #cfm.window.activateWindow()
     #cfm.window.raise_()
     #fig.canvas.manager.window.tkraise()# fig.canvas.manager.window.raise_()
