@@ -57,6 +57,8 @@ class dash(object):
              MuJPy = MG(mysuite,model='mgml') # instance is MuJPy
 
         '''
+        from mujpy._version import __version__
+        self.__version__ = __version__
         # print('__init__ now ...')
 #        from mujpy import __file__ as MuJPyName
         from mujpy.aux.aux import validmodel
@@ -170,7 +172,7 @@ class dash(object):
             '''
             from ipywidgets import Textarea, Layout, HTML, VBox
 
-            _version = 'MuJPy          version '+'2.0' # increment while progressing
+            _version = 'MuJPy          version '+self.__version__ # increment while progressing
             _authors = '\n\n  Authors: Roberto De Renzi, Pietro Bonfà (*)'
             _blahblah = ('\n\n A Python MuSR data analysis tool'+
                          '\n  designed for Jupyterlab.'+

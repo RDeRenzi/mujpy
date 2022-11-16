@@ -50,6 +50,8 @@ class mufitplot(object):
         
 # reassigned, for backward compatibility  
         # print('mufitplot __init__ debug: inside')  
+        from mujpy._version import __version__
+        self.__version__ = __version__
         self.fit = the_fit
 #        self.lastfits = the_fit.lastfits
         self._the_model_ = the_fit._the_model_                           

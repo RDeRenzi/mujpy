@@ -10,6 +10,8 @@ class mufit(object):
             suite is the instance of the runs
             dashboard_file is a JSON file of a dictionary structure
         '''
+        from mujpy._version import __version__
+        self.__version__ = __version__
         self.suite = suite
         self.dash = dash
         self.log = self.dash.log if self.dash else self.suite.console

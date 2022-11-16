@@ -64,6 +64,8 @@ class suite(object):
         import json
         import os
         from mujpy import __file__ as MuJPyName
+        from mujpy._version import __version__
+        self.__version__ = __version__
         # print('__init__ now ...')
         self.firstbin = 0
         self.loadfirst = False  
