@@ -326,6 +326,7 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
     from mujpy.aux.plot import errorb, plot_fit, decorate_data, decorate_data_late
     from mujpy.aux.plot import plot_res, decorate_res, decorate_res_late, plot_txt, plot_chi2
     from mujpy.aux.plot import draw
+    from datetime import datetime
 
     def animate_fit(i): 
         '''
@@ -505,7 +506,8 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         paused = not paused    
 
 ## set_sequence_fit begins here
-        
+    now = datetime.now()
+    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")             
     font = {'family':'Ubuntu','size':10}
     P.rc('font', **font)
     prop_cycle = rcParams['axes.prop_cycle']
@@ -560,6 +562,7 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         ym,yM,rm,rM = ytot.min()-0.05,ytot.max()+0.01,rtot.min()-0.005,rtot.max()+0.005
         xtgl,ytgl = 1.35*t.min()-0.35*t.max(), 1.65*rm-0.65*rM
         ax_early_res.text(xtgl,ytgl,'Click to toggle\npause/resume',fontsize='small')
+        ax_early.text(xtgl,yM+0.01,dt_string,fontsize='small')
  
  
         line, xe, ye = errorb(ax_early,t,y[0],ey[0],color[0])
@@ -609,6 +612,7 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         ym,yM,rm,rM = y.min()-0.05,y.max()+0.01,(y-f_res).min()-0.005,(y-f_res).max()+0.005
         xtgl,ytgl = 1.125*t.min()-0.125*t.max(), 1.5*rm-0.5*rM
         ax_res.text(xtgl,ytgl,'Click to toggle pause/resume',fontsize='medium')
+        ax_fit.text(xtgl,yM,dt_string,fontsize='small')
         nu_fit_early,nu_fit_late,dy_early = n*[None], n*[None], n*[None],
         w_early,dy_late,w_late = n*[None], n*[None], n*[None]
 
@@ -754,6 +758,8 @@ def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
     ax_fft.set_ylim(ym,yM)
     
     ax_fft.text(0.75*xM,ym-0.125*(yM-ym),'Click to pause/resume',fontsize='medium')
+#    ydat = 1.01*yM
+#    ax_early.text(,ydat,dt_string,fontsize='small')
     if len(ap.shape)>1:
         anim_fft = animation.FuncAnimation(fig_fft, animate_fft, 
                                                 frames=range(len(run_title)),

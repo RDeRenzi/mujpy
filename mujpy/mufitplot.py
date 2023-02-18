@@ -53,7 +53,7 @@ class mufitplot(object):
         from mujpy._version import __version__
         self.__version__ = __version__
         self.fit = the_fit
-#        self.lastfits = the_fit.lastfits
+        self.lastfits = the_fit.lastfits
         self._the_model_ = the_fit._the_model_                           
         self._the_model_single_ = the_fit._the_model_single_                           
         self.suite = the_fit.suite
@@ -618,7 +618,7 @@ class mufitplot(object):
         #  B20 3d (group,runs) sequential, pars is a list, uses _load_data_multigroup_
         #  B21 3d multigroup userpar, to be done
         '''
-        from mujpy.aux.aux import _nparam, int2_method_key, calib
+        from mujpy.aux.aux import _nparam, int2_method_key, calib, cstack
         
         _,_, freepars = _nparam(self.dashboard[self.model])
         nu = len(t) - freepars # degrees of freedom in plot
@@ -627,9 +627,9 @@ class mufitplot(object):
             mthdk = int2_method_key(self.dashboard,self._the_model_)
             if calib(self.dashboard):
                 mthdk = mthdk[1:]
-            ok, msg = _the_model_._load_data_(t,yin,mthdk,e=eyin) 
+            ok, msg = self._the_model_._load_data_(t,yin,mthdk,e=eyin) 
             if ok:
-                f = self.fstack(t,*pars)
+                f = cstack(self._the_model_._add_,t,*pars)
 #                print('mufitplot chi_2 debug: pars {}\nf.shape = {}'.format(pars,f.shape))
             else:
                 self.log(msg)
@@ -639,7 +639,7 @@ class mufitplot(object):
 #                chi2.append(lastfits[k]) # chi2 in plot
                 # print('mufitplot chi_2 debug: k {}, chi2 = {}'.format(k,chi2[-1]))
         else: # only f is really needed, this can be called only after a call with yin = None
-            f = self.fstack(t,*pars)
+            f = cstack(self._the_model_._add_,t,*pars)
             chi2 = [None for k in range(len(pars))]
         return nu,f,chi2
                 
@@ -896,7 +896,7 @@ class mufitplot(object):
         returns f for the fft of residues
         for the moment works only for single or sequential fits
         '''
-        from mujpy.aux.aux import int2_method_key
+        from mujpy.aux.aux import int2_method_key, cstack
         from numpy import vstack
         _the_model = self._the_model_
         method_keys = int2_method_key(self.dashboard,self._the_model_)
@@ -914,7 +914,7 @@ class mufitplot(object):
         fres = self._the_model_._add_fft_(t_fit,y_fit,*pars)
         if isinstance(pars,tuple):
             # print('mufitplot chi_fft debug: pars is tuple')
-            f = self.fstack(t_fit,*pars)
+            f = cstack(t_fit,*pars)
         else: 
             # print('mufitplot chi_fft debug: pars is not tuple')
             self._the_model_._add_(t_fit,*pars)

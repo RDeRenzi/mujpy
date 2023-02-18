@@ -7,12 +7,12 @@ class suite(object):
         (console(string) must print string somewhere)
         t0 parameters are fixed depending on bin or mdu spec
     
-    Self.groups = grp.calib contains a list of dictionaries for groups and their alpha values
+    Self.groups = grp.calib contains a list of dictionaries for forward, backward groups and their alpha values
         where groups may be in shorthand notation
         self.alpha value used for normal fit 
         as opposed to calibration fits where alpha is a fit parameter
-    self.grouping is the same with groups as lists of indices (aux get_grouping does the translation)
-
+    self.grouping is a list of dictionaries for forward, backward groups and their alpha values
+        where groups as np array of 0 based indices of detectors (aux get_grouping does the translation)
     imports musr2py or muisis2py and loads it as instance for each data set
     which can be an individual run or the sum of several runs
 
@@ -44,8 +44,11 @@ class suite(object):
         * Initiates an instance of suite, 
         * inputs: 
             the suite_input_file a dict containing
-                    consile, runlist, datafile, offset
-                    grp_calib  
+                    datafile,   containing the full path 
+                    runlist, run number or list of runs
+                    grp_calib, grouping and alpha paramter dictionary, see below
+                    offset, first good bin
+                    startuppath, path where mudash is lauched                      
         * grp_calib is a list of dictionaries (minimum one)
           {'forward':stringfw,'backward':stringbw,'alpha':alpha}
           strings are translated into np.arrays of histograms by aux get_grouping
@@ -70,7 +73,6 @@ class suite(object):
         self.firstbin = 0
         self.loadfirst = False  
         self._the_runs_ = [] # initialized 
-        self.grouping = [] # reproduce the same with arrays of histogram numbers
 #        with open(suite_input_file,"r") as f:
 #            suite_input_json = f.read()
 #            suite_input = json.loads(suite_input_json)
@@ -122,10 +124,13 @@ class suite(object):
         if not os.path.exists(self.__startuppath__+'/cache/'):
             os.mkdir(self.__startuppath__+'/cache/')
         self.__cachepath__ = self.__startuppath__+'/cache/'
-        self.groups = grp_calib
-        # grp_calib is a list of dictionaries, one per group, with keys 'forwar,'backward','alpha'
+        # reverse of aux get_grouping is aux get_group
         self.offset = int(offset) # offset belongs to suite, that needs it for asymmetries
         self.load_runs() #           load data instances in self._the_runs_
+        self.groups = grp_calib
+        # grp_calib is a list of dictionaries, one per group, with keys 'forward,'backward','alpha'
+        # where groups may be in shorthand notation
+        self.grouping = [] # reproduce the same with arrays of histogram numbers, done by aux get_grouping
         self.store_groups() #        in self.grouping
         self.promptfit(mplot)   #    to be done: make switch for ISIS
         self.timebase()
@@ -203,6 +208,12 @@ class suite(object):
         
         return read_ok # False with console error message in add_runs
 
+    def check_group(self,group):
+        '''
+        check that this is a group of existing detectors
+        '''
+        return (group>=0).all()*(group<self._the_runs_[0][0].get_numberHisto_int()).all()
+
     def store_groups(self):
         '''
         reads groups dictionary in dashboard shortnote
@@ -210,11 +221,8 @@ class suite(object):
         '''
         from mujpy.aux.aux import get_grouping
         for k,group in enumerate(self.groups):
-            fgroup, bgroup, alpha = get_grouping(group['forward']), get_grouping(group['backward']),       group['alpha']
-            ok = 1
-            ok *= alpha>0*(fgroup>=0).all()*(fgroup<self._the_runs_[0][0].get_numberHisto_int()).all()
-            ok *= (bgroup>=0).all()*(bgroup<self._the_runs_[0][0].get_numberHisto_int()).all()
-            if ok: # checks for errors in grpcalib_file
+            fgroup, bgroup, alpha = get_grouping(group['forward']), get_grouping(group['backward']), group['alpha']
+            if alpha>0 and self.check_group(fgroup) and self.check_group(bgroup): # checks legal grpcalib_file
                 self.grouping.append({'forward':fgroup, 'backward':bgroup, 'alpha':alpha})
                 # fgroup bgroup are two np.arrays of integers
             else:
@@ -862,5 +870,21 @@ class suite(object):
             False if just one group (fits A1, B1, C1)
         '''
         # print('multi_group suite debug: self.grouping {} len {}'.format(self.grouping,len(self.grouping)))
-        return len(self.grouping)>1        
+        return len(self.grouping)>1     
+        
+    def scan(self):
+        '''
+        output
+            False if single
+            'B[mT]' if it's a B scan
+            'T[K] ' if it's a T scan
+            '[deg]' if it's an angle scan 
+            '#    ' if it's another scan
+        '''  
+        if self.single(): return False
+        elif [run[0].get_temp() for run in self._the_runs_]!=[self._the_runs_[0][0].get_temp()]*len(self._the_runs_): return 'T[K] '
+        elif [run[0].get_field() for run in self._the_runs_]!=[self._the_runs_[0][0].get_field()]*len(self._the_runs_): return 'B[mT]'
+        elif [run[0].get_orient() for run in self._the_runs_]!=[self._the_runs_[0][0].get_orient()]*len(self._the_runs_): return '[deg]'
+        else: return '#    '
+        
         

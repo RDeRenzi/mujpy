@@ -1,5 +1,5 @@
-from numpy import cos, pi, exp, sqrt, real, nan_to_num, inf, ceil, linspace, zeros, empty, ones, hstack, fft, sum, zeros_like, abs, array, where, arctan, pi
-from scipy.special import dawsn,erf, j0
+from numpy import cos, sin, pi, exp, sqrt, log, real, nan_to_num, inf, ceil, linspace, zeros, empty, ones, hstack, fft, sum, zeros_like, abs, array, where, arctan, pi
+from scipy.special import dawsn,erf, j0, j1
 from scipy.constants import physical_constants as C
 from iminuit.util import make_func_code
 
@@ -347,14 +347,12 @@ class mumodel(object):
             method da not allowed here, no need for alpha
             no fft of residues   
         '''
-        from numpy import vstack
-            
         self._x_ = x
         self._y_ = y        # self._global_ = True if _nglobals_ is not None else False
         self._components_ = components
-        self._ntruecomponents_ = len(components)
+        # self._ntruecomponents_ = len(components)
         self._add_ = self._add_multirun_
-        self._n0truecomponents_ = 0
+        # self._n0truecomponents_ = 0
         # print('mucomponents _load_data_multirun_user_ mucomponents debug: {} components, n of parameters/component: {}'.format(len(components),[len(par) for group in components for par in group[1]]))
         try:
             if isinstance(e,int):
@@ -379,17 +377,34 @@ class mumodel(object):
             return False, e       
         return True, '' # no error
 
+    def _load_data_multirun_grad_(self,minuit_ordered_grad_list):
+        '''
+        minuit_ordered_grad_list is
+        self._glocals_ to loop 
+            over minuit parameters and calculate gradient components, 
+                over runs, whose number n = y.shape[0], for globals
+                on single run, for locals
+                    over component parameters that contain that minuit parameter, i
+                    ncluding the derivative of the user function.
+        constructed in mujpy.aux.aux int2_multirun_grad_method_key
+        '''
+        self._minuit_grad_list_ = minuit_ordered_grad_list
+#        for m,grad_list in enumerate(minuit_ordered_grad_list): 
+#            for [k,n,j,_,_] in grad_list:
+#                print('debug mucomponents _load_data_multirun_grad_: min = {}, k,n,j = {},{},{}'.format(m,k,n,j))
+
+
 #####################################################################################################
 # add methods:
 # the 'time' array is x, not self._x_ because they are invoked by plot with different t vectors
-#  _add_single_ :           single run, single group 
-#  _add_calib_single_ :     single run single group with recalculation of asymmetry and errors
-#  _add_single_calib_ :     single run single group for calib plot (normal asymmetry)
+#  _add_single_           : single run, single group 
+#  _add_calib_single_     : single run single group with recalculation of asymmetry and errors
+#  _add_single_calib_     : single run single group for calib plot (normal asymmetry)
 #                                  use _add_single_ after _load_data_calib_
-#  _add_multigroup_ :       single run multigroup global (a unique chisquare)
+#  _add_multigroup_       : single run multigroup global (a unique chisquare)
 #  _add_calib_multigroup_ : single run multigroup global with recalculation of asymmetry and errors
-#  _add_multirun_   :       multi run single group global (a unique chisquare)
-#  _add_fft_ : single run, single group for partial residues
+#  _add_multirun_         : multi run single group global (a unique chisquare)
+#  _add_fft_              : single run, single group for partial residues
 #####################################################################################################
 
     def _add_single_(self,x,*argv): 
@@ -607,7 +622,7 @@ class mumodel(object):
 #                the  inner list is over the parameters of the component (e.g. ml) 
 #                the outer list os over runs 
         for method, keys in self._components_:
-            # each method in the model is a vstack of nrun methods prepared by aux fstack
+            # each method in the model is a vstack of nrun methods prepared by aux cstack
             # expecting a list of lists of parameters, with parameters for the k-th run in the k-th inner list  
             j += 1
 #            for run_keys in keys: 
@@ -631,6 +646,78 @@ class mumodel(object):
 #                print('Warning, model is getting too big in {}'.format(warn))
         return f     
 
+    def _add_multirun_grad_(self,*argv):
+        '''
+        input:
+            *argv   passed as a variable number of parameter values 
+                    val0,val1,val2,val3,val4,val5, ... at this iteration 
+                    argv is a list of values [val0,val1,val2,val3,val4,val5, ...]
+           (here independent variable is self._x_ time array by default, no plots)
+        output:
+            np.array(grad) 
+              whose m-th value is the chisquare gradient 
+              with respect to internal minuit parameter p[m]
+        requires previous calls to _load_data_multirun_grad_  to define self._minuit_grad_list_
+                       both constructed in int2_multirun_grad_method_key() from mujpy.aux.aux
+        self._gradients_ used to store f values and g derivatives of all components, to minimize numpy array calculations;
+        self._glocals_ to loop 
+            over minuit parameters and calculate gradient components, 
+                over runs, whose number n = y.shape[0], for globals
+                on single run, for locals
+                    over component parameters that contain that minuit parameter, i
+                    including the derivative of the user function.
+        _add_multirun_grad_ (user is implicit, no grads in sequential fit) 
+        '''    
+        p = argv 
+        grad = zeros(len(p))
+        dcdf = 2*(self._add_(self._x_,*argv) - self._y_)/self._e_**2
+        # print('debug grad: shape dcdf = {}'.format(dcdf.shape))
+        pars = [[[key(p) for key in component_run]  for component_run in component_runs] for _,component_runs in self._components_]
+        for m, grad_list in enumerate(self._minuit_grad_list_):
+            gg = zeros((self._y_.shape[0],self._x_.shape[0]))
+            for [k,n,j,dkndj,djdm] in grad_list:
+                par = pars[n][k]
+                dk,dj = dkndj(self._x_,*par),djdm(p)
+                #print ('debug grad: m= {}, k = {}, n = {}, j = {}, par = {}'.format(m,k,n,j,    par))
+                #print ('debug: dkddj shape = {}, djdm = {}'.format(dk.shape,dj))
+                gg[k] +=  dk*dj
+            grad[m] = sum(dcdf*gg,axis=None)           
+        return grad     
+        
+#    def _set_grad_(*p,grad_list):   
+#        """
+#        input: 
+#            *p are the nmin minuit internal parameters
+#            grad_list is the m-th item in the list self._minuit_grad_list of length nmin
+#                 containing a list of lists [k,n,j,dkndj,djdm]
+#                     where k,n,j are run, component and parameter indices, respectively
+#                     dkndj is the binding to a mthd(self._x_,*p) for the component
+#                     djdm is the binding to a mthd(p) for the user func
+#        output: 
+#            bindmthd grad_m, such that grad_m(*p) calculates the total derivative d chi^2 / dp[m] 
+#              by computing 
+#                dcdf = 2*(sum((self._add_(self._x_,*p) - self._y_)/self._e_**2,axis=None))  
+#                gg = sum_grad_list dkndj(self._x_,*p)*djdm(p) same dimension as dsdf 
+#                grad_m = sum(dcdf*gg)
+#        """
+#        code = """
+#def foo():
+#    gg = zeros((self._y_.shape[0],self._x_.shape[0]))
+#    for [k,n,j,dkndj,djdm] in grad_list:
+#""" 
+#        string = '"lambda p: '+string+ '"' 
+#        code = "    key = eval('"+string+"')"
+#        # print('string ={}'.format(string))
+#        code = code + string + """
+#        return key
+#    """
+#        # print('code = {}'.format(code))
+#        exec(code,globals(),globals())
+#        key = eval(foo())
+#        return key   
+
+  
+    
     def _add_calib_multigroup_(self,x,*argv):   
         '''
          input: 
@@ -797,7 +884,7 @@ class mumodel(object):
            
     def bl(self,x,A,λ): 
         '''
-        Lorentzian decay, 
+        Lorentzian decay, A*exp(-x*λ)
         x [mus], A, λ [mus-1]
         '''
         # x need not be self.x (e.g. in plot)
@@ -805,62 +892,194 @@ class mumodel(object):
         return A*exp(-x*λ)
         bl.func_code = make_func_code(["A","λ"])
 
+    def _grad_bl_0_(self,x,A,λ): 
+        '''
+        derivative of bl with respect to A in terms of self.bl
+        x [mus], A, λ [mus-1]  
+        '''
+        return self.bl(x,A,λ)/A
+
+    def _grad_bl_1_(self,x,A,λ): 
+        '''
+        derivative of bl with respect to λ in terms of self.bl
+        x [mus], A, λ [mus-1]  
+        '''
+        return -x*self.bl(x,A,λ)
+
     def bg(self,x,A,σ): 
         '''
-        Gaussian decay, 
+        Gaussian decay, A*exp(-0.5*(x*σ)**2)
         x [mus], A, σ [mus-1] (positive parity)
         '''
         # x need not be self.x (e.g. in plot)        
         return A*exp(-0.5*(x*σ)**2)
         bg.func_code = make_func_code(["A","σ"])
 
+    def _grad_bg_0_(self,x,A,σ): 
+        '''
+        derivative of bg with respect to A in terms of self.bg
+        x [mus], A, σ [mus-1]  
+        '''
+        return self.bg(x,A,σ)/A
+        
+    def _grad_bg_1_(self,x,A,σ): 
+        '''
+        derivative of bg with respect to σ in terms of self.bg
+        x [mus], A, σ [mus-1]  
+        '''
+        return -x**2*σ*self.bg(x,A,σ)
+
     def ba(self,x,A,λ,σ): 
         '''
-        Lorentzian times Gaussian decay, 
+        Lorentzian times Gaussian decay, A*exp(-x*λ)*exp(-0.5*(x*σ)**2)
         x [mus], A, λ [mus-1], σ [mus-1] (positive parity)
         '''
         # x need not be self.x (e.g. in plot)
         return A*exp(-x*λ)*exp(-0.5*(x*σ)**2)
         ba.func_code = make_func_code(["A","λ","σ"])
 
+    def _grad_ba_0_(self,x,A,λ,σ): 
+        '''
+        derivative of ba with respect to A in terms of self.ba
+        x [mus], A, σ [mus-1]  
+        '''
+        return self.ba(x,A,λ,σ)/A
+
+    def _grad_ba_1_(self,x,A,λ,σ): 
+        '''
+        derivative of ba with respect to λ in terms of self.ba
+        x [mus], A, σ [mus-1]  
+        '''
+        return -x*self.ba(x,A,λ,σ)
+
+    def _grad_ba_2_(self,x,A,λ,σ): 
+        '''
+        derivative of ba with respect to σ in terms of self.ba
+        x [mus], A, σ [mus-1]  
+        '''
+        return -x**2*σ*self.ba(x,A,λ,σ)
+
     def bs(self,x,A,Λ,β): 
         '''
-        stretched decay, 
+        stretched decay A*exp(-(x*Λ)**β), 
         x [mus], A, Λ [mus-1] (>0), β (>0)
         '''
         # x need not be self.x (e.g. in plot)
         return A*exp(-(x*Λ)**β)
         bs.func_code = make_func_code(["A","Λ","β"])
 
+    def _grad_bs_0_(self,x,A,Λ,β): 
+        '''
+        derivative of bs with respect to A in terms of self.bs
+        x [mus], A, Λ [mus-1] (>0), β (>0)  
+        '''
+        return self.bs(x,A,Λ,β)/A
+
+    def _grad_bs_1_(self,x,A,Λ,β): 
+        '''
+        derivative of bs with respect to Λ in terms of self.bs
+        x [mus], A, Λ [mus-1] (>0), β (>0)  
+        '''
+        return -β/Λ*(Λ*x)**β*self.bs(x,A,Λ,β)
+
+    def _grad_bs_3_(self,x,A,Λ,β): 
+        '''
+        derivative of bs with respect to β in terms of self.bs
+        x [mus], A, Λ [mus-1] (>0), β (>0)  
+        '''
+        return -log(Λ*x)*(Λ*x)**β*self.bs(x,A,Λ,β)
+
     def ml(self,x,A,B,φ,λ): 
         '''
-        precession times Lorentzian decay, 
+        precession A cos(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times Lorentzian decay, 
         x [mus], A, B [mT], φ [deg], λ [mus-1]
         '''
-#        x need not be self.x (e.g. in plot)
-#        import warnings
-#        warnings.filterwarnings("error")
-        # print('a={}, B={}, ph={}, lb={}'.format(asymmetry,field,phase,Lor_rate))
-#        try:
-        # λ = -87. if λ < -87. else λ
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)
-#        except RuntimeWarning:
-#            print('debug: λ = {}'.format(λ))
-#            return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)      
         ml.func_code = make_func_code(["A","B","φ","λ"])
+
+    def _derivative_ml_(self,x,A,B,φ,λ): 
+        '''
+        derivative of mlwith respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
+        - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times Lorentzian decay
+        x [mus], A, B [mT], φ [degrees], λ [mus-1]  
+        '''
+        return -A*sin(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)
+
+    def _grad_ml_0_(self,x,A,B,φ,λ): 
+        '''
+        derivative of ml with respect to A in terms of self.ml and self._derivative_ml_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1]  
+        '''
+        return self.ml(x,A,B,φ,λ)/A
+
+    def _grad_ml_1_(self,x,A,B,φ,λ): 
+        '''
+        derivative of ml with respect to B in terms of self.ml and self._derivative_ml_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1]  
+        '''
+        return -2*pi*self._gamma_Mu_MHzper_mT*x*self._derivative_ml_(x,A,B,φ,λ)
+
+    def _grad_ml_2_(self,x,A,B,φ,λ): 
+        '''
+        derivative of ml with respect to φ in terms of self.ml and self._derivative_ml_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1]  
+        '''
+        return -self._radeg_*self._derivative_ml_(x,A,B,φ,λ)
+
+    def _grad_ml_3_(self,x,A,B,φ,λ): 
+        '''
+        derivative of ml with respect to λ in terms of self.ml and self._derivative_ml_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1]  
+        '''
+        return -x*self.ml(x,A,B,φ,λ)
 
     def mg(self,x,A,B,φ,σ): 
         '''
-        precession times Gaussian decay, 
+        precession A cos(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times Gaussian decay, 
         x [mus], A, B [mT], φ [degrees], σ [mus-1]  (positive parity)
         '''
-        # x need not be self.x (e.g. in plot)
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-0.5*(x*σ)**2)
         mg.func_code = make_func_code(["A","B","φ","σ"])
+        
+    def _derivative_mg_(self,x,A,B,φ,σ): 
+        '''
+        derivative of mg with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
+        - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times Gaussian decay,
+        x [mus], A, B [mT], φ [degrees], σ [mus-1]  
+        '''
+        return -A*sin(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-0.5*(x*σ)**2)
 
+    def _grad_mg_0_(self,x,A,B,φ,σ): 
+        '''
+        derivative of mg with respect to A in terms of self.mg and self._derivative_mg_
+        x [mus], A, B [mT], φ [degrees], σ [mus-1]  
+        '''
+        return self.mg(x,A,B,φ,σ)/A
+        
+    def _grad_mg_1_(self,x,A,B,φ,σ): 
+        '''
+        derivative of mg with respect to B in terms of self.mg and self._derivative_mg_
+        x [mus], A, B [mT], φ [degrees], σ [mus-1]  
+        '''
+        return 2*pi*self._gamma_Mu_MHzper_mT*x*self._derivative_mg_(x,A,B,φ,σ)
+        
+    def _grad_mg_2_(self,x,A,B,φ,σ): 
+        '''
+        derivative of mg with respect to φ in terms of self.mg and self._derivative_mg_
+        x [mus], A, B [mT], φ [degrees], σ [mus-1]  
+        '''
+        return -self._radeg_*self._derivative_mg_(x,A,B,φ,σ)
+        
+    def _grad_mg_3_(self,x,A,B,φ,σ): 
+        '''
+        derivative of mg with respect to σ in terms of self.mg and self._derivative_mg_
+        x [mus], A, B [mT], φ [degrees], σ [mus-1]  
+        '''
+        return -x**2*σ*self.mg(x,A,B,φ,σ)
+        
     def mu(self,x,A,B,φ,λ,σ): 
         '''
-        precession times Gaussian times Lorentzian decays, 
+        precession A cos(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times Gaussian times Lorentzian decays, 
         x [mus], A, B [mT], φ [degrees], 
         λ [mus-1], σ [mus-1]  (positive parity)
         '''
@@ -868,25 +1087,113 @@ class mumodel(object):
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)*exp(-0.5*(x*σ)**2)
         mu.func_code = make_func_code(["A","B","φ","λ","σ"])
 
+    def _derivative_mu_(self,x,A,B,φ,λ,σ): 
+        '''
+        derivative of mu with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
+        - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times Lorentzian times Gaussian decay,
+        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  
+        '''
+        return -A*sin(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)*exp(-0.5*(x*σ)**2)
+
+    def _grad_mu_0_(self,x,A,B,φ,λ,σ): 
+        '''
+        derivative of mu with respect to A in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  
+        '''
+        return self.mu(x,A,B,φ,λ,σ)/A
+
+    def _grad_mu_1_(self,x,A,B,φ,λ,σ): 
+        '''
+        derivative of mu with respect to B in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  
+        '''
+        return -2*pi*self._gamma_Mu_MHzper_mT*x*self._derivative_mu_(x,A,B,φ,λ,σ)
+
+    def _grad_mu_2_(self,x,A,B,φ,λ,σ): 
+        '''
+        derivative of mu with respect to φ in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  
+        '''
+        return -self._radeg_*self._derivative_mu_(x,A,B,φ,λ,σ)
+
+    def _grad_mu_3_(self,x,A,B,φ,λ,σ): 
+        '''
+        derivative of mu with respect to λ in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  
+        '''
+        return -x*self.mu(x,A,B,φ,λ,σ)
+
+    def _grad_mu_4_(self,x,A,B,φ,λ,σ): 
+        '''
+        derivative of mu with respect to σ in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  
+        '''
+        return -x**2*σ*self.mu(x,A,B,φ,λ,σ)
+
     def ms(self,x,A,B,φ,Λ,β): 
         '''
-        precession times stretched decay, 
+        precession A cos(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times stretched decay, 
         x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
         '''
         # x need not be self.x (e.g. in plot)
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-(x*Λ)**β)
         ms.func_code = make_func_code(["A","B","φ","Λ","β"])
 
+    def _derivative_ms_(self,x,A,B,φ,Λ,β): 
+        '''
+        derivative of ms with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
+        - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times stretched decay
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
+        '''
+        return -A*sin(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-(x*Λ)**β)
+
+    def _grad_ms_0_(self,x,A,B,φ,Λ,β): 
+        '''
+        derivative of ms with respect to A in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0) 
+        '''
+        return self.ms(x,A,B,φ,Λ,β)/A
+
+    def _grad_ms_1_(self,x,A,B,φ,Λ,β): 
+        '''
+        derivative of ms with respect to B in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0) 
+        '''
+        return -2*pi*self._gamma_Mu_MHzper_mT*x*self._derivative_ms_(x,A,B,φ,Λ,β)
+
+    def _grad_ms_2_(self,x,A,B,φ,Λ,β): 
+        '''
+        derivative of ms with respect to φ in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
+        '''
+        return -self._radeg_*self._derivative_ms_(x,A,B,φ,Λ,β)
+
+    def _grad_ms_3_(self,x,A,B,φ,Λ,β): 
+        '''
+        derivative of ms with respect to Λ in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
+        '''
+        return -β/Λ*(Λ*x)**β*self.ms(x,A,B,φ,Λ,β)
+
+    def _grad_ms_4_(self,x,A,B,φ,Λ,β): 
+        '''
+        derivative of ms with respect to β in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
+        '''
+        return -log(Λ*x)*(Λ*x)**β*self.ms(x,A,B,φ,Λ,β)
+
+
     def fm(self,x,A,B,λ):
         '''
         FmuF (powder average)
+        according to Book  
         x [mus], A, B [mT], λ [mus-1]
         B is Bdip
         '''
         # x need not be self.x (e.g. in plot)
-        return A/6.0*( 3.+cos(2*pi*self._gamma_Mu_MHzper_mT*B*sqrt(3.)*x)+
-               (1.-1./sqrt(3.))*cos(pi*self._gamma_Mu_MHzper_mT*Bd*(3.-sqrt(3.))*x)+
-               (1.+1./sqrt(3.))*cos(pi*self._gamma_Mu_MHzper_mT*Bd*(3.+sqrt(3.))*x) )*exp(-x*λ)
+        return A/6.0*(1.+cos(2*pi*self._gamma_Mu_MHzper_mT*B*x)+
+               2.*(cos(pi*self._gamma_Mu_MHzper_mT*B*x)+
+                   cos(3*pi*self._gamma_Mu_MHzper_mT*B*x) ))*exp(-x*λ)
         fm.func_code = make_func_code(["A","B","λ"])
 
     def jl(self,x,A,B,φ,λ): 
@@ -898,6 +1205,43 @@ class mumodel(object):
         return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)
         jl.func_code = make_func_code(["A","B","φ","λ"])
 
+    def _derivative_jl_(self,x,A,B,φ,λ): 
+        '''
+        derivative of jl with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
+        - A J1(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times Lorentzian decay,
+        x [mus], A, B [mT], φ [degrees], λ [mus-1]
+        '''
+        return -A*j1(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)
+
+    def _grad_jl_0_(self,x,A,B,φ,λ): 
+        '''
+        derivative of jl with respect to A in terms of self.ml and self._derivative_ml_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1]  
+        '''
+        return self.jl(x,A,B,φ,λ)/A
+
+    def _grad_jl_1_(self,x,A,B,φ,λ): 
+        '''
+        derivative of jl with respect to B in terms of self.ml and self._derivative_ml_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1]  
+        '''
+        return -2*pi*self._gamma_Mu_MHzper_mT*x*self._derivative_jl_(x,A,B,φ,λ)
+
+    def _grad_jl_2_(self,x,A,B,φ,λ): 
+        '''
+        derivative of jl with respect to φ in terms of self.ml and self._derivative_ml_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1]  
+        '''
+        return -self._radeg_*self._derivative_jl_(x,A,B,φ,λ)
+
+    def _grad_ml_3_(self,x,A,B,φ,λ): 
+        '''
+        derivative of ml with respect to λ in terms of self.ml and self._derivative_ml_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1]  
+        '''
+        return -x*self.jl(x,A,B,φ,λ)
+
+
     def jg(self,x,A,B,φ,σ): 
         '''
         Bessel j0 precession times Gaussian decay, 
@@ -906,6 +1250,96 @@ class mumodel(object):
         # x need not be self.x (e.g. in plot)
         return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-0.5*(x*σ)**2)
         jg.func_code = make_func_code(["A","B","φ","σ"])
+
+    def _derivative_jg_(self,x,A,B,φ,σ): 
+        '''
+        derivative of jg with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
+        - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times Gaussian decay,
+        x [mus], A, B [mT], φ [degrees], σ [mus-1]  
+        '''
+        return -A*j1(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-0.5*(x*σ)**2)
+
+    def _grad_jg_0_(self,x,A,B,φ,σ): 
+        '''
+        derivative of jg with respect to A in terms of self.mg and self._derivative_mg_
+        x [mus], A, B [mT], φ [degrees], σ [mus-1]  
+        '''
+        return self.jg(x,A,B,φ,σ)/A
+        
+    def _grad_jg_1_(self,x,A,B,φ,σ): 
+        '''
+        derivative of jg with respect to B in terms of self.mg and self._derivative_mg_
+        x [mus], A, B [mT], φ [degrees], σ [mus-1]  
+        '''
+        return 2*pi*self._gamma_Mu_MHzper_mT*x*self._derivative_jg_(x,A,B,φ,σ)
+        
+    def _grad_jg_2_(self,x,A,B,φ,σ): 
+        '''
+        derivative of jg with respect to φ in terms of self.mg and self._derivative_mg_
+        x [mus], A, B [mT], φ [degrees], σ [mus-1]  
+        '''
+        return -self._radeg_*self._derivative_jg_(x,A,B,φ,σ)
+        
+    def _grad_jg_3_(self,x,A,B,φ,σ): 
+        '''
+        derivative of jg with respect to σ in terms of self.mg and self._derivative_mg_
+        x [mus], A, B [mT], φ [degrees], σ [mus-1]  
+        '''
+        return -x**2*σ*self.jg(x,A,B,φ,σ)
+        
+    def j0(self,x,A,B,φ,λ,σ): 
+        '''
+        precession A j1(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times Gaussian times Lorentzian decays, 
+        x [mus], A, B [mT], φ [degrees], 
+        λ [mus-1], σ [mus-1]  (positive parity)
+        '''
+        # x need not be self.x (e.g. in plot)
+        return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)*exp(-0.5*(x*σ)**2)
+        mu.func_code = make_func_code(["A","B","φ","λ","σ"])
+
+    def _derivative_j0_(self,x,A,B,φ,λ,σ): 
+        '''
+        derivative of j0 with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
+        - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times Lorentzian times Gaussian decay,
+        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  
+        '''
+        return -A*j1(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)*exp(-0.5*(x*σ)**2)
+
+    def _grad_j0_0_(self,x,A,B,φ,λ,σ): 
+        '''
+        derivative of j0 with respect to A in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  
+        '''
+        return self.j0(x,A,B,φ,λ,σ)/A
+
+    def _grad_j0_1_(self,x,A,B,φ,λ,σ): 
+        '''
+        derivative of j0 with respect to B in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  
+        '''
+        return -2*pi*self._gamma_Mu_MHzper_mT*x*self._derivative_j0_(x,A,B,φ,λ,σ)
+
+    def _grad_j0_2_(self,x,A,B,φ,λ,σ): 
+        '''
+        derivative of j0 with respect to φ in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  
+        '''
+        return -self._radeg_*self._derivative_j0_(x,A,B,φ,λ,σ)
+
+    def _grad_j0_3_(self,x,A,B,φ,λ,σ): 
+        '''
+        derivative of j0 with respect to λ in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  
+        '''
+        return -x*self.j0(x,A,B,φ,λ,σ)
+
+    def _grad_j0_4_(self,x,A,B,φ,λ,σ): 
+        '''
+        derivative of j0 with respect to σ in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], λ [mus-1], σ [mus-1]  
+        '''
+        return -x**2*σ*self.j0(x,A,B,φ,λ,σ)
+
 
     def js(self,x,A,B,φ,Λ,β): 
         '''
@@ -916,11 +1350,57 @@ class mumodel(object):
         return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-(x*Λ)**β)
         js.func_code = make_func_code(["A","B","φ","Λ","β"])
 
+    def _derivative_js_(self,x,A,B,φ,Λ,β): 
+        '''
+        derivative of js with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
+        - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times stretched decay
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
+        '''
+        return -A*j1(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-(x*Λ)**β)
+
+    def _grad_js_0_(self,x,A,B,φ,Λ,β): 
+        '''
+        derivative of js with respect to A in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0) 
+        '''
+        return self.js(x,A,B,φ,Λ,β)/A
+
+    def _grad_js_1_(self,x,A,B,φ,Λ,β): 
+        '''
+        derivative of js with respect to B in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0) 
+        '''
+        return -2*pi*self._gamma_Mu_MHzper_mT*x*self._derivative_js_(x,A,B,φ,Λ,β)
+
+    def _grad_js_2_(self,x,A,B,φ,Λ,β): 
+        '''
+        derivative of js with respect to φ in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
+        '''
+        return -self._radeg_*self._derivative_js_(x,A,B,φ,Λ,β)
+
+    def _grad_js_3_(self,x,A,B,φ,Λ,β): 
+        '''
+        derivative of ms with respect to Λ in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
+        '''
+        return -β/Λ*(Λ*x)**β*self.js(x,A,B,φ,Λ,β)
+
+    def _grad_js_4_(self,x,A,B,φ,Λ,β): 
+        '''
+        derivative of js with respect to β in terms of self.mu and self._derivative_mu_
+        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
+        '''
+        return -log(Λ*x)*(Λ*x)**β*self.js(x,A,B,φ,Λ,β)
+        
+# kubo toyabe and fm gradients not implemented
+
     def _kg(self,t,w,Δ):
         '''
         auxiliary component for a static Gaussian Kubo Toyabe in longitudinal field, 
         t [mus], w [mus-1], Δ [mus-1], 
         w = 2*pi*gamma_mu*L_field
+        The first derivative of dawsn(x) is 1-2*x*dawsn(x)
         '''
         # note that t can be different from self._x_
         Dt = Δ*t
@@ -1075,6 +1555,32 @@ class mumodel(object):
 
         Provides partial chisquares over individual runs or groups if self._axis_ = 1 
         None is default and sum is over all indices::
+        ''' 
+        # print('_chisquare_ mucomponents debug: {} {} {}'.format(self._x_.shape,self._y_.shape,self._e_.shape))
+        from numpy import abs # finfo, where, array, 
+        # Mepsi = finfo('d').max/10.
+        num = abs(self._add_(self._x_,*argv) - self._y_)
+        normsquaredev = (num/self._e_)**2
+        # divergence = normsquaredev>Mepsi
+#        if divergence.any():
+#            print('Warning: big numbers in chisquare {}'.format(normsquaredev[divergence]))
+        return sum(normsquaredev,axis=self._axis_ )
+
+    def _grad_chisquare_(self,*argv):
+        '''
+        option for global multirun fits, 
+        where sum (...,axis=None) yields the sum over all indices.
+
+        Provides gradient of chisquare with respect to p, i.e. along the i-th parameter p_i it is
+        sum_j 2[y(t_j,p)-y_ej)]/e_j^2 sum_k d y_k(t_j,p) /dp_i
+        where j are bins, k are components in the model
+        
+        The first factor is common to a all grad components
+        The second factor mus be selected. 
+        y_k may not depend on p_i, dy_k/dp_i = 0
+        And if y_k' does depend, p_i will be its l-th parameter, and we must use the l-th component of its gradient
+        Need 
+        
         ''' 
         # print('_chisquare_ mucomponents debug: {} {} {}'.format(self._x_.shape,self._y_.shape,self._e_.shape))
         from numpy import abs # finfo, where, array, 
