@@ -750,6 +750,7 @@ class dash(object):
                 '''
                 from mujpy.aux.aux import json_name
                 import json
+                import os
                 from numpy import array
                 from mujpy.mufit import mufit
                 from mujpy.mufitplot import mufitplot
@@ -793,9 +794,15 @@ class dash(object):
                 if self.userpar:
                     # fill self.userpar from list_text_userparvalue[k], list_text_userparstd.value
                     for k,par in enumerate(self.userpar):
-                        par['value'] = float(ist_text_userparvalue[k].value)
+                        if list_text_userparvalue[k].value[0]=='[':
+                            par['value'] = [float(a) for a in list_text_userparvalue[k].value[1:-1].split(',')]
+                        else:
+                            par['value'] = float(list_text_userparvalue[k].value)
                         par['flag'] = '~'
-                        par['error'] = float(list_text_userparstd[k].value)
+                        if list_text_userparstd[k].value[0]=='[':
+                            par['error'] = [float(a) for a in list_text_userparstd[k].value[1:-1].split(',')]
+                        else:
+                            par['error'] = float(list_text_userparstd[k].value)
                         lim0 = None if list_text_userparlim0[k].value == 'None' else float(list_text_userparlim0[k].value)
                         lim1 = None if list_text_userparlim1[k].value == 'None' else float(list_text_userparlim1[k].value)
                         par['limits'] = [lim0, lim1]
@@ -809,7 +816,10 @@ class dash(object):
                     pardicts = []
                     for j,pardict in enumerate(self.model_components[k]['pardicts']): # update and complete the pardict for each parameter 
                         nint += 1
-                        pardict["value"] = float(list_parvalue[nint].value) # is a float
+                        if list_parvalue[nint].value[0]=='[':
+                            pardict['value'] = [float(a) for a in list_parvalue[nint].value[1:-1].split(',')]
+                        else:
+                            pardict["value"] = float(list_parvalue[nint].value) # is a float
                         pardict["flag"] = list_flag[nint].value
                         fun = list_function[nint].value.split(";") # already checked for sanity
                         if len(fun)>1:
@@ -833,7 +843,8 @@ class dash(object):
                 dash["model_guess"] = model_guess
 #                self.log('  on_fit_request: self.model = {}'.format(self.model))                            
                 # dashboard must be stored in a json file
-                self.dashboard_file = self.suite.__templatepath__+json_name(self.model,self.suite.datafile,self.suite.grouping,self.version,g=self.userpar)
+                self.dashboard_file = os.path.join(self.suite.__templatepath__,json_name(self.model,
+                                                      self.suite.datafile,self.suite.grouping,self.version,g=self.userpar))
                 with open(self.dashboard_file,"w") as f:
                     json.dump(dash,f,indent=4)
                     

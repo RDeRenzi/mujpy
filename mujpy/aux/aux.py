@@ -2447,8 +2447,8 @@ def group_shorthand(grouping):
     '''
     shorthand = []
     for group in grouping:
-        fwd = '_'.join([str(s) for s in group['forward']])
-        bkd = '_'.join([str(s) for s in group['backward']])
+        fwd = '_'.join([str(s+1) for s in group['forward']])
+        bkd = '_'.join([str(s+1) for s in group['backward']])
         shorthand.append(fwd+'-'+bkd)
     return '+'.join(shorthand)
 
@@ -2464,9 +2464,8 @@ def json_name(model,datafile,grouping,version,g=False):
     '''    
     from re import findall
     from mujpy.aux.aux import group_shorthand
-    run = findall(r'(\d+)\.',datafile)[0]
-    label = 'gg_'+version if g else version
-    return model+'.'+run+'.'+group_shorthand(grouping)+'.'+label+'.json'
+    run = findall('[0-9]+',datafile)[-1]
+    return model+'.'+run+'.'+group_shorthand(grouping)+'.'+version+'.json'
     
 def muvaluid(string):
     '''

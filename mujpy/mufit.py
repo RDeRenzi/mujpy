@@ -763,17 +763,6 @@ class mufit(object):
             self.log('hesse in {} s, {} calls, {} grads'.format(tuc,self.lastfit.nfcn,self.lastfit.ngrad))
             
             n_runs = len(self.suite._the_runs_)
-            ## DEBUG: REMOVE WHEN FINISHED !
-            # print('debug mufit dofit_multirun_singlegroup_userpardicts')
-            # print('* self.lastfit.fval = {}, self.number_dof = {}, chi2r = {}'.format(self.lastfit.fval,self.number_dof,self.lastfit.fval/self.number_dof)) #self.number_dof
-            # fcn = self._the_model_._chisquare_(*self.lastfit.values)
-            # print('* self._the_model_._chisquare_(*pars) = {}'.format(fcn))
-            # self._the_model_._axis_ = 1
-            # fcn = self._the_model_._chisquare_(*self.lastfit.values)
-            # self._the_model_._axis_ = None            
-            # print('* individual chi2 = {}\n chi2r = {}'.format(fcn,fcn/self.number_dof*n_runs))
-            # print('* pars = {}'.format(self.lastfit.values)) # Watch out! self.lastfit.values is the damn ValueView 
-            # print(self.lastfit)
 
             # write summary on console
             self.summary_multirun_global(start,stop,time[1]-time[0])
@@ -782,6 +771,7 @@ class mufit(object):
             version = self.dashboard["version"]
             strgrp = stringify_groups(self.suite.groups)
             modelname = ''.join([component["name"] for component in self.dashboard['model_guess']])
+
             # this is a one-shot csv, not incremental
             file_csv = self.suite.__csvpath__+modelname+'.'+version+'.'+strgrp+'.csv'
             self.write_multirun_user_csv(file_csv,scan=self.scan)

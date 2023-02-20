@@ -114,7 +114,7 @@ class suite(object):
             self.__startuppath__ = os.getcwd()
         # implement new folder policy, see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy.Dashboard
         self.__path__ = os.path.dirname(MuJPyName) # mujpy path
-        self.__templatepath__ = os.path.abspath(os.path.join(os.path.dirname(MuJPyName), '..', 'templates'))
+        self.__templatepath__ = os.path.abspath(os.path.join(os.path.dirname(MuJPyName), '../', 'templates/'))
         if not os.path.exists(self.__startuppath__+'/fit/'):
             os.mkdir(self.__startuppath__+'/fit/')
         self.__fitpath__ = self.__startuppath__+'/fit/'
@@ -131,7 +131,7 @@ class suite(object):
         # grp_calib is a list of dictionaries, one per group, with keys 'forward,'backward','alpha'
         # where groups may be in shorthand notation
         self.grouping = [] # reproduce the same with arrays of histogram numbers, done by aux get_grouping
-        self.store_groups() #        in self.grouping
+        self.store_groups() #        in self.grouping        self.promptfit(mplot)   #    to be done: make switch for ISIS
         self.promptfit(mplot)   #    to be done: make switch for ISIS
         self.timebase()
         # self.console('... end of initialize suite')
