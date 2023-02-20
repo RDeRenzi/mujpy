@@ -3222,4 +3222,14 @@ def results():
     process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
     # issue os command 'p2j cache/notebook.py '+filename
+    
+def signif(x, p):
+    '''
+    write x with p significant digits
+    '''
+    from numpy import asarray,where,isfinite,abs,floor,log10,round
+    x = asarray(x)
+    x_positive = where(isfinite(x) & (x != 0), abs(x), 10**(p-1))
+    mags = 10 ** (p - 1 - floor(log10(x_positive)))
+    return round(x * mags) / mags
         

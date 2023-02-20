@@ -150,11 +150,13 @@ class dash(object):
             with board:
                for line in reversebuf:
                     print(line)
+                    
         def erlog(string):
             print(string)
-        self.erlog = erlog 
-        self.log = console
-        self.suite.console = console # redirects suite output to log Output widget
+            
+        self.erlog = erlog # self.erlog(string) will print the string to stdout, whichever is the stdout at that point
+        self.log = console # self.log(string) will output the string on the side log Output defined above.
+        self.suite.console = console # redirects suite output to side log Output widget
         self.log('********************** LOG ABOVE HERE FILLS UPWARDS **********************') 
                 # 12345678901234567890123456789012345678901234567890123456789012345678901234
                 # 0        1         2         3         4         5         6         7
@@ -405,6 +407,7 @@ class dash(object):
                                  layout={'width':'2%','height':'16pt'})  
             text_filepath = Text(value=self.suite.datafile,
                                  description = "path",
+                                 description_tooltip = 'filepath of master data file\nnormally the first run in a suite',
                                  layout={'width':'73%','height':'16pt'},
                                  continuous_update=False,
                                  disabled=False)
@@ -709,7 +712,7 @@ class dash(object):
                 from self.dashboard_file, already verifies
                 '''
                 import json
-                try:        
+                try:       
                     with open(self.dashboard_file,"r") as f:
                         fit_json = f.read()
                         fit_dict = json.loads(fit_json)
@@ -717,7 +720,6 @@ class dash(object):
                     self.userpar = []  # must be cleared in case neither of userpardicts_results of _guess exist
                     self.version = fit_dict['version']
                     fit_range = json.loads('['+fit_dict['fit_range']+']') # is a list
-                    # self.log('debug mudash load_dashboard: fit_range = {}'.format(fit_range))
                     if 'userpardicts_result' in fit_dict:
                         self.userpar = fit_dict['userpardicts_result']
                     elif 'userpardicts_guess' in fit_dict:
@@ -730,6 +732,7 @@ class dash(object):
                         self.suite.groups = fit_dict['grp_calib']
                         self.suite.store_groups()
                     self.model = ''.join([component["name"] for component in self.model_components])
+                    # self.erlog('debug mudash load_dashboard: self.model = {}'.format(self.model))
                     # self.log('debug mudash load_dashboard: self.model = {}'.format(self.model))
                     fit(fit_range=fit_range) # re-initialize the tab with a new model, self.model_components exists so gui values are taken from there
                     # self.log(' group( mudash load_dashboard: loaded from {}'.format(self.dashboard_file))
@@ -948,34 +951,60 @@ class dash(object):
                 '''
                 remove the clicked user parameter
                 '''
-                import tkinter as tk
                 from json import loads as str2lst
-                def create_userpar():
-                    self.userpar.append({'name':e1.get()})
-                    lst = tk.grid_slaves()
-                    for l in lst:
-                        l.destroy()
-                    fit_range = str2lst('['+text_fit_range.value+']')
-                    fit(fit_range=fit_range)  # keeps existing text_fit_range.value
-                master = tk.Tk()
-                master.title('mujpy user parameter')
-                tk.Label(master, text="Enter new parameter name").grid(row=0)
-                e1 = tk.Entry(master)
-                e1.grid(row=0, column=1)
-                tk.Button(master, 
-                          text='Cancel', 
-                          command=master.quit).grid(row=1, 
-                                        column=0, 
-                                        sticky=tk.W, 
-                                        pady=4)
-                tk.Button(master, 
-                          text='Create', command=create_userpar).grid(row=1, 
-                                                           column=1, 
-                                                           sticky=tk.W, 
-                                                           pady=4)            
-                tk.mainloop()
-                            
+                if b['name'] == 'value': # when add dropdown is changed this method is called three times
+                    self.log(b)
+                    selected = b['new']
+                    k = selected if selected <= len(self.userpar) else len(self.userpar)
                 
+                    self.userpar.insert(k,{'name':'','local':False})
+                    fit_range = str2lst('['+text_fit_range.value+']') 
+                    fit(fit_range=fit_range)  # keeps existing text_fit_range.value
+#                from tkinter import Toplevel, Label, Entry, StringVar, Button, W
+#                from json import loads as str2lst
+#                def create_userpar():
+#                    self.userpar.insert(int(e2.get()),{'name':e1.get()})
+#                    fit_range = str2lst('['+text_fit_range.value+']')                    
+#                    fit(fit_range=fit_range)  # keeps existing text_fit_range.value
+#                    quit()
+#                def quit():
+#                    Add.iconify()
+#                def raise_add():
+#                    Add.deiconify()
+#                    
+#                def create_add():
+#                    Add = Toplevel(self.tkinter)
+#                    Add.geometry('450x80')
+#                    Add.title('Add mujpy user parameter')
+#                    Label(Add, text="Enter new parameter name").grid(row=0)
+#                    e1 = Entry(Add)
+#                    e1.grid(row=0, column=1,padx=2,pady=2)
+#                    Label(Add, text="Index").grid(row=0,column=2,padx=2,pady=2)
+#                    default = StringVar()
+#                    default.set(str(len(self.userpar)))
+#                    e2 = Entry(Add,textvariable = default)
+#                    e2.grid(row=0, column=3,padx=2,pady=2)
+#                    Button(Add, 
+#                              text='Cancel', 
+#                              command=quit).grid(row=1, 
+#                                            column=0, 
+#                                            sticky=W, padx=2,
+#                                            pady=2)
+#                    Button(Add, 
+#                              text='Create', command=create_userpar).grid(row=1, 
+#                                                               column=1, 
+#                                                               sticky=W, padx=2,
+#                                                               pady=2)          
+#                    self.tkinter.mainloop()      
+#                try: 
+#                    raise_add()                                                                   
+#                    self.log('Raised Add Toplevel')
+#                except:
+#                    self.log('Adding Toplevel to self,tincker')
+#                    create_add()
+               
+                # self.tkinter.deiconify()
+            
             def on_remove_userpar(change):
                 '''
                 remove the clicked user parameter
@@ -983,9 +1012,9 @@ class dash(object):
                 import tkinter as tk
                 from tkinter.messagebox import askyesno
                 from json import loads as str2lst
-                k = -change['owner'].value
+                k = int(change.description[3:])
                 # are you sure?
-                answer = askyesno(message='Delete parameter {}?'.format(str(k)+' - '+list_userparname[k]))
+                answer = askyesno(message='Delete parameter {}?'.format(str(k)+' - '+list_userparname[k].value))
                 if answer:
                     self.userpar.pop(k)
                     list_userparname.pop(k) 
@@ -993,70 +1022,33 @@ class dash(object):
                     list_text_userparstd.pop(k)
                     list_text_userparlim0.pop(k)
                     list_text_userparlim1.pop(k)
+                    list_local_userparm.pop(k)
                 #version = change.value
                 fit_range = str2lst('['+text_fit_range.value+']')
                 fit(fit_range=fit_range)  # keeps existing text_fit_range.value
                 
-            def on_add_component(b):
+            def on_add_component(new_component):
                 '''
                 add a component
                 '''
-                from tkinter import Tk, StringVar, OptionMenu, Button, Label
                 from json import loads as str2lst
-                from time import sleep as pause
                 # Create object
-                def add():
-                    text = clicked.get()
-                    self.log('Adding '+text+' to form model '+self.model+text)
-                    components.append(text)
-                    self.model += ''.join(components)
-                    label.config(text=components)
-                    # Dropdown menu options
-                def save():
-                    add()
-                    pause(0.3)
-                    if components:
-                        self.model_components,emsg = create_model(self.model)
-                        self.mainwindow.set_title(0, 'fit '+self.model)
-                        fit_range = str2lst('['+text_fit_range.value+']')
-                        fit(fit_range=fit_range) # keeps existing text_fit_range.value
-                        quit()
-                def quit():
-                    mucomponent_chooser.destroy()
-                    # Dropdown menu options
-                    
-                components = []
-                mucomponent_chooser = Tk()
-                mucomponent_chooser.geometry( "200x100" )
-            
-                options = [ c["name"] for c in list_available_components ]
-      
-                # datatype of menu text
-                clicked = StringVar()
-                # initial menu text
-                clicked.set( "ml" )
-                # Create Dropdown menu
-                drop = OptionMenu( mucomponent_chooser, clicked , *options )
-                drop.grid(row=0)
-                # Create button, it will change label text
-                button = Button( mucomponent_chooser, text = "Add" , command = add ).grid(row=1, column=0)
-                button = Button( mucomponent_chooser, text = "Quit" , command = quit ).grid(row=1, column=2)
-                button = Button( mucomponent_chooser, text = "Add&Save" , command = save ).grid(row=1, column=1)
-                # Create Label
-                label = Label( mucomponent_chooser, text = "Chosen: " )
-                label.grid(row=2,column=1)
-      
-                # Execute tkinter
-                mucomponent_chooser.mainloop()    
-            
-            
+                if new_component['name']=='value' and new_component['new'] != 'Choose': # when add dropdown is changed this method is called three times
+                    self.model += new_component['new']
+                    self.log('Adding '+new_component['new']+' to form model '+self.model)
+                    self.model_components,emsg = create_model(self.model)
+                    self.mainwindow.set_title(0, 'fit '+self.model)
+                    addcomponent_dropdown.value='Choose'
+                    fit_range = str2lst('['+text_fit_range.value+']')
+                    fit(fit_range=fit_range) # keeps existing text_fit_range.value
+              
             def on_remove_component(b):
                 '''
                 remove this component from the model
                 need to identify which
                 '''
                 from json import loads as str2lst
-                i = 2*int(b.description[3])
+                i = 2*int(b.description[4])
                 j = i+2
                 model = self.model[:i]+self.model[j:]
                 self.log('remove component '+self.model[i:j]+' to yield model '+model)
@@ -1102,7 +1094,7 @@ class dash(object):
 ######### here starts the fit method of mudash ####################################################
             from ipywidgets import Text, IntText, Layout, Button, HBox, FloatText, \
                                    Checkbox, VBox, Dropdown, ToggleButton, Label
-            from mujpy.aux.aux import _available_components_
+            from mujpy.aux.aux import _available_components_, signif
             from mujpy.aux.aux import path_file_dialog, create_model, addcomponent, name_of_model
             import os
             
@@ -1168,14 +1160,14 @@ class dash(object):
             fit_button.on_click(on_fit_request)
 
             offset_width = '8%'                                                              # 14%
-            offset = IntText(value=self.suite.offset,
+            offset = IntText(description_tooltip='First good bin\n(number of bins skipped\nafter prompt peak)',
+                             value=self.suite.offset,
+                             description = '|',
                              layout=Layout(width=bwidth,height=textheight),
-                             description ='_',
-                             description_tooltip='First good bin\n(number of bins skipped\nafter prompt peak)',
                              continuous_update=False) # offset, is an integer
-            offset.style.description_width = '6%'                                             
+            offset.style.description_width = '10%'                                             
             offset.observe(on_offset)
-            offset_description = Label(value='_  offset',
+            offset_description = Label(value='|  offset',
                                        layout=Layout(width=bwidth,height=labelheight))
             # initialized to 50, only input is from an IntText, integer value, or saved and reloaded from mujpy_setup.pkl
 
@@ -1196,12 +1188,12 @@ class dash(object):
                     string = ','.join([str(val) for val in fit_range])
             # self.log('mudash fit debug: string = {}'.format(string))          
             fit_range_width = '13%'                                                         # 27%
-            text_fit_range = Text(value=string,description='_',
+            text_fit_range = Text(value=string,description='|',
                                   layout=Layout(width=bwidth,height=textheight),
                                   description_tooltip='start,stop[,pack]\ne.g. 0,20000,10\ni.e. starts from offset\nuse 20000 bins\n pack them 10 by  10',
                                   continuous_update=False)                                  
             text_fit_range.style.description_width='7%'
-            fit_range_description = Label('_ fit range',layout=Layout(width=bwidth,height=labelheight))
+            fit_range_description = Label('| fit range',layout=Layout(width=bwidth,height=labelheight))
             text_fit_range.observe(on_range,'value')
 
             plot_button = Button (description='Plot',
@@ -1213,52 +1205,47 @@ class dash(object):
             plot_range_width = '15%'                                                         # 48%
             string = ','.join([str(val) for val in self.plot_range])
             text_plot_range = Text(value=string,
-                                   description='_',
+                                   description='|' ,
                                    description_tooltip='start,stop[,pack][,last,pack]\ne.g 0,20000,10 \nor 0,2000,10,20000,100 \npack 10 up to bin 2000\npack 100 from bin 2001 to bin 20000',
                                    layout=Layout(width=bwidth,height=textheight),
                                    continuous_update=False)                        
             text_plot_range.style.description_width='3%'
-            plot_range_description = Label('_ plot range',layout=Layout(width=bwidth,height=labelheight))
+            plot_range_description = Label('| plot range',layout=Layout(width=bwidth,height=labelheight))
             text_plot_range.observe(on_range,'value')
             self.mainwindow.set_title(0, 'fit '+self.model)
             
             type_width = '10%'                                                              # 58%
             plot_type = Dropdown(options=[('Fit',1),
                                                     ('Guess',2)],
-                                                    value=1,description = '_',
+                                                    value=1,description = '|' ,
                                                     description_tooltip='Plot best fit\n(if available)\nor initial guess',
                                                     layout=Layout(width=bwidth,height=textheight)) 
             plot_type.style.description_width = '6%'
-            type_description = Label('_ fit/guess',layout=Layout(width=bwidth,height=labelheight),
+            type_description = Label('| fit/guess',layout=Layout(width=bwidth,height=labelheight),
                                                     description_tooltip='Plot best fit\n(if available)\nor initial guess')
 
-            addcomponent_button = Button(description='Add',
-                                         layout=Layout(width='6%',height=buttonheight),
-                                         tooltip='Add new component')                       # 64%
-            addcomponent_button.on_click(on_add_component)
-            addcomponent_button.style.button_color = self.button_color
             
-            version_width = '10%'                                                           # 74%
-            version = Text(value=self.version,description='_',
+            version_width = '10%'                                                           # 68%
+            version = Text(value=self.version,description='|' ,
                            description_tooltip='String to distinguish\namong model output files',
                            layout=Layout(width=bwidth,height=textheight),   
                            continuous_update=False)
             version.style.description_width = '6%'
             version.observe(on_version)
-            version_description = Label('_ version',layout=Layout(width=bwidth,height=labelheight))
+            version_description = Label('| version',layout=Layout(width=bwidth,height=labelheight))
                 
             
-            model_width = '10%'                                                             # 84%
-            model_handle = Text(value = '',description='_',
+            model_width = '10%'                                                             # 78%
+            model_handle = Text(value = '',description='|' ,
                                 description_tooltip='Acronyim for new model\n from scratch',
                                 layout=Layout(width=bwidth,height=textheight),
                                 continuous_update=False)
             model_handle.style.description_width = '6%'
             model_handle.observe(on_model)
-            model_description = Label('_  new model',layout=Layout(width=bwidth,height=labelheight))
+            model_description = Label('|  new model',layout=Layout(width=bwidth,height=labelheight))
             loadbutton = Button(description='Load',
                                 tooltip='Opens GUI to load\none of the existing\nfit templates',
-                                layout=Layout(width='6%',height=buttonheight))              #  90%
+                                layout=Layout(width='6%',height=buttonheight))              #  84%
             loadbutton.style.button_color = self.button_color
             loadbutton.on_click(load_fit)
 
@@ -1268,19 +1255,27 @@ class dash(object):
             #        update_button.style.button_color = self.button_color
             #        update_button.on_click(on_update)
 
-            template_width = '10%'                                                           # 100%
+            template_width = '16%'                                                           # 100%
             dropdwn_empty_tmplate = Dropdown(options=[('Best Fit',1),
                                                     ('Template',2)],
                                                     value=1,
-                                                    description = '_',
+                                                    description = 'model',
                                                     description_tooltip='Load either\ngeneric template or\nBest fit for given run',
                                                     layout=Layout(width=bwidth,height=textheight))
-            dropdwn_empty_tmplate.style.description_width = "6%"                                        
-            template_description = Label('_ model',layout=Layout(width=bwidth,height=labelheight),description_tooltip='Load either\ngeneric template or\nBest fit for given run')
+            dropdwn_empty_tmplate.style.description_width = "28%"  
+
+            options = [a['name'] for a in list_available_components]
+            options.insert(0,'Choose') #value=0,options=options,
+            addcomponent_dropdown = Dropdown(value='Choose',options=options, description='Add',
+                                         layout=Layout(width=bwidth,height=textheight),
+                                         description_tooltip='Add new component')                       # 64%
+            addcomponent_dropdown.observe(on_add_component)
+            addcomponent_dropdown.style.description_width = "28%" 
+                                     
        
     #-------------------- fill model template into input widgets, two columns
 
-
+            width = '100%'
             nint = -1 # internal parameter count, each widget its unique name
 
             list_parname, list_parvalue, list_flag, list_function = [],[],[],[]            
@@ -1291,89 +1286,121 @@ class dash(object):
             # mudash(usepar=usepar)
 
             if self.userpar:
-                list_userparname, list_text_userparvalue, list_text_userparstd, list_text_userparlim0, list_text_userparlim1, list_button_userparm = [] , [], [], [], [] # lists of handles, index runs according to internal parameter count nint
+                list_userparname, list_text_userparvalue, list_text_userparstd, list_text_userparlim0, list_text_userparlim1, list_local_userparm, list_button_userparm = [] , [], [], [], [], [], [] # lists of handles, index runs according to internal parameter count nint
                 
                 nuserpar = len(self.userpar)
-                s_n,s_nam,s_val,s_std,s_lim,s_add ='P[#]','Name','Value','Std','Limits','+'+str(nuserpar+1)
-                userhead = HBox([Label(s_n,layout={'width':'3%','height':'16pt'},description_tooltip='number to be used in Functions.'),
-                                Label(s_nam,layout={'width':'6%','height':'16pt'}),
-                                Label(s_val,layout={'width':'9%','height':'16pt'},description_tooltip='initial guess.'),
-                                Label(s_std,layout={'width':'4%','height':'16pt'},description_tooltip='initial step'),
-                                Label(s_lim,layout={'width':'8%','height':'16pt'},description_tooltip='e.g. 0, None, None is no limit'),
-                                Button(s_add,layout={'width':'3%'})
+                s_nam,s_val,s_std,s_lim,s_loc,s_add ='Name','p[#] | Value','Step','Limits','Local','Add'
+                userhead = HBox([Label(s_nam,layout={'width':'11%','height':'16pt'}),
+                                Label(s_val,layout={'width':'24%','height':'16pt'}),
+                                Label(s_std,layout={'width':'18%','height':'16pt'}),
+                                Label(s_lim,layout={'width':'21%','height':'16pt'}),
+                                Label(s_loc,layout={'width':'9%','height':'16pt'})
                                 ])
-                userhead[5].style.button_color = self.button_color
-                userhead[5].on_click(on_add_userpar)
-                one_list, two_list, three_list = [],[],[]
+
+                userheadright = HBox([Label(s_nam,layout={'width':'11%','height':'16pt'}), # 11%
+                                Label(s_val,layout={'width':'24%','height':'16pt'}),       # 33%
+                                Label(s_std,layout={'width':'18%','height':'16pt'}),       # 51%
+                                Label(s_lim,layout={'width':'21%','height':'16pt'}),       # 72%
+                                Label(s_loc,layout={'width':'7%','height':'16pt'}),       # 84%
+                                IntText(value = len(self.userpar),layout={'width':'17%'},description=s_add,description_tooltip='Add new user parameter\n(index in dashboard)')])
+                
+                userheadright.children[5].style.description_width = '30%'
+                userheadright.children[5].observe(on_add_userpar)                
+                one_list, two_list = [],[]
                 
                 nuserpar = len(self.userpar)
                 for k in range(nuserpar):
                     nint += 1      # all parameters are internal parameters, first is pythonically zero 
                         
-                    nintlabel_handle = Text(value=str(nint),
-                                            layout=Layout(width='3%'),
-                                            disabled=True)                               # 3%
                     value = self.userpar[k]['name'] # this one must exist, checked at _init__
                     list_userparname.append( 
                                         Text(value=value,
-                                          layout=Layout(width='6%'),
-                                          disabled=True))                                 # 9%
+                                          layout=Layout(width='11%'),
+                                          disabled=False,
+                                          continuous_update=False))                                 # 11%
                     # self.log('\n{} - comp {} par {} appended'.format(nint,self.model_components[k]['name'],name))
 
-                    value = '' if not 'value' in self.userpar[k] else self.userpar[k]['value']
+                    value = '' if not 'value' in self.userpar[k] else str(self.userpar[k]['value'])
                     list_text_userparvalue.append(
                                       Text(value=value,
-                                      layout=Layout(width='9%'),
-                                      continuous_update=False))                          # 18%
+                                           description=str(nint),
+                                           description_tooltip='number to be used in Functions.',
+                                           layout=Layout(width='20%'),
+                                           continuous_update=False))                          # 31%
+                    list_text_userparvalue[nint].style.description_width = '10%'
                     # parvalue handle must be unique and stored at position nint, it will provide the initial guess for the fit
 
-                    value = '' if not 'std' in self.userpar[k] else self.userpar[k]['std']
+                    if 'std' in self.userpar[k]:
+                        errorkey = 'std'
+                    elif 'error' in self.userpar[k]:
+                        errorkey = 'error'
+                    else:
+                        errorkey = ''
+                    if errorkey:
+                        value = str(self.userpar[k][errorkey])
+                    elif value:
+                        value = str(signif(float(value)/40.,1)) 
+                         
                     list_text_userparstd.append( 
                                      Text(value=value,
-                                     layout=Layout(width='4%'),
-                                      continuous_update=False))                          # 22%
+                                          description='|' ,
+                                          description_tooltip='initial step',
+                                          layout=Layout(width='14%'),
+                                          continuous_update=False))                          # 45%
+                    list_text_userparstd[nint].style.description_width = '10%'
 
-                    value = 'None' if not 'limits' in self.userpar[k] else self.userpar[k]['limits'][0]
+                    value = 'None' if not 'limits' in self.userpar[k] else str(self.userpar[k]['limits'][0])
                     list_text_userparlim0.append( 
                                      Text(value=value,
-                                     layout=Layout(width='4%'),
-                                      continuous_update=False))                          # 26%
+                                     description='|' ,
+                                     description_tooltip='e.g. 0, None\nNone is no limit',
+                                     layout=Layout(width='13%'),
+                                     continuous_update=False))                          # 58%
+                    list_text_userparlim0[nint].style.description_width = '10%'
 
-                    value = 'None' if not 'limits' in self.userpar[k] else self.userpar[k]['limits'][2]
-                    list_text_userparlim0.append( 
-                                     FloatText(value=value,
-                                     layout=Layout(width='4%'),
-                                      continuous_update=False))                          # 30%
-                    value = -k 
+                    value = 'None' if not 'limits' in self.userpar[k] else str(self.userpar[k]['limits'][1])
+                    list_text_userparlim1.append( 
+                                     Text(value=value,
+                                     layout=Layout(width='12%'),
+                                     continuous_update=False))                          # 70%
+
+                    value = False if not 'local' in self.userpar[k] else self.userpar[k]['local']
+                    list_local_userparm.append( 
+                                     Checkbox(value=value,
+                                     layout=Layout(width='13%'),
+                                     description='loc',
+                                     description_tooltip='if checked each run\ngets its own parameter'))                          # 83%
+                    list_local_userparm[k].style.description_width = '0%'
+
                     list_button_userparm.append( 
-                                     Button(value=value,
-                                     layout=Layout(width='2%'),
-                                     tooltip='Click to remove this parameter'))                          # 32%
+                                     Button(description='rm '+str(k),
+                                     layout=Layout(width='10%'),
+                                     tooltip='Click to remove this parameter'))                          # 93%
                     list_button_userparm[k].on_click(on_remove_userpar)
                     list_button_userparm[k].style.button_color = self.button_color
 
 
-                    par_handle = HBox([nintlabel_handle, list_userparname[nint], list_text_userparvalue[nint], list_text_userparstd[nint]],layout=Layout(width='100%'))
-                    if k%3==0: 
-                        if k//3==0:
+                    par_handle = HBox([list_userparname[nint], list_text_userparvalue[nint], list_text_userparstd[nint],
+                                       list_text_userparlim0[nint], list_text_userparlim1[nint], list_local_userparm[nint], 
+                                       list_button_userparm[nint]],
+                                       layout=Layout(width='100%'))
+                    if k%2==0: 
+                        if k//2==0:
                             one_list.append(userhead) 
                         one_list.append(par_handle) # append it to the left if k even
-                    elif k%3==1: 
-                        if k//4==0:
-                            two_list.append(userhead) 
+                    elif k%2==1: 
+                        if k//2==0:
+                            two_list.append(userheadright) 
                         two_list.append(par_handle) # or to the right if k odd  
-                    elif k%3==2: 
-                        if k//4==0:
-                            three_list.append(userhead) 
-                        three_list.append(par_handle) # or to the right if k odd  
 
-                if nuserpar//3: # 3 or more userpar, all lists are populated
-                    userframe_handle = HBox([one_list,two_list,three_list],layout={'width':width})
-                elif nuserpar==2: # only 2 userpar
-                    userframe_handle = HBox([one_list,two_list],layout={'width':width/4})
+                if nuserpar//2: # 2 or more userpar, all lists are populated
+                    userframe_handle = HBox([
+                                        VBox(one_list,layout=Layout(width='100%',height='100%')),  # border = self.border_color,
+                                        VBox(two_list,layout=Layout(width='100%',height='100%'))], # border = self.border_color,
+                                        layout={'border':self.border_color,'width':width})
                 elif nuserpar==1: # Only 1 userpar
-                    userframe_handle = HBox(one_list,layout={'width':width/4})
-
+                    userframe_handle = HBox([VBox(one_list,layout=Layout(width='100%',height='100%'))], #border = self.border_color,
+                                        layout={'border':self.border_color,'width':width}) # 
             #-------------------- create the model template
             # nint = len(self.userpar)-1
             for k in range(len(self.userpar)): # if len(self.userpar)>0 keeps parameter k -> list_parname[k] etc.
@@ -1387,16 +1414,16 @@ class dash(object):
             dashheadplus = HBox([
                             #Label(s_n,layout={'width':'8%','height':'16pt'},description_tooltip='Number to be used in Functions.'),
                             Label(s_nam,layout={'width':'10%','height':'16pt'}),
-                            Label(s_val,layout={'width':'26%','height':'16pt'}),
+                            Label(s_val,layout={'width':'40%','height':'16pt'}),
                             Label(s_flag,layout={'width':'10%','height':'16pt'}),
-                            Label(s_func,layout={'width':'46%','height':'16pt'})
+                            Label(s_func,layout={'width':'40%','height':'16pt'})
                             ])
             dashhead  = HBox([
                             #Label(s_n,layout={'width':'16%','height':'16pt'}),
                             Label(s_nam,layout={'width':'10%','height':'16pt'}),
-                            Label(s_val,layout={'width':'26%','height':'16pt'}),
+                            Label(s_val,layout={'width':'40%','height':'16pt'}),
                             Label(s_flag,layout={'width':'10%','height':'16pt'}),
-                            Label(s_func,layout={'width':'44%','height':'16pt'})
+                            Label(s_func,layout={'width':'40%','height':'16pt'})
                             ])
             leftframe_list, rightframe_list = [],[]
       
@@ -1420,6 +1447,7 @@ class dash(object):
                 list_fftcheck[j].style.description_width='2%'
                 header = HBox([ Text(value=str(j)+': '+self.model_components[j]['name'],
                                      disabled=True,
+                                     description_tooltip = 'component number:\n component acronym',
                                      layout=Layout(width='12%')), 
                                 list_componentlabel[j],                      #  8 %
                                 list_fftcheck[j],
@@ -1444,7 +1472,7 @@ class dash(object):
                     nint += 1      # all parameters are internal parameters, first is pythonically zero 
                     nleftorright += 1
                     nintlabel_handle = Text(value=str(nint),
-                                            # description='_',description_tooltip='Number to be used in Functions.',
+                                            # description='|' ,description_tooltip='Number to be used in Functions.',
                                             layout=Layout(width='7%'),
                                             disabled=True)                               # 7%
                     # nintlabel_handle.style.description_width = '6%'
@@ -1462,20 +1490,17 @@ class dash(object):
                         baloon = '[MHz]'
                     list_parname.append( 
                                         Text(value=name,
-                                             #description = '_',
-                                             #description_tooltip=baloon,
                                              layout=Layout(width='10%'),
-                                             disabled=True))
-                    # list_parname[k].style.description_width='6%'                                # 23%
-                    # self.log('\n{} - comp {} par {} appended'.format(nint,self.model_components[k]['name'],name))
-
+                                             disabled=True))                            # 10%
+                    value = '{}'.format(self.model_components[j]['pardicts'][k]['value']) #{:.4f}
+                    #self.log('{}'.format(value))
                     list_parvalue.append(
-                                      Text(value='{:.4f}'.format(self.model_components[j]['pardicts'][k]['value']),
-                                      layout=Layout(width='20%'),
+                                      Text(value=value,
+                                      layout=Layout(width='35%'),
                                       description=str(nint),
                                       description_tooltip = 'use this parameter index in functions\n'+'value in '+baloon,
-                                      continuous_update=False))                          # 38%
-                    list_parvalue[nint].style.description_width='14%' # hidden, used in on_parvalue_changed
+                                      continuous_update=False))                          # 45%
+                    list_parvalue[nint].style.description_width='8%' # hidden, used in on_parvalue_changed
                     try:
                         list_parvalue[nint].value = _parvalue[nint]
                     except:
@@ -1486,7 +1511,7 @@ class dash(object):
                                      value=self.model_components[j]['pardicts'][k]['flag'],
                                      layout=Layout(width='12%'),
                                      description_tooltip='~ is free\n! is fixed\n= must be defined with function',
-                                     description='__'+str(nint)))                      # 49%
+                                     description='__'+str(nint)))                      # 57%
                     list_flag[nint].style.description_width='7%'
                     try:
                         list_flag[nint].value = _flag[nint]
@@ -1503,7 +1528,7 @@ class dash(object):
                                          layout=Layout(width='36%'),
                                          description='__',
                                          description_tooltip='e.g.\n=p[2]/2\nfor single group\n=0.5*p[2];=p[3]/2\nfor a global two-group fit',
-                                         continuous_update=False))                       # 85%
+                                         continuous_update=False))                       # 93%
 
                     # function handle must be unique and stored at position nint, it will provide (eventually) the nonlinear relation 
 
@@ -1545,13 +1570,12 @@ class dash(object):
                                          layout=Layout(width=plot_range_width)),
                                     VBox([plot_type,type_description],
                                          layout=Layout(width=type_width)),
-                                    addcomponent_button,
                                     VBox([version,version_description],
                                          layout=Layout(width=version_width)),
                                     VBox([model_handle,model_description],
                                          layout=Layout(width=model_width)),
                                     loadbutton,
-                                    VBox([dropdwn_empty_tmplate,template_description],
+                                    VBox([dropdwn_empty_tmplate,addcomponent_dropdown],
                                          layout=Layout(width=template_width))],
                                     layout=Layout(width=width)
                                     )
