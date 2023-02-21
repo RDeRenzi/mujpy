@@ -38,7 +38,7 @@ class dash(object):
 ##########################
 # INIT
 ##########################
-    def __init__(self, suite, model = 'alml', json_file='', version = '1', fit_range = [0,20000,4], load=False, userpar = []):
+    def __init__(self, suite, model = 'alml', json_file='', version = '1', fit_range = [0,20000,4], load=False):
         '''
         * Launches the gui, initiates a few attributes, 
         * pass empty model, e.g. model = 'mgmgbl' for a two site polycrystal magnet, 
@@ -47,7 +47,6 @@ class dash(object):
         * fit_range is a list of integer values, passed on to fit
         * version is a label, fit range a list, 
         * load = True requests gui to load best-fit [default load = False] 
-        * userpar = list of dictionaries, keys 'name', 'value', 'std', for global fits, [default is [], no globals]
         *
         * Use a template notebook, basically as follows::
 
@@ -106,13 +105,7 @@ class dash(object):
         self.plot_range = fit_range
         self.fig_fit = None
         self.fig_fft = None
-        for par in userpar:
-            if 'name' not in par:
-                print('*** Global parameters in userpar list must contain at least their names')
-                print("    suggested e.g. [{'name':'B[mT]},{'name':'λ[µs-1]'}]")
-                print('aborting ...') 
-                return
-        self.userpar = userpar
+        self.userpar = [] # initialize to empty; aither fill from a global json_file or create through the dashboard 
         self.dash_init(fit_range)
         
     def dash_init(self,fit_range):
@@ -958,9 +951,23 @@ class dash(object):
                         text_plot_range.background_color = "white"
                         text_plot_range.value=string
        
+            def on_create_userpar(b):
+                '''
+                start user parameters
+                integer is number of empty parameters to list in dashboard
+                '''
+                from json import loads as str2lst
+                if b['name'] == 'value': # when add dropdown is changed this method is called three times
+                    k = b['new']                
+                    for j in range(k):
+                        self.userpar.append({'name':'','local':False})
+                    self.log('Added {} user parameters to the dashboard'.format(k))
+                    fit_range = str2lst('['+text_fit_range.value+']') 
+                    fit(fit_range=fit_range)  # keeps existing text_fit_range.value
+
             def on_add_userpar(b):
                 '''
-                remove the clicked user parameter
+                add a global (default) user parameter at the selected index position
                 '''
                 from json import loads as str2lst
                 if b['name'] == 'value': # when add dropdown is changed this method is called three times
@@ -1020,7 +1027,6 @@ class dash(object):
                 '''
                 remove the clicked user parameter
                 '''
-                import tkinter as tk
                 from tkinter.messagebox import askyesno
                 from json import loads as str2lst
                 k = int(change.description[3:])
@@ -1296,8 +1302,10 @@ class dash(object):
             # before invoking
             # mudash(usepar=usepar)
 
+            one_list, two_list = [],[]
             if self.userpar:
                 list_userparname, list_text_userparvalue, list_text_userparstd, list_text_userparlim0, list_text_userparlim1, list_local_userparm, list_button_userparm = [] , [], [], [], [], [], [] # lists of handles, index runs according to internal parameter count nint
+                
                 
                 nuserpar = len(self.userpar)
                 s_nam,s_val,s_std,s_lim,s_loc,s_add ='Name','p[#] | Value','Step','Limits','Local','Add'
@@ -1317,101 +1325,114 @@ class dash(object):
                 
                 userheadright.children[5].style.description_width = '30%'
                 userheadright.children[5].observe(on_add_userpar)                
-                one_list, two_list = [],[]
                 
-                nuserpar = len(self.userpar)
-                for k in range(nuserpar):
-                    nint += 1      # all parameters are internal parameters, first is pythonically zero 
-                        
-                    value = self.userpar[k]['name'] # this one must exist, checked at _init__
-                    list_userparname.append( 
-                                        Text(value=value,
-                                          layout=Layout(width='11%'),
-                                          disabled=False,
-                                          continuous_update=False))                                 # 11%
-                    # self.log('\n{} - comp {} par {} appended'.format(nint,self.model_components[k]['name'],name))
+            else:
+                s_add = 'Add' 
+                userhead = HBox([IntText(value = 1,layout={'width':'17%'},description=s_add,description_tooltip='Add user parameters to dashboard\n(for a global fit)\nInteger is number of user parameters.')])
 
-                    value = '' if not 'value' in self.userpar[k] else str(self.userpar[k]['value'])
-                    list_text_userparvalue.append(
-                                      Text(value=value,
-                                           description=str(nint),
-                                           description_tooltip='number to be used in Functions.',
-                                           layout=Layout(width='20%'),
-                                           continuous_update=False))                          # 31%
-                    list_text_userparvalue[nint].style.description_width = '10%'
-                    # parvalue handle must be unique and stored at position nint, it will provide the initial guess for the fit
+                userhead.children[0].style.description_width = '30%'
+                userhead.children[0].observe(on_create_userpar)                
 
-                    if 'std' in self.userpar[k]:
-                        errorkey = 'std'
-                    elif 'error' in self.userpar[k]:
-                        errorkey = 'error'
-                    else:
-                        errorkey = ''
-                    if errorkey:
-                        value = str(self.userpar[k][errorkey])
-                    elif value:
-                        value = str(signif(float(value)/40.,1)) 
-                         
-                    list_text_userparstd.append( 
-                                     Text(value=value,
-                                          description='|' ,
-                                          description_tooltip='initial step',
-                                          layout=Layout(width='14%'),
-                                          continuous_update=False))                          # 45%
-                    list_text_userparstd[nint].style.description_width = '10%'
+            nuserpar = len(self.userpar)
+            for k in range(nuserpar):
+                nint += 1      # all parameters are internal parameters, first is pythonically zero 
+                    
+                value = self.userpar[k]['name'] # this one must exist, checked at _init__
+                list_userparname.append( 
+                                    Text(value=value,
+                                      layout=Layout(width='11%'),
+                                      disabled=False,
+                                      continuous_update=False))                                 # 11%
+                # self.log('\n{} - comp {} par {} appended'.format(nint,self.model_components[k]['name'],name))
 
-                    value = 'None' if not 'limits' in self.userpar[k] else str(self.userpar[k]['limits'][0])
-                    list_text_userparlim0.append( 
-                                     Text(value=value,
-                                     description='|' ,
-                                     description_tooltip='e.g. 0, None\nNone is no limit',
-                                     layout=Layout(width='13%'),
-                                     continuous_update=False))                          # 58%
-                    list_text_userparlim0[nint].style.description_width = '10%'
+                value = '' if not 'value' in self.userpar[k] else str(self.userpar[k]['value'])
+                list_text_userparvalue.append(
+                                  Text(value=value,
+                                       description=str(nint),
+                                       description_tooltip='number to be used in Functions.',
+                                       layout=Layout(width='20%'),
+                                       continuous_update=False))                          # 31%
+                list_text_userparvalue[nint].style.description_width = '10%'
+                # parvalue handle must be unique and stored at position nint, it will provide the initial guess for the fit
 
-                    value = 'None' if not 'limits' in self.userpar[k] else str(self.userpar[k]['limits'][1])
-                    list_text_userparlim1.append( 
-                                     Text(value=value,
-                                     layout=Layout(width='12%'),
-                                     continuous_update=False))                          # 70%
+                if 'std' in self.userpar[k]:
+                    errorkey = 'std'
+                elif 'error' in self.userpar[k]:
+                    errorkey = 'error'
+                else:
+                    errorkey = ''
+                if errorkey:
+                    value = str(self.userpar[k][errorkey])
+                elif value:
+                    value = str(signif(float(value)/40.,1)) 
+                     
+                list_text_userparstd.append( 
+                                 Text(value=value,
+                                      description='|' ,
+                                      description_tooltip='initial step',
+                                      layout=Layout(width='14%'),
+                                      continuous_update=False))                          # 45%
+                list_text_userparstd[nint].style.description_width = '10%'
 
-                    value = False if not 'local' in self.userpar[k] else self.userpar[k]['local']
-                    list_local_userparm.append( 
-                                     Checkbox(value=value,
-                                     layout=Layout(width='13%'),
-                                     description='loc',
-                                     description_tooltip='if checked each run\ngets its own parameter'))                          # 83%
-                    list_local_userparm[k].style.description_width = '0%'
+                value = 'None' if not 'limits' in self.userpar[k] else str(self.userpar[k]['limits'][0])
+                list_text_userparlim0.append( 
+                                 Text(value=value,
+                                 description='|' ,
+                                 description_tooltip='e.g. 0, None\nNone is no limit',
+                                 layout=Layout(width='13%'),
+                                 continuous_update=False))                          # 58%
+                list_text_userparlim0[nint].style.description_width = '10%'
 
-                    list_button_userparm.append( 
-                                     Button(description='rm '+str(k),
-                                     layout=Layout(width='10%'),
-                                     tooltip='Click to remove this parameter'))                          # 93%
-                    list_button_userparm[k].on_click(on_remove_userpar)
-                    list_button_userparm[k].style.button_color = self.button_color
+                value = 'None' if not 'limits' in self.userpar[k] else str(self.userpar[k]['limits'][1])
+                list_text_userparlim1.append( 
+                                 Text(value=value,
+                                 layout=Layout(width='12%'),
+                                 continuous_update=False))                          # 70%
+
+                value = False if not 'local' in self.userpar[k] else self.userpar[k]['local']
+                list_local_userparm.append( 
+                                 Checkbox(value=value,
+                                 layout=Layout(width='13%'),
+                                 description='loc',
+                                 description_tooltip='if checked each run\ngets its own parameter'))                          # 83%
+                list_local_userparm[k].style.description_width = '0%'
+
+                list_button_userparm.append( 
+                                 Button(description='rm '+str(k),
+                                 layout=Layout(width='10%'),
+                                 tooltip='Click to remove this parameter'))                          # 93%
+                list_button_userparm[k].on_click(on_remove_userpar)
+                list_button_userparm[k].style.button_color = self.button_color
 
 
-                    par_handle = HBox([list_userparname[nint], list_text_userparvalue[nint], list_text_userparstd[nint],
-                                       list_text_userparlim0[nint], list_text_userparlim1[nint], list_local_userparm[nint], 
-                                       list_button_userparm[nint]],
-                                       layout=Layout(width='100%'))
-                    if k%2==0: 
-                        if k//2==0:
-                            one_list.append(userhead) 
-                        one_list.append(par_handle) # append it to the left if k even
-                    elif k%2==1: 
-                        if k//2==0:
-                            two_list.append(userheadright) 
-                        two_list.append(par_handle) # or to the right if k odd  
+                par_handle = HBox([list_userparname[nint], list_text_userparvalue[nint], list_text_userparstd[nint],
+                                   list_text_userparlim0[nint], list_text_userparlim1[nint], list_local_userparm[nint], 
+                                   list_button_userparm[nint]],
+                                   layout=Layout(width='100%'))
+                if k%2==0: 
+                    if k//2==0:
+                        one_list.append(userhead) 
+                    one_list.append(par_handle) # append it to the left if k even
+                elif k%2==1: 
+                    if k//2==0:
+                        two_list.append(userheadright) 
+                    two_list.append(par_handle) # or to the right if k odd  
 
-                if nuserpar//2: # 2 or more userpar, all lists are populated
-                    userframe_handle = HBox([
-                                        VBox(one_list,layout=Layout(width='100%',height='100%')),  # border = self.border_color,
-                                        VBox(two_list,layout=Layout(width='100%',height='100%'))], # border = self.border_color,
-                                        layout={'border':self.border_color,'width':width})
-                elif nuserpar==1: # Only 1 userpar
-                    userframe_handle = HBox([VBox(one_list,layout=Layout(width='100%',height='100%'))], #border = self.border_color,
-                                        layout={'border':self.border_color,'width':width}) # 
+            if nuserpar==0:
+                # self.log('nuserpar=0')
+                one_list.append(userhead) 
+                userframe_handle = HBox([VBox(one_list,layout=Layout(width='100%',height='100%'))], #border = self.border_color,
+                                    layout={'border':self.border_color,'width':width}) #            
+            elif nuserpar//2: # 2 or more userpar, all lists are populated
+                userframe_handle = HBox([
+                                    VBox(one_list,layout=Layout(width='100%',height='100%')),  # border = self.border_color,
+                                    VBox(two_list,layout=Layout(width='100%',height='100%'))], # border = self.border_color,
+                                    layout={'border':self.border_color,'width':width})
+            elif nuserpar==1: # Only 1 userpar
+                userframe_handle = HBox([VBox(one_list,layout=Layout(width='100%',height='100%'))], #border = self.border_color,
+                                    layout={'border':self.border_color,'width':width}) # 
+                
+                # user parameter''
             #-------------------- create the model template
             # nint = len(self.userpar)-1
             for k in range(len(self.userpar)): # if len(self.userpar)>0 keeps parameter k -> list_parname[k] etc.
@@ -1596,13 +1617,13 @@ class dash(object):
                                       )
 
             # now collect the handles of the three horizontal frames to the main fit window 
-            if self.userpar:
-                fittab = [VBox([oneframe_handle,
+            # if self.userpar:
+            fittab = [VBox([oneframe_handle,
                                 userframe_handle,
                                 bottomframe_handle],layout=Layout(width=width))]
-            else: 
-                fittab = [VBox([oneframe_handle,
-                                bottomframe_handle],layout=Layout(width=width))]
+            #else: 
+            #    fittab = [VBox([oneframe_handle,
+            #                    bottomframe_handle],layout=Layout(width=width))]
 
             self.mainwindow.children[0].children = fittab
 
