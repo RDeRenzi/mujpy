@@ -530,6 +530,7 @@ class dash(object):
 ##########################
 # GROUP TAB
 ##########################
+
         def group():
             '''
             gui version of grouping, path
