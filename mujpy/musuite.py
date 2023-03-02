@@ -12,7 +12,7 @@ class suite(object):
         self.alpha value used for normal fit 
         as opposed to calibration fits where alpha is a fit parameter
     self.grouping is a list of dictionaries for forward, backward groups and their alpha values
-        where groups as np array of 0 based indices of detectors (aux get_grouping does the translation)
+        where groups as np array of 0 based indices of detectors (tools get_grouping does the translation)
     imports musr2py or muisis2py and loads it as instance for each data set
     which can be an individual run or the sum of several runs
 
@@ -51,7 +51,7 @@ class suite(object):
                     startuppath, path where mudash is lauched                      
         * grp_calib is a list of dictionaries (minimum one)
           {'forward':stringfw,'backward':stringbw,'alpha':alpha}
-          strings are translated into np.arrays of histograms by aux get_grouping
+          strings are translated into np.arrays of histograms by tools get_grouping
         * upon initialization automatically
                 checks input, stores paths
                 load_runs(): stores data load instance(s) in self._the_runs_
@@ -63,7 +63,7 @@ class suite(object):
         if dash = self in mudash calls to suite, and console = 'self.dash.log'   
               self.console will exec self.dash.log(string), i.e. write on board output                           
         '''
-        from mujpy.aux.aux import derun
+        from mujpy.tools.tools import derun
         import json
         import os
         from mujpy import __file__ as MuJPyName
@@ -124,13 +124,13 @@ class suite(object):
         if not os.path.exists(self.__startuppath__+'/cache/'):
             os.mkdir(self.__startuppath__+'/cache/')
         self.__cachepath__ = self.__startuppath__+'/cache/'
-        # reverse of aux get_grouping is aux get_group
+        # reverse of tools get_grouping is tools get_group
         self.offset = int(offset) # offset belongs to suite, that needs it for asymmetries
         self.load_runs() #           load data instances in self._the_runs_
         self.groups = grp_calib
         # grp_calib is a list of dictionaries, one per group, with keys 'forward,'backward','alpha'
         # where groups may be in shorthand notation
-        self.grouping = [] # reproduce the same with arrays of histogram numbers, done by aux get_grouping
+        self.grouping = [] # reproduce the same with arrays of histogram numbers, done by tools get_grouping
         self.store_groups() #        in self.grouping        self.promptfit(mplot)   #    to be done: make switch for ISIS
         self.promptfit(mplot)   #    to be done: make switch for ISIS
         self.timebase()
@@ -147,7 +147,7 @@ class suite(object):
         from musr2py import MuSR_td_PSI_bin as psiload
         from mujpy.muisis2py.muisis2py import muisis2py as isisload
         # muisis2py has the same methods as musr2py
-        from mujpy.aux.aux import get_datafilename, get_title
+        from mujpy.tools.tools import get_datafilename, get_title
 
         read_ok = True
         runadd = []
@@ -219,7 +219,7 @@ class suite(object):
         reads groups dictionary in dashboard shortnote
         and appends lists of histogram numbers, alphas to self.grouping 
         '''
-        from mujpy.aux.aux import get_grouping
+        from mujpy.tools.tools import get_grouping
         for k,group in enumerate(self.groups):
             fgroup, bgroup, alpha = get_grouping(group['forward']), get_grouping(group['backward']), group['alpha']
             if alpha>0 and self.check_group(fgroup) and self.check_group(bgroup): # checks legal grpcalib_file
@@ -275,7 +275,7 @@ class suite(object):
         import matplotlib.pyplot as P
         from mujpy.mucomponents.muprompt import muprompt
         from mujpy.mucomponents.muedge import muedge
-        from mujpy.aux.aux import TauMu_mus, scanms, step, set_fig 
+        from mujpy.tools.tools import TauMu_mus, scanms, step, set_fig 
     
         if mplot:  # setup figure window
             font = {'family' : 'Ubuntu','size'   : 8}
@@ -582,7 +582,7 @@ class suite(object):
         * all are 1D numpy arrays
         """
         from numpy import zeros, array, mean, exp, where
-        from mujpy.aux.aux import TauMu_mus
+        from mujpy.tools.tools import TauMu_mus
 
         filespec = self.datafile[-3:] # 'bin', 'mdu' or 'nsx'
         if self.loadfirst:
@@ -716,7 +716,7 @@ class suite(object):
             asymmetry and asymmetry error (1d)
          """
         from numpy import exp, sqrt, where, array, intersect1d, finfo
-        from mujpy.aux.aux import TauMu_mus
+        from mujpy.tools.tools import TauMu_mus
 
         if self.loadfirst:
             # print(the_run)

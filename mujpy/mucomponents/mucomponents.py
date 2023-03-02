@@ -41,7 +41,7 @@ class mumodel(object):
 # General structure:
 # _load_... loads data and defines which _add_... method
 # _add_... distributes Minuit parameters to components, adds components into model function
-# organized by mufit dofit_...which invokes aux methods:
+# organized by mufit dofit_...which invokes tools methods:
 # int2min_... to pass guess values as
 #        int2min val err fix lim names pospar are lists
 #        int2min_multigroup >> >> 
@@ -62,7 +62,7 @@ class mumodel(object):
             x, y, e are numpy arrays, y, e are 1d 
             e = 1 or missing yields unitary errors 
             _components_ is a list [[method,[key,...,key]],...,[method,[key,...,key]]], 
-                produced by int2_method() from mujpy.aux.aux
+                produced by int2_method() from mujpy.tools.tools
                 where method is an instantiation of a component, e.g. self.ml 
                 and value = eval(key) produces the parameter value
         '''
@@ -117,7 +117,7 @@ class mumodel(object):
            yf,yb 1d array of shape nbins
            bf,bb,yfm,yfb are scalars (see suite.single_for_back_counts)
         components is a list [[method,[key,...,key]],...,[method,[key,...,key]]  where
-        arg _components_ is the output of int2_int() from mujpy.aux.aux
+        arg _components_ is the output of int2_int() from mujpy.tools.tools
         for calib the first method is empty (loke da) and its single parameter is alpha
         '''
         self._x_ = x 
@@ -147,7 +147,7 @@ class mumodel(object):
             x, y, e are numpy arrays, y, e are 1d 
             e = 1 or missing yields unitary errors 
             _components_ is a list [[method,[key,...,key]],...,[method,[key,...,key]]], 
-                produced by int2_method() from mujpy.aux.aux
+                produced by int2_method() from mujpy.tools.tools
                 where method is an instantiation of a component, e.g. self.ml 
                 and value = eval(key) produces the parameter value
         the argument _components_ is stored in self._components_
@@ -190,7 +190,7 @@ class mumodel(object):
             x, y, e are numpy arrays, y, e are 2d 
             e = 1 or missing yields unitary errors 
             components is a list [[method,[[key,...],...,[key,...]]],...,[method,[[key...],...,[key,...]]]], 
-                produced by int2_method() from mujpy.aux.aux
+                produced by int2_method() from mujpy.tools.tools
                 where method is an instantiation of a component, e.g. self.ml 
                 and value = eval(key) produces the parameter value (the inner key list is for different groups)
             _add_multigroup_ must produce a 2d function f.shape(ngroup,nbins)
@@ -238,7 +238,7 @@ class mumodel(object):
             bf, bb, yfm, ybm are backgrounnd f and b, and its exponential average, f and b 
             e = 1, since errors are calculated (should be simplified)
             components is a list [[method,[[key,...],...,[key,...]]],...,[method,[[key...],...,[key,...]]]], 
-                produced by int2_method() from mujpy.aux.aux
+                produced by int2_method() from mujpy.tools.tools
                 where method is an instantiation of a component, e.g. self.ml 
                 and value = eval(key) produces the parameter value (the inner key list is for different groups)
             _add_multigroup_ must produce an 2d function f.shape(ngroup,nbins)
@@ -294,7 +294,7 @@ class mumodel(object):
             x, y, e are numpy arrays, y, e are 2d 
             e = 1 or missing yields unitary errors 
             components is a list [[method,[[key,...],...,[key,...]]],...,[method,[[key...],...,[key,...]]]], 
-                produced by int2_method() from mujpy.aux.aux
+                produced by int2_method() from mujpy.tools.tools
                 where method is an instantiation of a component, e.g. self.ml 
                 and value = eval(key) produces the parameter value (the inner key list is for different groups)
             _add_multigroup_ must produce an 2d function f.shape(ngroup,nbins)
@@ -339,7 +339,7 @@ class mumodel(object):
             x, y, e are numpy arrays, y, e are 2d 
             e = 1 or missing yields unitary errors 
             components is a list [[method,[key,...,key]],...,[method,[key,...,key]]], 
-                produced by int2_multirun_user_method_key() from mujpy.aux.aux
+                produced by int2_multirun_user_method_key() from mujpy.tools.tools
                 where method is an instantiation of a component, e.g. self.ml 
                 and value = eval(key) produces the parameter value
             _add_multirun_ must produce a 2d function f.shape(ngroup,nbins)
@@ -386,7 +386,7 @@ class mumodel(object):
                 on single run, for locals
                     over component parameters that contain that minuit parameter, i
                     ncluding the derivative of the user function.
-        constructed in mujpy.aux.aux int2_multirun_grad_method_key
+        constructed in mujpy.tools.tools  int2_multirun_grad_method_key
         '''
         self._minuit_grad_list_ = minuit_ordered_grad_list
 #        for m,grad_list in enumerate(minuit_ordered_grad_list): 
@@ -504,7 +504,7 @@ class mumodel(object):
         NO FFT mode, no check on self._include_components
         '''      
         from numpy import where
-        from mujpy.aux.aux import TauMu_mus
+        from mujpy.tools.tools import TauMu_mus
                 
         f = zeros_like(x)  # initialize a 1D array
         p = argv 
@@ -614,7 +614,7 @@ class mumodel(object):
         # print('mucomponents _add_multirun_ mucomponents debug: component {}-th: {}\npars {}'.format(j,method.__doc__,pars))
         j = -1 # what is j for?
 #            self._components_ is a list [[method,keys],...,[method,keys]], 
-#                produced by int2_multirun_method_key() from mujpy.aux.aux
+#                produced by int2_multirun_method_key() from mujpy.tools.tools
 #                where method is a vectorised instantiation of a component, e.g. ml 
 #                                  producing one value per run
 #                keys is a list of lists [[key,..,key],...,[key,...,key]]
@@ -622,7 +622,7 @@ class mumodel(object):
 #                the  inner list is over the parameters of the component (e.g. ml) 
 #                the outer list os over runs 
         for method, keys in self._components_:
-            # each method in the model is a vstack of nrun methods prepared by aux cstack
+            # each method in the model is a vstack of nrun methods prepared by tools cstack
             # expecting a list of lists of parameters, with parameters for the k-th run in the k-th inner list  
             j += 1
 #            for run_keys in keys: 
@@ -658,7 +658,7 @@ class mumodel(object):
               whose m-th value is the chisquare gradient 
               with respect to internal minuit parameter p[m]
         requires previous calls to _load_data_multirun_grad_  to define self._minuit_grad_list_
-                       both constructed in int2_multirun_grad_method_key() from mujpy.aux.aux
+                       both constructed in int2_multirun_grad_method_key() from mujpy.tools.tools
         self._gradients_ used to store f values and g derivatives of all components, to minimize numpy array calculations;
         self._glocals_ to loop 
             over minuit parameters and calculate gradient components, 
@@ -733,7 +733,7 @@ class mumodel(object):
         must loop over groups, whose number n = y.shape[0]
         and produce a n-valued np.array function f, f[k] for y[k],e[k] 
         '''      
-        from mujpy.aux.aux import TauMu_mus
+        from mujpy.tools.tools import TauMu_mus
         from numpy import where,sqrt,exp,array
 
         f = zeros((self._yf_.shape[0],x.shape[0]))  # initialize a 2D array        
@@ -801,7 +801,7 @@ class mumodel(object):
         NO FFT mode, no check on self._include_components
         '''      
 #        from numpy import where
-#        from mujpy.aux.aux import TauMu_mus
+#        from mujpy.tools.tools import TauMu_mus
 #                
 #        f = zeros_like(x)  # initialize a 1D array
 #        p = argv 
@@ -830,7 +830,7 @@ class mumodel(object):
         NO FFT mode, no check on self._include_components
         '''
 #        from numpy import where
-#        from mujpy.aux.aux import TauMu_mus
+#        from mujpy.tools.tools import TauMu_mus
 #                
 #        f = zeros((self._y_.shape[0],x.shape[0]))  # initialize a 1D array
 #        p = argv 

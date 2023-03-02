@@ -15,11 +15,11 @@ Main GUI class
     :private-members:
 
 ---
-aux
+tools
 ---
 Utilities
 
-.. automodule:: aux.aux
+.. automodule:: tools.tools
     :members:
     :undoc-members:
     :private-members:

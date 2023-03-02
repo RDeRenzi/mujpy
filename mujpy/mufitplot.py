@@ -32,7 +32,7 @@ class mufitplot(object):
 # Maybe make another version that does multiplots from the dashboards
 #
 #
-#  the function that performs the plot is mujpy.aux.aux import set_single_fit, self_sequence_fit 
+#  the function that performs the plot is mujpy.tools.tools import set_single_fit, self_sequence_fit 
 #        invoked by self.plot_run in 
 #        plot_singlerun or plot_singlerun_multigroup_sequential or plot_singlerun_multigroup_userpar
 
@@ -108,7 +108,7 @@ class mufitplot(object):
         # C1     False          False       True        False               True  *
         # C2     True           False       True        True                True  *
         '''
-        from mujpy.aux.aux import multigroup_in_components, userpars, userlocals
+        from mujpy.tools.tools import multigroup_in_components, userpars, userlocals
         if self.suite.single(): # A1, A20, A21
             if self.suite.multi_groups(): # A20 A21
                 self.log('Multigroup fit animation: toggle pause/resume by clicking on the plot')
@@ -145,7 +145,7 @@ class mufitplot(object):
             asymm, asyme 1d        
         calib pops first par and passes it as alpha to standard plot
         '''
-        from mujpy.aux.aux import int2min, mixer, calib
+        from mujpy.tools.tools import int2min, mixer, calib
         from numpy import cos, pi
 #        self.log('muplotfit plot_singlerun debug')
         kgroup = 0 # default single group 
@@ -167,7 +167,7 @@ class mufitplot(object):
             # A21
             asymm, asyme 2d        
         '''
-        from mujpy.aux.aux import int2min_multigroup, mixer, calib
+        from mujpy.tools.tools import int2min_multigroup, mixer, calib
         from numpy import cos, pi, vstack
         userpardicts = (self.dashboard["userpardicts_guess"] if self.guess else 
                         self.dashboard["userpardicts_result"])
@@ -198,7 +198,7 @@ class mufitplot(object):
         # B2 fit, multirun is sequential
         asymm, asyme d
         '''
-        from mujpy.aux.aux import int2min_multigroup, mixer, calib
+        from mujpy.tools.tools import int2min_multigroup, mixer, calib
         from numpy import cos, pi, vstack
         userpardicts = (self.dashboard["userpardicts_guess"] if self.guess else 
                         self.dashboard["userpardicts_result"])
@@ -239,7 +239,7 @@ class mufitplot(object):
         if model_guess
             reproduces the same from a single guesses            
         '''
-        from mujpy.aux.aux import int2min, mixer
+        from mujpy.tools.tools import int2min, mixer
         from numpy import cos, pi, vstack
         # dashboard is a multi_sequential thing: each sequential fit has its own
         asymm, asyme = self.suite.asymmetry_multigroup()
@@ -270,7 +270,7 @@ class mufitplot(object):
             asymm, asyme 2d
             # B1 fit
         '''
-        from mujpy.aux.aux import mixer
+        from mujpy.tools.tools import mixer
         from numpy import vstack
         
         kgroup = 0 # default single 
@@ -302,7 +302,7 @@ class mufitplot(object):
             the difference is that A21 all Minuit pars are userpardicts, 
             while here there is a mixed situation
         '''
-        from mujpy.aux.aux import mixer
+        from mujpy.tools.tools import mixer
         from numpy import vstack
         
         kgroup = 0 # default
@@ -335,13 +335,13 @@ class mufitplot(object):
         calls either 
             self.chi_1 or self.chi_2 (stats and model function, 
                                       deals also with plotting model function)
-            set_single_fit or set_sequence_fit, from aux.plot
+            set_single_fit or set_sequence_fit, from tools.plot
                                     (produces actual figures)
-        Draws either static or anim figures using aux.plot functions 
+        Draws either static or anim figures using tools.plot functions 
         '''
-        from mujpy.aux.aux import derange, rebin, multigroup_in_components
-        from mujpy.aux.aux import get_run_title, userpars, mixer
-        from mujpy.aux.plot import set_single_fit, set_sequence_fit
+        from mujpy.tools.tools import derange, rebin, multigroup_in_components
+        from mujpy.tools.tools import get_run_title, userpars, mixer
+        from mujpy.tools.plot import set_single_fit, set_sequence_fit
         from iminuit import Minuit
         from numpy import ones 
 
@@ -531,8 +531,8 @@ class mufitplot(object):
             number_dof, fit function (1d), chi2_r  scalar for single and calib
         adding fit C1
         '''
-        from mujpy.aux.aux import multigroup_in_components, int2_multigroup_method_key, int2_multirun_user_method_key
-        from mujpy.aux.aux import _nparam, calib, int2_method_key
+        from mujpy.tools.tools import multigroup_in_components, int2_multigroup_method_key, int2_multirun_user_method_key
+        from mujpy.tools.tools import _nparam, calib, int2_method_key
         
         # print('chi_1 mufitplot debug: {}'.format(pars)) 
         if sum(multigroup_in_components(self.dashboard)):
@@ -618,7 +618,7 @@ class mufitplot(object):
         #  B20 3d (group,runs) sequential, pars is a list, uses _load_data_multigroup_
         #  B21 3d multigroup userpar, to be done
         '''
-        from mujpy.aux.aux import _nparam, int2_method_key, calib, cstack
+        from mujpy.tools.tools import _nparam, int2_method_key, calib, cstack
         
         _,_, freepars = _nparam(self.dashboard[self.model])
         nu = len(t) - freepars # degrees of freedom in plot
@@ -662,8 +662,8 @@ class mufitplot(object):
           single-multi group
           sequential-global  
         '''
-        from mujpy.aux.aux import multigroup_in_components, userlocals
-        from mujpy.aux.aux import get_nruns, int2min, int2min_multigroup
+        from mujpy.tools.tools import multigroup_in_components, userlocals
+        from mujpy.tools.tools import get_nruns, int2min, int2min_multigroup
         from numpy import array
 
         # single - multi run sequential  A1 B1 both produce list of pars 
@@ -739,14 +739,14 @@ class mufitplot(object):
         
         calls either 
             self.chi_fft (only for model function) 
-            set_single_fft or set_sequence_fft, from aux.plot
+            set_single_fft or set_sequence_fft, from tools.plot
             first version single only
                                     (produces actual figures
-                                     using aux.plot functions)
+                                     using tools.plot functions)
         '''
-        from mujpy.aux.aux import derange, rebin, autops, ps
-        from mujpy.aux.aux import get_run_title, userpars
-        from mujpy.aux.plot import set_figure_fft
+        from mujpy.tools.tools import derange, rebin, autops, ps
+        from mujpy.tools.tools import get_run_title, userpars
+        from mujpy.tools.plot import set_figure_fft
         from copy import deepcopy
         from numpy import ones, exp, linspace, sqrt, mean, fft
         from numpy import hstack, linspace, zeros, mgrid
@@ -896,7 +896,7 @@ class mufitplot(object):
         returns f for the fft of residues
         for the moment works only for single or sequential fits
         '''
-        from mujpy.aux.aux import int2_method_key, cstack
+        from mujpy.tools.tools import int2_method_key, cstack
         from numpy import vstack
         _the_model = self._the_model_
         method_keys = int2_method_key(self.dashboard,self._the_model_)
@@ -952,7 +952,7 @@ class mufitplot(object):
         # C2     True           False       True        True                True         *
         #  True : A1 1d, A21 2d multigroup userpar, C1 2d userpar, C2 3d multgrup userpar
         #  False: B1 2d, A20, B20 2d multigroup, B21 2d multigroup userpar
-#        from mujpy.aux.aux import userlocals, userpars
+#        from mujpy.tools.tools import userlocals, userpars
 #        return (userlocals(self.dashboard) or 
 #                   (self.suite.single() and 
 #                        (not self.suite.multi_groups() or userpars(self.dashboard)))) 
@@ -960,6 +960,6 @@ class mufitplot(object):
                     
     def debug(self,pars):
         # can be deleted after debugging stage of mujpy 2.0
-        from mujpy.aux.aux import min2int_multigroup
+        from mujpy.tools.tools import min2int_multigroup
         names, ps, _ = min2int_multigroup(self.dashboard,pars,pars)
         print('muplotfit debug: internal dashboard parameters {}'.format([[name,p] for name,p in  zip(names,ps)]))

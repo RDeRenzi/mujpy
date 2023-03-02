@@ -29,7 +29,7 @@ class mufit(object):
             json dashboard_file produces a dict structure
         '''
         # from collections import OrderedDict
-        from mujpy.aux.aux import _available_components_
+        from mujpy.tools.tools import _available_components_
         from mujpy.mucomponents.mucomponents import mumodel
         import json
 
@@ -85,8 +85,8 @@ class mufit(object):
             C global (single cost function)   
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import derange, add_step_limits_to_model, checkvalidmodel
-        from mujpy.aux.aux import model_name, userpars, userlocals, multigroup_in_components
+        from mujpy.tools.tools import derange, add_step_limits_to_model, checkvalidmodel
+        from mujpy.tools.tools import model_name, userpars, userlocals, multigroup_in_components
         
         if self.nodata or self.nodash:
             return True        
@@ -189,7 +189,7 @@ class mufit(object):
             kgroup is group index in suitegrouping
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import int2min, int2_method_key, rebin_decay, write_csv
+        from mujpy.tools.tools import int2min, int2_method_key, rebin_decay, write_csv
         from mujpy.mucomponents.mucomponents import mumodel
         _the_model_ = mumodel()                
         # self.log('In single calib.')      
@@ -268,7 +268,7 @@ class mufit(object):
         (A1) tested
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import int2min, int2_method_key, rebin, write_csv
+        from mujpy.tools.tools import int2min, int2_method_key, rebin, write_csv
           
         #self.log('In single single: grouping is {}'.format(self.suite.grouping)) 
 
@@ -339,8 +339,8 @@ class mufit(object):
         (A20) tested
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import int2min, int2_method_key, min2int
-        from mujpy.aux.aux import rebin, write_csv
+        from mujpy.tools.tools import int2min, int2_method_key, min2int
+        from mujpy.tools.tools import rebin, write_csv
         
         a,e = self.suite.asymmetry_multigroup() # the second dimension is group
         start, stop, pack = returntup
@@ -426,8 +426,8 @@ class mufit(object):
         It could be also run sequentially (next devel)
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import rebin, derange, write_csv, stringify_groups
-        from mujpy.aux.aux import int2min_multigroup, int2_multigroup_method_key
+        from mujpy.tools.tools import rebin, derange, write_csv, stringify_groups
+        from mujpy.tools.tools import int2min_multigroup, int2_multigroup_method_key
         
         # self.log('Single run, global multigroup')      
         
@@ -519,8 +519,8 @@ class mufit(object):
         (A21-calib) tested
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import int2min_multigroup, int2_multigroup_method_key 
-        from mujpy.aux.aux import rebin_decay, write_csv, stringify_groups
+        from mujpy.tools.tools import int2min_multigroup, int2_multigroup_method_key 
+        from mujpy.tools.tools import rebin_decay, write_csv, stringify_groups
         
         # self.log('Multigroup calib global: does not work yet')      
 
@@ -593,7 +593,7 @@ class mufit(object):
         (A20-calib) tested
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import int2min, int2_method_key, rebin_decay, write_csv, min2int
+        from mujpy.tools.tools import int2min, int2_method_key, rebin_decay, write_csv, min2int
         
         # self.log('Multigroup calib: does not work yet')
         string = []
@@ -692,10 +692,10 @@ class mufit(object):
         '''
         from iminuit import Minuit
         from mujpy.mucomponents.mucomponents import mumodel
-        from mujpy.aux.aux import int2min_multirun, int2_multirun_user_method_key 
-        from mujpy.aux.aux import int2_multirun_grad_method_key
-        from mujpy.aux.aux import minglobal2sequential, int2min, int2_method_key
-        from mujpy.aux.aux import rebin, stringify_groups #, _available_gradients_
+        from mujpy.tools.tools import int2min_multirun, int2_multirun_user_method_key 
+        from mujpy.tools.tools import int2_multirun_grad_method_key
+        from mujpy.tools.tools import minglobal2sequential, int2min, int2_method_key
+        from mujpy.tools.tools import rebin, stringify_groups #, _available_gradients_
         from numpy import array
         from time import time as timeit 
 
@@ -788,7 +788,7 @@ class mufit(object):
         (B1) tested
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import int2min, int2_method_key, rebin, write_csv
+        from mujpy.tools.tools import int2min, int2_method_key, rebin, write_csv
 
         # print('dofit_multirun_singlegroup_sequential mufit debug')
         # self.log('In sequential single')   
@@ -865,8 +865,8 @@ class mufit(object):
         (B2) testing
         '''
         from iminuit import Minuit
-        from mujpy.aux.aux import int2min_multigroup, int2_multigroup_method_key, rebin
-        from mujpy.aux.aux import stringify_groups, write_csv
+        from mujpy.tools.tools import int2min_multigroup, int2_multigroup_method_key, rebin
+        from mujpy.tools.tools import stringify_groups, write_csv
         from numpy import where, array, finfo, sqrt
         
         from matplotlib.pyplot import subplots, draw 
@@ -992,8 +992,8 @@ class mufit(object):
         #          execute tail -f -n +1 log.txt  !!! os dependent
         # The Log Console option would be much better if one could drag it to the right         
         #          it would be os independent
-        from mujpy.aux.aux import get_grouping, get_title, chi2std
-        from mujpy.aux.aux import len_print_components, print_components, min2int, value_error
+        from mujpy.tools.tools import get_grouping, get_title, chi2std
+        from mujpy.tools.tools import len_print_components, print_components, min2int, value_error
         from datetime import datetime
 
         modelname = ''.join([component["name"] for component in self.dashboard['model_guess']])
@@ -1053,7 +1053,7 @@ class mufit(object):
         input: k is index in _the_runs_, default 0
         initial version: prints single fit single group result
         '''
-        from mujpy.aux.aux import get_title, chi2std, len_print_components, print_components, min2int
+        from mujpy.tools.tools import get_title, chi2std, len_print_components, print_components, min2int
         from datetime import datetime
 
         modelname = ''.join([component["name"] for component in self.dashboard['model_guess']])
@@ -1104,8 +1104,8 @@ class mufit(object):
         input: krun is index in _the_runs_, default 0
         initial version: prints multigroup globa fit result
         '''
-        from mujpy.aux.aux import get_title, chi2std, stringify_groups
-        from mujpy.aux.aux import len_print_components, print_components, min2int_multigroup
+        from mujpy.tools.tools import get_title, chi2std, stringify_groups
+        from mujpy.tools.tools import len_print_components, print_components, min2int_multigroup
         from datetime import datetime
 
         modelname = ''.join([component["name"] for component in self.dashboard['model_guess']])
@@ -1173,8 +1173,8 @@ class mufit(object):
         print summary on Output and log file
         multirun user version
         '''
-        from mujpy.aux.aux import get_title, chi2std, stringify_groups, value_error
-        from mujpy.aux.aux import len_print_components_multirun, print_components_multirun, min2int_multirun
+        from mujpy.tools.tools import get_title, chi2std, stringify_groups, value_error
+        from mujpy.tools.tools import len_print_components_multirun, print_components_multirun, min2int_multirun
         from datetime import datetime
 
         modelname = ''.join([component["name"] for component in self.dashboard['model_guess']])
@@ -1280,9 +1280,9 @@ class mufit(object):
         that can be imported to produce figures
         Identifies multigroup as dashboard = False in minparam2_csv::
         '''
-        from mujpy.aux.aux import get_title, spec_prec, chi2std, initialize_csv 
-        from mujpy.aux.aux import minparam2_csv, chi2_csv, min2int, min2int_multigroup
-        from mujpy.aux.aux import min2int_multirun, multigroup_in_components, userpars
+        from mujpy.tools.tools import get_title, spec_prec, chi2std, initialize_csv 
+        from mujpy.tools.tools import minparam2_csv, chi2_csv, min2int, min2int_multigroup
+        from mujpy.tools.tools import min2int_multirun, multigroup_in_components, userpars
 
         # print('k = {}, self.nrun = {}'.format(k,[j for j in self.nrun]))
 
@@ -1377,7 +1377,7 @@ class mufit(object):
             the_runs is suite _the_runs_
             file_csv = full path/filename to csv file 
         '''
-        from mujpy.aux.aux import get_title, min2int_multirun
+        from mujpy.tools.tools import get_title, min2int_multirun
         from datetime import datetime
 
     # prepare_csv writes a header: # column-index-name 
@@ -1410,7 +1410,7 @@ class mufit(object):
         filename is __cachepath__ + modelname + nrun  + strgrp + version .json
         nrun = runNumber, strgrp = shorthand for group
         '''
-        from mujpy.aux.aux import min2int
+        from mujpy.tools.tools import min2int
         import json
         import os
         from copy import deepcopy
@@ -1458,7 +1458,7 @@ class mufit(object):
         filename is __cachepath__ + modelname + nrun  + srtgrp0 + strgrp...  + version .json
         nrun = runNumber, strgrp0,1,... = shorthand for allgroups
         '''
-        from mujpy.aux.aux import stringify_groups
+        from mujpy.tools.tools import stringify_groups
         import json
         import os
         from copy import deepcopy
@@ -1531,7 +1531,7 @@ class mufit(object):
         filename is __cachepath__ + modelname + nruns + srtgrp + version.json
         nruns = shorthand for runNumbers, strgrp = shorthand for allgroups
         '''
-        from mujpy.aux.aux import stringify_groups, min2int_multirun
+        from mujpy.tools.tools import stringify_groups, min2int_multirun
         import json
         import os
         from copy import deepcopy
@@ -1599,7 +1599,7 @@ class mufit(object):
             f guess fit function for calib mode
         for degugging single run calibs
         '''
-        from mujpy.aux.aux import int2_method_key, int2min
+        from mujpy.tools.tools import int2_method_key, int2min
         run = self.suite._the_runs_[0]
         yf, yb, bf, bb, yfm, ybm = self.suite.single_for_back_counts(run,self.suite.grouping[0])
         t = self.suite.time

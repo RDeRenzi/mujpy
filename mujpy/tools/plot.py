@@ -210,9 +210,9 @@ def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,c
     import matplotlib.pyplot as P
     from matplotlib.pyplot import rcParams, suptitle
     from numpy import hstack   
-    from mujpy.aux.plot import errorb, plot_fit, decorate_data, decorate_data_late
-    from mujpy.aux.plot import plot_res, decorate_res, decorate_res_late, plot_txt, plot_chi2
-    from mujpy.aux.plot import draw
+    from mujpy.tools.plot import errorb, plot_fit, decorate_data, decorate_data_late
+    from mujpy.tools.plot import plot_res, decorate_res, decorate_res_late, plot_txt, plot_chi2
+    from mujpy.tools.plot import draw
         
     font = {'family':'Ubuntu','size':10}
     P.rc('font', **font)
@@ -323,9 +323,9 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
 
     import matplotlib.animation as animation
     from numpy import hstack, vstack   
-    from mujpy.aux.plot import errorb, plot_fit, decorate_data, decorate_data_late
-    from mujpy.aux.plot import plot_res, decorate_res, decorate_res_late, plot_txt, plot_chi2
-    from mujpy.aux.plot import draw
+    from mujpy.tools.plot import errorb, plot_fit, decorate_data, decorate_data_late
+    from mujpy.tools.plot import plot_res, decorate_res, decorate_res_late, plot_txt, plot_chi2
+    from mujpy.tools.plot import draw
     from datetime import datetime
 
     def animate_fit(i): 
@@ -518,7 +518,7 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
 #        # chi_dof packed by mufitplot: 
 
     t, y, ey, f_res, tf, f, dy_fit = data
-#    print('aux plot debug: max, min t {}, y {}, ey {}, f_res {}, tf {}, f {}, dy_fit {}'.format(
+#    print('tools plot debug: max, min t {}, y {}, ey {}, f_res {}, tf {}, f {}, dy_fit {}'.format(
 #                                                                                 [t.min(),t.max()],
 #                                                                                 [y.min(),y.max()],
 #                                                                               [ey.min(),ey.max()],
@@ -664,7 +664,7 @@ def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
     output the figure (anim for 2,3d a, af)
     '''
     from numpy import arange, array
-    from mujpy.aux.aux import autops, ps, _ps_acme_score, _ps_peak_minima_score
+    from mujpy.tools.tools import autops, ps, _ps_acme_score, _ps_peak_minima_score
     from copy import deepcopy
     import matplotlib.pyplot as P
     from matplotlib.path import Path
@@ -941,7 +941,7 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
     ax.axis('off')
     ax.set_ylim(ylim)
 
-    # print('plot_txt in aux.plot debug: chi_late = {}'.format(chi_late))
+    # print('plot_txt in tools.plot debug: chi_late = {}'.format(chi_late))
     if chi_late is not None: 
         mm = round(nu_early/4)
         hb = linspace(-mm,mm,2*mm+1)

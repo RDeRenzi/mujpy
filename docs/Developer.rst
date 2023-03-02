@@ -50,7 +50,7 @@ calculates chi2, see `mucomponents`_
 -------
 derange
 -------
-see aux
+see tools
 
 -------
 fitargs
@@ -82,7 +82,7 @@ fitplot
    * non global, split up again into three cases
 
      * anim for suites shwon as animations
-     * suites (no anim) uses plotile from `aux`_ to produce superposiion of plots
+     * suites (no anim) uses plotile from `tools`_ to produce superposiion of plots
      * single 
      
  * let's describe single as simplest example, it produces
@@ -141,7 +141,7 @@ started by pressing the Fit button
 -------
 plotile
 -------
-organizes multiplot shifted vertically, see `aux`_
+organizes multiplot shifted vertically, see `tools`_
 
 -------
 plotpar
@@ -151,7 +151,7 @@ plots fit resuts vs T or B
 -----
 rebin
 -----
-performs packing, see `aux`_
+performs packing, see `tools`_
 
 
 ------------
@@ -160,7 +160,7 @@ mucomponents
 a class dedicated to muon fit component functions, chi2 calculation and theirs services.
 
 ---
-aux
+tools
 ---
 utilities
 

@@ -23,7 +23,7 @@ class dash(object):
        muedge        >>
        muprompt      >>
     and on the library 
-       aux in aux/aux
+       tools in tools/tools
        
     function __init__(self)
 
@@ -60,7 +60,7 @@ class dash(object):
         self.__version__ = __version__
         # print('__init__ now ...')
 #        from mujpy import __file__ as MuJPyName
-        from mujpy.aux.aux import validmodel
+        from mujpy.tools.tools import validmodel
         import os
         import numpy as np
         from IPython.display import display# ,  HTML
@@ -257,7 +257,7 @@ class dash(object):
                 - check syntax
                 - load a new suite
                 '''
-                from mujpy.aux.aux import derun, thisrun
+                from mujpy.tools.tools import derun, thisrun
                 
                 runlist = derun(text_runlist.value)
                 if runlist:                
@@ -273,7 +273,7 @@ class dash(object):
                 load next run (if it exists)
                 '''
                 from time import sleep
-                from mujpy.aux.aux import nextrun
+                from mujpy.tools.tools import nextrun
                 # print('self.nrun[0] = {}'.format(self.nrun[0]))
 
                 runnext, datafile = nextrun(self.suite.datafile)
@@ -291,7 +291,7 @@ class dash(object):
                 actually load it
                 '''
                 from mujpy.musuite import suite 
-                from mujpy.aux.aux import get_title, get_totals, nextrun
+                from mujpy.tools.tools import get_title, get_totals, nextrun
                 grp_calib = self.suite.groups
                 offset = self.suite.offset  
                 self.suite = suite(datafile, run, grp_calib , offset,
@@ -312,7 +312,7 @@ class dash(object):
                 load from gui
                 '''
                 from mujpy.musuite import suite 
-                from mujpy.aux.aux import nextrun, path_file_dialog,  get_title, get_totals
+                from mujpy.tools.tools import nextrun, path_file_dialog,  get_title, get_totals
                 import os
                 import re
                 # from datetime import datetime
@@ -333,7 +333,7 @@ class dash(object):
                 load previous run (if it exists)
                 '''
                 from time import sleep
-                from mujpy.aux.aux import prevrun
+                from mujpy.tools.tools import prevrun
                 runprev, datafile = prevrun(self.suite.datafile)                  
                 # if runprev does not exist returns present run
                 if datafile != self.suite.datafile:        
@@ -349,7 +349,7 @@ class dash(object):
                                            
             from ipywidgets import Image, Text, Layout, HBox, Output, VBox, Tab
             from ipywidgets import Button, Label, Box, HTML
-            from mujpy.aux.aux import get_totals, get_title, get_datafilename, run_shorthand 
+            from mujpy.tools.tools import get_totals, get_title, get_datafilename, run_shorthand 
             import os                      
 
             file = open(os.path.join(self.__logopath__,"logo.png"), "rb")
@@ -535,7 +535,7 @@ class dash(object):
             '''
             gui version of grouping, path
             passed to suite via input (shorthand) grp_calib so that suite.groups = grp_calib 
-            converted to lists by get_grouping (aux) in suite.grouping
+            converted to lists by get_grouping (tools) in suite.grouping
             and passed to mudash via suite
             '''
            
@@ -543,7 +543,7 @@ class dash(object):
                 '''
                 store new version
                 '''
-                from mujpy.aux.aux import get_grouping
+                from mujpy.tools.tools import get_grouping
                 groupalpha = change['owner'].value # is string
                 if change['owner'].description[0]=='f':
                 # forward group k
@@ -577,7 +577,7 @@ class dash(object):
         ######### here starts the group method of mudash ####################################################
         #### new comment ####
             from ipywidgets import Text, Layout, HBox, FloatText, VBox
-            from mujpy.aux.aux import thisrun
+            from mujpy.tools.tools import thisrun
             textheight = '23px'
             # self.suite.grouping is a list of dictionaries with the two np.arrays of detetctor indices, forw and backw, plus an alpha value
             rows = [] # empty VBox content
@@ -691,7 +691,7 @@ class dash(object):
                 '''
                 loads fit values such that the same fit can be reproduced on the same data
                 '''
-                from mujpy.aux.aux import path_file_dialog
+                from mujpy.tools.tools import path_file_dialog
                 import json
                 if dropdwn_empty_tmplate.value==2:            
                     dashboard_file = path_file_dialog(self.suite.__templatepath__,'json') # returns the full path and filename
@@ -743,7 +743,7 @@ class dash(object):
                 copy latest groupings from the group tab to self.suite
                 and produce the json dashboard file            
                 '''
-                from mujpy.aux.aux import json_name
+                from mujpy.tools.tools import json_name
                 import json
                 import os
                 from numpy import array
@@ -825,7 +825,7 @@ class dash(object):
                             pardict.pop("function_multi",None)
                         # pardict["error"] is already set in dict_model_component
                         # deactivate error_propagate_multi, that was devised in the hand-written json dashboard 
-                        # Error propagation is dealt with numerically by jax grad, as in mujpy.aux.aux errorpropagate, at the best fit
+                        # Error propagation is dealt with numerically by jax grad, as in mujpy.tools.tools errorpropagate, at the best fit
                         pardicts.append(pardict) 
                     comp["pardicts"] = pardicts # list of dictionaries
                     model_guess.append(comp)  
@@ -876,7 +876,7 @@ class dash(object):
                 check for validity of function syntax
 
                 '''
-                from mujpy.aux.aux import muvalid
+                from mujpy.tools.tools import muvalid
 
                 dscr = change['owner'].description # description is three chars ('val','fun','flg') followed by an integer nint
                                                    # iterable in range(ntot), total number of internal parameters
@@ -920,7 +920,7 @@ class dash(object):
                 observe response of FIT, PLOT range widgets:
                 check for validity of function syntax
                 '''
-                from mujpy.aux.aux import derange
+                from mujpy.tools.tools import derange
                 import time
 
                 fit_or_plot = change['owner'].description[0] # description is a long sentence starting with 'fit range' or 'plot range'
@@ -1088,7 +1088,7 @@ class dash(object):
                 store new name
                 araba phoenix rebirth of gui 
                 '''
-                from mujpy.aux.aux import validmodel, create_model
+                from mujpy.tools.tools import validmodel, create_model
                 from json import loads as str2lst
                 #self.log('change["new"] is {}'.format(change['new']))
                 model = (change['new']['value']).strip() # removes accidental lead & trail blanks
@@ -1113,8 +1113,8 @@ class dash(object):
 ######### here starts the fit method of mudash ####################################################
             from ipywidgets import Text, IntText, Layout, Button, HBox, FloatText, \
                                    Checkbox, VBox, Dropdown, ToggleButton, Label
-            from mujpy.aux.aux import _available_components_, signif
-            from mujpy.aux.aux import path_file_dialog, create_model, addcomponent, name_of_model
+            from mujpy.tools.tools import _available_components_, signif
+            from mujpy.tools.tools import path_file_dialog, create_model, addcomponent, name_of_model
             import os
             
             list_available_components =_available_components_() # creates list automagically from mucomponents
