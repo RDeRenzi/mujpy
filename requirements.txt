@@ -14,4 +14,5 @@ jupyterlab 3.5.0b0
 NeXus 4.4.1
 nexusformat 0.5.3
 python-nexus 2.0.1
-musr2py 0.0.1
+musr2py 0.0.2
+munexus 0.1
