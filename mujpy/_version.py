@@ -1,6 +1,8 @@
 '''
 Version history
-Version  2.7.3 mudash works decently for non global fits
+Version  2.7.3 mudash works decently for non global, 
+                                         global single run multi group and 
+                                         global multirun single group fits
 Version  2.7.2 introduces grad in minuit, analytical gradients for mg for testing purposes.
                gradient works for all components but Kuto Toyabe only in single group multirun global fit
                works but has two drawbacks: it is slower and it requires a guess much closer to minimum
