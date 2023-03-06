@@ -20,12 +20,8 @@ In this context herw we explore another solution seeking the following advantage
 
 * Intuitive GUI approach, with attention to power-execution, presently from single fits to suites.
 * Based on python, a present growing standard.
-* Inserted in Jupyter-lab, a growing standard for data analysis
-* Potentially easy to install, also on macOS and Windows.
+* Inserted in Jupyterlab, a growing standard for data analysis, and offering with that a Browser interface
+* Easy to install, also on macOS and Windows.
 * Easily documented by ReadTheDocs
-
-Needs
-
-* implementing global fits (next)
-* refactoring to maximize ease of maintenance (this is a chimera, I know)
+* Implementing continuous integration [not yet ;)] 
   

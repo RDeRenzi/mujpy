@@ -3,6 +3,8 @@
 Tutorial
 ========
 
+[This is frozen at 2.0]
+
 We will walk through a few basic steps, assuming you have installed the following bits (see :ref:`installation`)
 
 - python

@@ -3,34 +3,49 @@
 Installation
 ============
 
-Mujpy is `python3` native, but its should work also with `python2` (open an `issue <https://github.com/RDeRenzi/mujpy/issues>`_ if not). In the following instructions for `python3` are given, it is easy to dapt to `python` instead (which defaults to python2 on most distributions). 
+Mujpy is `python3` native. 
 
 `Linux`_ `Windows`_ `Macos`_
 
 Linux
 -----
 
-Python comes with most distributions. To install jupyter 
+Python comes with most distributions. To install jupyterlab
 
 ::
 
     python3 -m pip install --upgrade pip
-    python3 -m pip install jupyter
-
-
-Future: to install mujpy
+    python3 -m pip install jupyterlab
 
 ::
 
     python3 -m pip install mujpy
 
-
-(for the moment download from `git <https://github.com/RDeRenzi/mujpy/>`_ - hit the top right green Clone or Download button)
+To upgrade to the newest distribution
+ git clone https://github.com/RDeRenzi/mujpy/ 
  
 Windows
 -------
 
-to come
+download Anaconda from https://anaconda.com_
+execute Anaconda.exe 
+launch Anaconda Prompt (Anaconda 3)
+from the Anaconda Prompt run
+
+::
+
+    conda install -c conda-force jupyterlab
+    
+download https://bootstrap.pypa.io/get-pip.py_
+find the Download path (download_path), and run the following in a jupyterlab cell 
+launch jupyterlab
+
+::
+
+    %cd download_path
+    %run get-pip.py
+    pip install mujpy
+
 
 Macos
 -----

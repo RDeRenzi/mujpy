@@ -1,6 +1,6 @@
 .. _developer:
 
-This is a stub.
+This is a stub for version 1.0
 
 Developer
 =========
