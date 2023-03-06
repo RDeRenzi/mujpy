@@ -87,6 +87,22 @@ Here you find a not-so-quick reference for its widgets.
 Almost each of them has a tiptool:  additional instructions appear when hovering with the mouse over the descriptive text or the button.
 
 ------
+Output
+------
+
+An output area is provided to the left of the gui: the live log from mudash goes there and it is added at the top while the text scrolls down.
+
+.. image:: Output.png
+
+Errors (bugs?) should be intercepted and redirected to the Jupyter Log Console, which can be opened selecting View/Show Log Console in the top Jupiter tabs
+
+.. image:: JupyterTabs.png
+
+The Jupyter Log Console appears at the bottom 
+
+.. image:: JupyterLogConsole.png 
+
+------
 Header
 ------
 
