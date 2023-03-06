@@ -1,5 +1,6 @@
 '''
 Version history
+Version  2.7.3.1 FIxin silly mistake in docs for the distro
 Version  2.7.3 mudash works decently for non global, 
                                          global single run multi group and 
                                          global multirun single group fits
