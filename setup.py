@@ -32,8 +32,8 @@ setup(name='mujpy',
       keywords = 'musr fit',
       classifiers=[
             'Development Status :: 4 - Beta',
-            'Intended Audience :: Users',
-            'Topic :: Physics',
+            'Intended Audience :: Science/Research',
+            'Topic :: Scientific/Engineering :: Physics',
             'License :: OSI Approved :: MIT License',
 
     # Specify the Python versions you support here. In particular, ensure
