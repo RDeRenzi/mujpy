@@ -1,5 +1,6 @@
 '''
 Version history
+--- 11/2024 transferred to  nex pc34
 Version  2.7.3.3a mistake in nexus, is this the last?
 Version  2.7.3.2 FIxin another silly mistake in docs for the distro (arghhh)
 Version  2.7.3.1 FIxin silly mistake in docs for the distro
