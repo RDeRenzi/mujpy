@@ -769,7 +769,7 @@ class dash(object):
                 group_index = -1 
                 # determine if number of groups was changed
                 rows = self.mainwindow.children[1].children # the granddaughter
-                group_number = sum([len(groups.children[0].children)//3 for groups in rows])
+                group_number = len(rows[0].children)
                 if group_number > len(self.suite.grouping):
                     for grp in range(len(self.suite.grouping),group_number):
                         self.suite.grouping.append({}) 
@@ -781,7 +781,8 @@ class dash(object):
                         group_index += 1
                         forward = array([int(s)-1 for s in row.children[0].children[j].value.split(',')])  
                         backward = array([int(s)-1 for s in row.children[0].children[j+1].value.split(',')])  
-                        alpha = float(row.children[0].children[j+2].value)                   
+                        alpha = float(row.children[0].children[j+2].value) 
+                        # print('debug fw = {:}, bw  = {:}, al = {:}'.format(forward,backward,alpha))                   
                         self.suite.grouping[group_index]['forward'] = forward # convert '1,2,3' into array([1,2,3])
                         self.suite.grouping[group_index]['backward'] = backward
                         self.suite.grouping[group_index]['alpha'] = alpha
@@ -866,7 +867,7 @@ class dash(object):
                                                    # iterable in range(ntot), total number of internal parameters
                 nint = int(dscr[2:]) # description='__'+str(nint)
                 if change['owner'].value == change['new']:
-                    self.log('changing flag {} to {}'.format(nint,change['owner'].value))
+                    # self.log('changing flag {} to {}'.format(nint,change['owner'].value))
                     list_function[nint].disabled = False if change['owner'].value=='=' else True
 
 

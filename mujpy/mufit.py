@@ -305,7 +305,7 @@ class mufit(object):
             if pospar:
                 for k in pospar:
                     self.lastfit.limits[k] = [None,None]   
-                    self.log('....fit again wih no lims')                 
+                #self.log('Releasing positive defined parameters, ....fit again wih no lims')                 
                 self.lastfit.migrad()
             self.lastfit.hesse()
         self.lastfits.append(self.lastfit) # not really needed by this fit
@@ -595,7 +595,7 @@ class mufit(object):
         from iminuit import Minuit
         from mujpy.tools.tools import int2min, int2_method_key, rebin_decay, write_csv, min2int
         
-        # self.log('Multigroup calib: does not work yet')
+        self.log('Multigroup calib sequential: broken ...')
         string = []
         for kgroup,group in enumerate(self.suite.grouping):
             yf,yb,bf,bb,yfm,ybm = self.suite.single_for_back_counts(self.suite._the_runs_[0],group) 
