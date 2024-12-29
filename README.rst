@@ -6,7 +6,7 @@ A Python MuSR data analysis graphical interface, based on classes, designed for 
 
 Released under the MIT licence.
 
-v. 2.0.alpha major refactoring. For the time being works only via jupyter-lab notebooks (mugui is broken)
+v. 2.0.alpha major refactoring. For the time being works only via jupyter-lab notebooks (mugui is broken). New pc34.
 Once cloned, run::
 
   jupyter-lab
