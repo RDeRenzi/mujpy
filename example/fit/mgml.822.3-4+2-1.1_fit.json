@@ -1,0 +1,173 @@
+{
+  "version": "1",
+  "fit_range": "0,20000,40",
+  "offset": 20,
+  "userpardicts_guess": [
+      {"name": "f",
+       "value":0.556,
+       "flag": "~",
+       "error":0.0001,
+       "limits":[0,null],
+       "local":false},
+      {"name": "A34",
+       "value":0.267,
+       "flag": "~",
+       "error":0.0001,
+       "limits":[0,null],
+       "local":false},
+      {"name": "A21",
+       "value":0.249,
+       "flag": "~",
+       "error":0.0001,
+       "limits":[0,null],
+       "local":false},
+      {"name": "B",
+       "value":10.02,
+       "flag": "~",
+       "error":0.01,
+       "limits":[null,null],
+       "local":false},
+      {"name": "φ",
+       "value":35.0,
+       "flag": "~",
+       "error":0.1,
+       "limits":[null,null],
+       "local":false},
+      {"name": "σ",
+       "value":0.05,
+       "flag": "~",
+       "error":0.1,
+       "positive_parity":true,
+       "limits":[0,null],
+       "local":false},
+      {"name": "λ",
+       "value":0.8,
+       "flag": "~",
+       "error":0.002,
+       "limits":[null,null],
+       "local":false}   
+  ],
+  "model_guess": [
+    {
+      "name": "mg",
+      "label": "0",
+      "pardicts": [
+        {
+          "name": "A",
+          "error": 0.002,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.1,
+          "flag": "=",
+          "function": "",
+          "function_multi":
+	  [
+	  "p[0]*p[1]",
+           "p[0]*p[2]"
+	  ],
+          "error_propagate_multi": [
+          "sqrt((e[0]*p[1])**2+(p[0]*e[1])**2)",
+	  "sqrt((e[0]*p[2])**2+(p[0]*e[2])**2)"
+          ]
+        },
+        {
+          "name": "B",
+          "error": 0.1,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 10.0,
+          "flag": "=",
+          "function": "p[3]"
+        },
+        {
+          "name": "φ",
+          "error": 1.0,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.0,
+          "flag": "=",
+          "function": "",
+          "function_multi":["p[4]","p[4]-90."],
+ 	  "error_propagate_multi":["e[4]","e[4]"]
+ 	},
+        {
+          "name": "σ",
+          "error": 0.002,
+          "limits": [
+            0.0,
+            null
+          ],
+          "value": 0.0,
+          "flag": "~",
+          "function": "p[5]"
+        }
+      ]
+    },
+    {
+      "name": "ml",
+      "label": "1",
+      "pardicts": [
+        {
+          "name": "A",
+          "error": 0.002,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.1,
+          "flag": "=",
+          "function": "",
+          "function_multi":[
+	  "(1-p[0])*p[1]",
+	  "(1-p[0])*p[2]"
+	  ],
+          "error_propagate_multi": [
+           "sqrt((e[0]*p[1])**2+(p[0]*e[1])**2)",
+	   "sqrt((e[0]*p[2])**2+(p[0]*e[2])**2)"
+           ]
+        },
+        {
+          "name": "B",
+          "error": 0.1,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 10.0,
+          "flag": "=",
+          "function": "p[3]"
+        },
+        {
+          "name": "φ",
+          "error": 1.0,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.0,
+          "flag": "=",
+          "function": "",
+          "function_multi":["p[4]","p[4]-90."],            
+	  "error_propagate_multi":["e[4]","e[4]"]
+	},
+        {
+          "name": "λ",
+          "error": 0.002,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.0,
+          "flag": "=",
+          "function": "p[6]"
+        }
+      ]
+    }
+  ]
+}

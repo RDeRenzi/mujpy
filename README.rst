@@ -2,24 +2,26 @@
 MuJPy
 *****
 
-A Python MuSR data analysis graphical interface, based on classes, designed for jupyter.
+A Python MuSR data analysis based on classes, with a graphical interface designed for jupyter, released under the MIT licence.
 
-Released under the MIT licence.
-
-v. 2.0.alpha major refactoring. For the time being works only via jupyter-lab notebooks (mugui is broken). New pc34.
-Once cloned, run::
+v. 2.0.alpha major refactoring. For the time being works only via python3 scripts (see example test.py) and jupyter-lab notebooks 
+(mudash is broken). Once cloned, run test.py, or::
 
   jupyter-lab
 
 and launch the example/Tst_xxx.ipynb notebooks (check path to suitable data files for the tested type of fit)
 
+or run, e.g. for a single run single group fit:: 
+ 
+  python mgml.822.3-4.1_fit.py
+
 Each notebook shows how to perform
-* TF calibration, both single group (A1-calib) and multigroup (A2-calib), either sequential or global 
-* single run fit (A1), 
+* TF calibration, both single group (A1_calib) and multigroup, either sequential (A20_calib) or global (A21_calib) 
+* correspondinmg single run fit (A1,A20,A21), 
 * sequential single run fits (B1),
-* single run multi-group fit (A2), either sequential or global
 with plots: static for single fit, animated plots for multiple fits (both sequential or global) and optional fft
 
+Modify these scripts to your purposes. The clumsy part is to modify by hand the models fit/... .json
 Linux installation instructions, Valid on WIN10 that has a linux shell, to come.
 Docs not updated yet
 

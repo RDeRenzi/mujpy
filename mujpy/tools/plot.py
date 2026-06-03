@@ -3,7 +3,7 @@
 ################
 
 def plot_parameters(nsub,labels,fig=None): 
-    '''
+    r'''
     standard plot of fit parameters vs B,T (or X to be implemente)
     input
        nsub<6 is the number of subplots
@@ -186,8 +186,8 @@ def set_fig(num,nrow,ncol,title,**kwargs):  # NOT CLEAR WHERE IT IS USED
     fig.canvas.manager.set_window_title(title)
     return fig, ax  
 
-def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):
-    '''
+def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):#,canvas=None):
+    r'''
     input:
         
         flags = [early_late, anim] True/False
@@ -231,13 +231,13 @@ def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,c
     else:
         ncols, width_ratios = 2,[4,1]
 
-    try:    
+    if fig:
         fig.clf()
         fig,ax = P.subplots(2,ncols,sharex = 'col', 
                      gridspec_kw = {'height_ratios':[3,1],'width_ratios':width_ratios},
                                     num=fig.number)
         fig.subplots_adjust(hspace=0.05,top=0.90,bottom=0.12,right=0.97,wspace=0.03)
-    except: # handle does not exist, make one
+    else: # handle does not exist, make one
         fig,ax = P.subplots(2,ncols,figsize=(6,4),sharex = 'col',
                      gridspec_kw = {'height_ratios':[3, 1],'width_ratios':width_ratios})
         fig.canvas.manager.set_window_title('Fit')
@@ -298,7 +298,7 @@ def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,c
     return fig
 
 def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):
-    '''
+    r'''
     input:
         
         flags = [early_late, anim] True/False
@@ -373,7 +373,9 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         else:
             string1 = 'F-B: {} - {}\n'.format(fgroup[i],bgroup[i])
             string1 += r'$\alpha=$ {:.4f}'.format(alpha[i])
-        string1 += '\n$\chi^2_f=$ {:.4f}\n ({:.2f}-{:.2f})\n{} dof'.format(chi_fit[i],lc,hc,nu_fit) 
+        string1 += '\n'
+        string1 += r'$\chi^2_f=$ {:.4f}'.format(chi_fit[i])
+        string1 += '\n ({:.2f}-{:.2f})\n{} dof'.format(lc,hc,nu_fit) 
         text1.set_text(string1)
 
         if early_late:
@@ -405,8 +407,10 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
             vertl[2::5, 1] = top
             
             #nufitplot.set_ydata(nufit[i]*yh)
-            string2 = '$\chi^2_e=$ {:.4f}\n({:.2f}-{:.2f})'.format(chi_fit_early[i],lce,hce)
-            string3 = '$\chi^2_l=$ {:.4f}\n({:.2f}-{:.2f})'.format(chi_fit_late[i],lcl,hcl)
+            string2 = r'$\chi^2_e=$ {:.4f}'.format(chi_fit_early[i])
+            string2 += '\n({:.2f}-{:.2f})'.format(lce,hce)
+            string3 = r'$\chi^2_l=$ {:.4f}'.format(chi_fit_late[i])
+            string3 += '\n({:.2f}-{:.2f})'.format(lcl,hcl)
             text2.set_text(string2)
             text3.set_text(string3)
 
@@ -448,7 +452,9 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         # update text
         string1 = 'F-B: {} - {}\n'.format(fgroup[0],bgroup[0])
         string1 += r'$\alpha=$ {:.4f}'.format(alpha[0])
-        string1 += '\n$\chi^2_f=$ {:.4f}\n ({:.2f}-{:.2f})\n{} dof'.format(chi_fit[0],lc,hc,nu_fit) 
+        string1 += '\n'
+        string1 += r'$\chi^2_f=$ {:.4f}'.format(chi_fit[0])
+        string1 += '\n ({:.2f}-{:.2f})\n{} dof'.format(lc,hc,nu_fit) 
         text1.set_text(string1)
 
         if early_late:
@@ -481,8 +487,10 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
             vertl[2::5, 1] = top
             
             #nufitplot.set_ydata(nufit[i]*yh)
-            string2 = '$\chi^2_e=$ {:.4f}\n({:.2f}-{:.2f})'.format(chi_fit_early[0],lce,hce)
-            string3 = '$\chi^2_l=$ {:.4f}\n({:.2f}-{:.2f})'.format(chi_fit_late[0],lcl,hcl)
+            string2 = r'$\chi^2_e=$ {:.4f}'.format(chi_fit_early[0])
+            string2 += '\n({:.2f}-{:.2f})'.format(lce,hce)
+            string3 = r'$\chi^2_l=$ {:.4f}'.format(chi_fit_late[0])
+            string3 += '\n({:.2f}-{:.2f})'.format(lcl,hcl)
             text2.set_text(string2)
             text3.set_text(string3)
             return (line, ye, fline, res, linel, yel, flinel, resl, linesp, linesm, line2sp,
@@ -527,8 +535,9 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
 #                                                                                 [f.min(),t.max()],
 #                                                                      [dy_fit.min(),dy_fit.max()]))
     fgroup, bgroup, alpha = group
-    nu_fit, chi_fit = chi_dof  
-    n = len(chi_fit)
+    nu_fit, chi_fit = chi_dof
+    for k in range(len(chi_fit)):
+        n = len(chi_fit)
       
     if early_late:
         ncols, width_ratios = 3,[2,2,1]
@@ -936,7 +945,9 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
     
     string1 = 'F-B: {} - {}\n'.format(fgroup,bgroup)
     string1 += r'$\alpha=$ {:.4f}'.format(alpha)
-    string1 += '\n$\chi^2_r=$ {:.3f}\n ({:.2f}-{:.2f})\n{} dof'.format(chi_fit,lc,hc,nu_fit)
+    string1 += '\n'
+    string1 += r'$\chi^2_r=$ {:.3f}'.format(chi_fit)
+    string1 += '\n ({:.2f}-{:.2f})\n{} dof'.format(lc,hc,nu_fit)
     text1 = ax.text(xtxt,ylim[0]+0.55*dylim,string1,bbox={'facecolor': 'white', 'pad': pad}) 
     ax.axis('off')
     ax.set_ylim(ylim)
@@ -948,13 +959,13 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
         cc = gammainc((hb+nu_early)/2,nu_early/2) # muchi2cdf(x,nu) = gammainc(x/2, nu/2);
         lce = 1+hb[min(list(where((cc<norm.cdf(1))&(cc>norm.cdf(-1))))[0])]/nu_early
         hce = 1+hb[max(list(where((cc<norm.cdf(1))&(cc>norm.cdf(-1))))[0])]/nu_early
-        string2 = '$\chi^2_e$ = {:.3f}\n({:.2f}-{:.2f})'.format(chi_early,lce,hce) 
+        string2 = r'$\chi^2_e$ = {:.3f}\n({:.2f}-{:.2f})'.format(chi_early,lce,hce) 
         mml = round(nu_late/4)
         hbl = linspace(-mml,mml,2*mml+1)
         ccl = gammainc((hbl+nu_late)/2,nu_late/2) # muchi2cdf(x,nu) = gammainc(x/2, nu/2);
         lcl = 1+hbl[min(list(where((ccl<norm.cdf(1))&(ccl>norm.cdf(-1))))[0])]/nu_late
         hcl = 1+hbl[max(list(where((ccl<norm.cdf(1))&(ccl>norm.cdf(-1))))[0])]/nu_late
-        string3 = '$\chi^2_l$ = {:.3f}\n({:.2f}-{:.2f})'.format(chi_late,lcl,hcl) 
+        string3 = r'$\chi^2_l$ = {:.3f}\n({:.2f}-{:.2f})'.format(chi_late,lcl,hcl) 
         text2 = ax.text(xtxt,ylim[0]+0.28*dylim,string2,
                         bbox={'facecolor': color[0], 'alpha': transalpha, 'pad': pad})
         dyl = dylim/50
@@ -1020,7 +1031,7 @@ def plot_chi2(ax,dy_fit,nu_fit,dy_early,w_early,dy_late,w_late):
     xh = linspace(-5.5,5.5,23)
     yh = norm.cdf(xh+1)-norm.cdf(xh)
     ax.plot(xh+0.5,nu_fit*yh,'-',color=color[1])
-    ax.set_xlabel("$\sigma$")
+    ax.set_xlabel(r"$\sigma$")
     ax.yaxis.set_major_formatter(ticker.NullFormatter())
     ax.set_xlim([-5.5, 5.5])
     if isinstance(dy_late,ndarray):
@@ -1033,11 +1044,17 @@ def draw(fig):
     '''
     import matplotlib.pyplot as P
     cfm = P.get_current_fig_manager()
-    if hasattr(cfm.window,'attributes'):
-        cfm.window.attributes('-topmost', True) # Tkinter backend
-        cfm.window.attributes('-topmost', False)
+    if hasattr(cfm,'window'):
+        if hasattr(cfm.window,'attributes'):
+            cfm.window.attributes('-topmost', True) # Tkinter backend
+            cfm.window.attributes('-topmost', False)
     #cfm.window.activateWindow()
     #cfm.window.raise_()
     #fig.canvas.manager.window.tkraise()# fig.canvas.manager.window.raise_()
+#    if canvas:
+#        with canvas:
+#            P.draw()
+#    else:
+#        P.draw()
     P.draw()
     

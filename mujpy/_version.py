@@ -1,5 +1,12 @@
 '''
 Version history
+Version  2.8   new classes muroot2py.muroot2py muroot2py based on uproot
+               and muisis2py.muisis2py munxs2py based on nexusformat.
+               debugged A1 A1_calib A20 A20_calib A21 A21_calib B1 modes
+               new example/test.py, individual python3 command scripts
+               and models in example/fit/....1_fit.json
+               mudash is not adequately implemented yet
+________________________________________________________________________               
 --- 11/2024 transferred to  nex pc34
 Version  2.7.3.3a mistake in nexus, is this the last?
 Version  2.7.3.2 FIxin another silly mistake in docs for the distro (arghhh)
@@ -32,4 +39,4 @@ Versions 1.x, not documented, based on mujpy.mugui, enclusing both gui and funct
                        class muedge and muprompt for t=0 determination at isis and psi bulkmusr  
 
 '''
-__version__ = "2.7.3"
+__version__ = "2.8"

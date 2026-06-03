@@ -1,0 +1,225 @@
+{
+  "version": "1",
+  "fit_range": "0,20000,40",
+  "offset": 20,
+  "model_guess": [
+    {
+      "name": "mg",
+      "label": "0",
+      "pardicts": [
+        {
+          "name": "A",
+          "error": 0.002,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.1,
+          "flag": "~",
+          "function": ""
+        },
+        {
+          "name": "B",
+          "error": 0.1,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 10.0,
+          "flag": "~",
+          "function": ""
+        },
+        {
+          "name": "φ",
+          "error": 1.0,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.0,
+          "flag": "~",
+          "function": ""
+        },
+        {
+          "name": "σ",
+          "error": 0.002,
+          "limits": [
+            0.0,
+            null
+          ],
+          "value": 0.0,
+          "flag": "~",
+          "function": ""
+        }
+      ]
+    },
+    {
+      "name": "ml",
+      "label": "1",
+      "pardicts": [
+        {
+          "name": "A",
+          "error": 0.002,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.1,
+          "flag": "~",
+          "function": ""
+        },
+        {
+          "name": "B",
+          "error": 0.1,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 10.0,
+          "flag": "~",
+          "function": ""
+        },
+        {
+          "name": "φ",
+          "error": 1.0,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.0,
+          "flag": "=",
+          "function": "p[2]"
+        },
+        {
+          "name": "λ",
+          "error": 0.002,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.0,
+          "flag": "~",
+          "function": ""
+        }
+      ]
+    }
+  ],
+  "model_result": [
+    {
+      "name": "mg",
+      "label": "0",
+      "pardicts": [
+        {
+          "name": "A",
+          "error": 0.002,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.04572890584115737,
+          "flag": "~",
+          "function": "",
+          "std": 0.01112970380829291
+        },
+        {
+          "name": "B",
+          "error": 0.1,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.16240596528087636,
+          "flag": "~",
+          "function": "",
+          "std": 0.0993911498038505
+        },
+        {
+          "name": "φ",
+          "error": 1.0,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 15.797002157361467,
+          "flag": "~",
+          "function": "",
+          "std": 33.05488673279972
+        },
+        {
+          "name": "σ",
+          "error": 0.002,
+          "limits": [
+            0.0,
+            null
+          ],
+          "value": 0.00012090373350707095,
+          "flag": "~",
+          "function": "",
+          "std": 0.13688681789264173
+        }
+      ]
+    },
+    {
+      "name": "ml",
+      "label": "1",
+      "pardicts": [
+        {
+          "name": "A",
+          "error": 0.002,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 0.15243819983252874,
+          "flag": "~",
+          "function": "",
+          "std": 0.028448927733282267
+        },
+        {
+          "name": "B",
+          "error": 0.1,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 7.821735979278599,
+          "flag": "~",
+          "function": "",
+          "std": 3.0517618877030226
+        },
+        {
+          "name": "φ",
+          "error": 1.0,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 15.797002157361467,
+          "flag": "=",
+          "function": "p[2]",
+          "std": 33.05488673279972
+        },
+        {
+          "name": "λ",
+          "error": 0.002,
+          "limits": [
+            null,
+            null
+          ],
+          "value": 9.124164115805522,
+          "flag": "~",
+          "function": "",
+          "std": 2.5307341785832533
+        }
+      ]
+    }
+  ],
+  "chi2": 1.214370204768475,
+  "grp_calib": [
+    {
+      "forward": "3",
+      "backward": "4",
+      "alpha": 1.13
+    }
+  ]
+}

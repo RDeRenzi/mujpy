@@ -414,7 +414,6 @@ def _nparam(model):
     output: ntot, nmintot, nfree
     '''
     number_components = len(model)
-    # print('_nparam tools debug: model {}'.format(model))
     ntot = sum([len(model[k]['pardicts']) 
                                  for k in range(number_components)]) # total number of component parameters
     flag = [pardict['flag'] for component in model for pardict in component['pardicts']]
@@ -472,8 +471,6 @@ def int2min(model):
                 names.append(pardict['name']+'_'+label) 
                 err.append(float(pardict['error']))
                 lim.append(pardict['limits'])
-                # print('tools int2min debug: pardict name {} limits {}'.format(names[-1],lim[-1]))
-    # self.console('val = {}\nerr = {}\nfix = {}\nlim = {},\npar name = {} '.format(val,err,fix,lim, names)) 
 
     return val, err, fix, lim, names, pospar
 
@@ -510,7 +507,6 @@ def int2min_multigroup(pardicts):
         err.append(float(pardict[errstd]))
         if 'error' in pardict.keys():
             lim.append(pardict['limits'])
-            # print('tools debug: par {} limits {}'.format(pardict['name'],pardict['limits']))
         if 'flag' in pardict.keys():
             if pardict['flag'] == '!':
                 fix.append(True)
@@ -576,7 +572,6 @@ def int2min_multirun(dashboard,runs):
             err.append(pardict[errstd])
             if 'error' in pardict.keys():
                 lim.append(pardict['limits'])
-                # print('tools debug: par {} limits {}'.format(pardict['name'],pardict['limits']))
             if 'flag' in pardict.keys():
                 if pardict['flag'] == '!':
                     fix.append(True)
@@ -703,11 +698,10 @@ def int2_method_key(dashboard,the_model):
     for k in range(len(model_guess)):  # scan the model
         name = model_guess[k]['name']
         # print('name = {}, model = {}'.format(name,self._the_model_))
-        is_al_da = name=='al' or name=='da'
-        bndmthd = [] if is_al_da else the_model.__getattribute__(name) 
+        is_al = name=='al'
+        bndmthd = [] if is_al else the_model.__getattribute__(name) 
                             # this is the method to calculate a component, to set alpha, dalpha apart
         keys = []
-        # isminuit = [] not used
         flag = [item['flag'] for item in model_guess[k]['pardicts']]
         for j,pardict in enumerate(model_guess[k]['pardicts']): 
             nint += 1  # internal parameter incremente always   
@@ -715,9 +709,10 @@ def int2_method_key(dashboard,the_model):
                 # nint must be translated into nmin 
                 string = translate(nint,lmin,pardict['function']) # here is where lmin is used
                 # translate substitutes lmin[n] where n is the index read in the function (e.g. p[3])
+                # n is the parameter index but previous indices may also be "=", i.e. not in the minuit indices
+                #print('debug int2_method_key: key = {}, p =  {}'.format(
                 key_as_lambda = set_key(string) # NEW! calculates simple functions and speedup
                 keys.append(key_as_lambda) # the function key in keys will be evaluated, key(p), inside mucomponents
-                # isminuit.append(False)
                 lmin.append(0)
             else:# flag[j] == '~' or flag[j] == '!'
                 nmin += 1
@@ -725,7 +720,6 @@ def int2_method_key(dashboard,the_model):
                 keys.append(key_as_lambda) # the function key in keys will be evaluated, key(p), inside mucomponents
                 lmin.append(nmin) # 
                 # isminuit.append(True)
-        # print('int2_method tools debug: bndmthd = {}, keys = {}'.format(bndmthd,keys))
         method_key.append([bndmthd,keys]) 
     return method_key
 
@@ -734,73 +728,45 @@ def int2_multigroup_method_key(dashboard,the_model):
     input: 
         dashboard, the dashboard dict structure
         fit._the_model_ is an instance of mumodel 
-            (the number of groups is obtained from dashboard)
-    output: a list of methods and keys, in the order of the model components 
-            for the use of mumodel._add_multigroup_.
-            method is a 2d vector function 
-            accepting time and a variable number of lists of (component) parameters
-                e.g if one component is mumodel.bl(x,A,λ)
-                the corresponding component for a two group fit 
-                accepts the following argument (t,[A1, A2],[λ1,λ2])               
-            keys is a list of lists of strings 
-            they are evaluated to produce the method parameters, 
-            there are 
-                ngroups strings per parameter (inner list)
-                npar parametes per component (outer list)
-    Invoked by the iMinuit initializing call
-             self._the_model_._load_data_multigroup_
-    just before submitting migrad, 
-
-    This function does not need userpardicts and tools.translate 
-    since the correspondence with Minuit parameters
-    is given directly either by "function" or by "function_multi"
+            (number of groups from dashboard)
+    output: method_key = [method, keys] for mumodel._add_multigroup_ 
+            method is 2d vector-function(t,*par) 
+                e.g mumodel.bl(x,A,λ) for a two group fit 
+                method accepts argument (t,[A1, A2],[λ1,λ2])               
+                obtained evaluating algebra in string key (in keys, list of group-lists)          
+                that calculate method parameters for each group, 
     '''
-    from mujpy.tools.tools import multigroup_in_components, cstack, setkey
+    from mujpy.tools.tools import function_multi_in_components, cstack, set_key
     
-    model = dashboard['model_guess']  # guess surely exists
-    # these are the only Minuit parameters [p[k] for k in range (nuser)]
+    model = dashboard['model_guess']  
     ntot = sum([len(model[k]['pardicts']) for k in range(len(model))])
     method_key = []
     pardicts = [pardict for component in model for pardict in component['pardicts']]
-    mask_function_multi = multigroup_in_components(dashboard)
-    # print('int2_multigroup_method_key tools debug: index function_multi {}\npardicts = {}'.format(mask_function_multi,pardicts))
-#    if "userpardicts_guess" in dashboard.keys():
-#        updicts =  dashboard["userpardicts_guess"]
-#        print('int2_multigroup_method_key tools debug: userpardicts ')
-#        for j,pd in enumerate(updicts):
-#            print('{} {} = {}({}), {}, {} '.format(j,pd["name"],pd["value"],
-#                                    pd["error"], pd["flag"],pd["limits"]))
+    mask_function_multi = function_multi_in_components(dashboard) # True for function_multi, False for function
+
     if sum(mask_function_multi):
-        ngroups = len(pardicts[mask_function_multi.index(1)]["function_multi"])
+        ngroups = len(pardicts[mask_function_multi.index(1)]["function_multi"]) # counts groups
     else:
         return []
     nint = -1 # initialize the index of the dashboard component parameters
-    # p = [1.13,1.05,0.25,0.3,0.8,700,35,125,3.3,680,0.1] # debug delete
-    # print('tools int2_multigroup_method_key debug: fake values k, p {}'.format([[k,par] for k,par in enumerate(p)]))
-    bndmthd = {} # to avoid same name
-    for j,component in enumerate(model):  # scan the model components
+    bndmthd = {} # to load the [name] key
+    for j,component in enumerate(model):  # scan the pardicts of model components  
         name = component['name']
         keys = []
         bndmthd[name] = lambda x,*pars, name=name : cstack(the_model.__getattribute__(name),x,*pars)
         bndmthd[name].__doc__ = '"""'+name+'"""'
-                            # this is the method to calculate a component, to set alpha, dalpha apart
-        #print('\n\tools int2_multigroup_method_key debug: {}-th component name = {}'.format(j,bndmthd[name].__doc__))
-        nint0 = nint
+        nint0 = nint # increments nint0 for next component
         for l in range(ngroups):
             key = []  
-            nint = nint0
+            nint = nint0 # starts from same nint0 for both groups
             for pardict in component['pardicts']: 
                 nint += 1  # internal parameter index incremented always 
-                if mask_function_multi[nint]>0:
-#                    print('tools int2_multigroup_method_key debug: {}[{}] = {}'.format(pardict["name"],l,pardict["function_multi"][l])) 
-                    key_as_lambda = set_key(pardict["function_multi"][l]) # NEW! calculates simple functions and speedup
+                if mask_function_multi[nint]:
+                    key_as_lambda = set_key(pardict["function_multi"][l]) 
                 else:                
-#                    print('tools int2_multigroup_method_key debug: {}[{}] = {}'.format(pardict["name"],l,pardict["function"])) 
-                    key_as_lambda = set_key(pardict["function"][l]) # NEW! calculates simple functions and speedup
-                # print('tools int2_multigroup_method_key debug: key_as_lambda(p) = {} **delete also p!'.format(key_as_lambda(p)))
-                key.append(key_as_lambda) # the function key will be evaluated, key(p), inside mucomponents
+                    key_as_lambda = set_key(pardict["function"]) 
+                key.append(key_as_lambda) # evaluated as key(p) in mucomponents
             keys.append(key)
-        #print('int2_method tools debug: appending {}-th bndmthd {} with {} groups x {} keys'.format(j,bndmthd[name].__doc__,len(keys),len(keys[0])))
         method_key.append([bndmthd[name],keys]) # vectorialized method, with keys 
         # keys = [[strp0g0, strp1g0,...],[strp0g1, strp1g1, ..],[strp0g2, strp1g2,...]..]
         # pars = [[p0g0, p1g0, ...],[p0g1, p1g1, ..],[p0g2, p1g2,...]..]
@@ -833,7 +799,7 @@ def int2_multirun_user_method_key(dashboard,the_model,nruns):
              self._the_model_._load_data_multirun_user_
     just before submitting migrad
     '''
-    from mujpy.tools.tools import multigroup_in_components, cstack, translate_multirun, set_key
+    from mujpy.tools.tools import cstack, translate_multirun, set_key#, function_multi_in_components
     from mujpy.tools.tools import get_functions_in
 #            self._components_ is a list [[method,[key,...,key]],...,[method,[key,...,key]]], 
 #                produced by int2_multirun_user_method_key() from mujpy.tools.tools
@@ -854,6 +820,7 @@ def int2_multirun_user_method_key(dashboard,the_model,nruns):
         name = component['name']
         keys = []
         # this method uses pars, a list of lists (runs) of parameter for this component, obtained by key(p) from minuit p
+        
         bndmthd[name] = lambda x,*pars, name=name : cstack(the_model.__getattribute__(name),x,*pars)
         bndmthd[name].__doc__ = '"""'+name+'"""'
                             # no alpha in global multirun!
@@ -900,7 +867,7 @@ def int2_multirun_grad_method_key(dashboard,the_model,nruns):
           hereafter            dcdf                                   * sum_n,j           dkndj                                *               djdm        
     '''
     from mujpy.tools.tools import get_functions_in, diffunc, get_indices, get_number_minuit_internal
-    from mujpy.tools.tools import multigroup_in_components, translate_multirun, set_key
+    from mujpy.tools.tools import translate_multirun, set_key #, function_multi_in_components
     # firts generate dmethod_keys
     # dmethod_keys contains [[m_d,keys]...[m_d,keys]], as many as the model components (e.g. 2 for mgbl)
     # m_d is [method] if no derivative is required (e.g. bl) 
@@ -975,51 +942,27 @@ def set_key(string):
     output: key, a python method, such that in mumodel mucomponents _add_ the command 
             key(p) evaluates the formula 
             the evaluation knows simple numpy functions, see the import in string code, below
+    COMMENTS: maybe not the simplest, but it works
+    try the following in ipython3
+        from mujpy.tools.tools import set_key
+        p = [1,2,3,4]
+        key = set_key('p[2]')
+        key(p)
+    Out[] 3
     """
     code = """
 from numpy import cos, sin, tan, sinh, cosh, tanh, log, pi, exp, sqrt, real, abs, arctan
 def foo():
 """
-    string = '"lambda p: '+string+ '"' 
-    string = "    key = eval('"+string+"')"
+    string = "    key = eval('"+'lambda p: '+string +"')"
     # print('string ={}'.format(string))
     code = code + string + """
     return key
 """
     # print('code = {}'.format(code))
-    exec(code,globals(),globals())
-    key = eval(foo())
-    return key   
+    exec(code,globals(),globals())   # foo is defined by executing code
+    return eval('foo()') # key = set_key('p[2') when p = [10,11,12,13], key(p) returns 12  
         
-#def fstack(npfunc,x,*pars):
-#    '''
-#    vectorialize npfunc
-#    input: 
-#        npfunc numpy function with input (x,*argv)
-#        x time
-#        *pars is a list of lists of parameters, 
-#              list len is the output_function_array.shape[0]
-#    output:
-#        output_function_array
-#            stacks vertically n replica of npfunc distributing parameters as in
-#            (x, *argv[i]) for each i-th replica 
-#    '''
-#    # fstack reproduces the parameter input of a component according to         
-#    # self._components_ = [[method,[key,...,key]],...,[method,[key,...,key]]], and eval(key) produces the parmeter value
-#    # where the outer list a replica of the same component method 
-#    # either over several groups (multigroup) or over several runs (multirun)
-#    # as of now this method does not work for the multirun multigroup userpar case (C2)
-
-#    from numpy import vstack
-#    for k,par in enumerate(pars):
-#        if k:
-#            # print('tools fstack debug: npfunc.__doc__: {}'.format(npfunc.__doc__))
-#            f = vstack((f,npfunc(x,*par)))
-#        else:
-#            # print('tools fstack debug: k=0 npfunc.__doc__: {}'.format(npfunc.__doc__))
-#            f = npfunc(x,*par)
-#    return f
-    
 def cstack(npfunc,x,*pars):
     '''
     vectorialize npfunc
@@ -1039,7 +982,9 @@ def cstack(npfunc,x,*pars):
     # either over several groups (multigroup) or over several runs (multirun)
     # as of now this method does not work for the multirun multigroup userpar case (C2)
 
-    from numpy import concatenate    
+    from numpy import concatenate 
+    # print('debug tools.cstack: npfunc = {} pars = {}'.format(npfunc,pars))
+    # reshape makes as many rows as necessary, each with x.shape[0] columns   
     return concatenate([npfunc(x,*par) for par in pars]).reshape(-1,x.shape[0])
     
 def int2_calib_method_key(dashboard,the_model):
@@ -1113,7 +1058,6 @@ def int2_calib_multigroup_method_key(dashboard,the_model):
     but alpha is popped and shared or formula-determined ('=') ones are not minuit parameters  
     '''
     from mujpy.tools.tools import translate
-    print('int2_calib_multigroup_method_key tools debug: copy of non multigroup, adapt!')
     model_guess = dashboard['model_guess']  # guess surely exists
 
     ntot = sum([len(model_guess[k]['pardicts']) for k in range(len(model_guess))])-1 # minus alpha
@@ -1169,7 +1113,6 @@ def min2int(model_guess,values_in,errors_in):
     nmin = -1
     lmin = []
     flag = [pardict['flag'] for component in model_guess for pardict in component['pardicts']]
-#    flag = [pardict['flag'] for component in model_guess for pardict in component['pardicts']]
     for k,component in enumerate(model_guess):  # scan the model
         component_name = component['name']
         name, value, error = [], [], []
@@ -1186,6 +1129,7 @@ def min2int(model_guess,values_in,errors_in):
                 lmin.append(nmin)
                 p.append(values_in[nmin]) # needed also by functions
                 value.append(values_in[nmin])
+                # print('diretto p_in[{}] = {} -> {}'.format(nmin,p[-1],value[-1]))
                 e.append(errors_in[nmin])
                 error.append(errors_in[nmin]) # parvalue item is a string
             else: # functions, calculate as such
@@ -1193,8 +1137,9 @@ def min2int(model_guess,values_in,errors_in):
                 string = translate(nint,lmin,pardict['function'])  
                 p.append(eval(string))
                 value.append(eval(string))
+                # print('{} shared p_in = {} -> {}'.format(string,p[-1],value[-1]))
                 e.append(eval(string.replace('p','e')))
-                error.append(eval(string.replace('p','e')))
+                error.append(eval(string.replace('p','e'))) # this is where e is used
                 lmin.append(0) # not needed
         names.append(name)
         values_out.append(value)
@@ -1220,7 +1165,7 @@ def min2int_multirun(dashboard,p,e,_the_runs_):
     # 
     # initialize
     #
-    from mujpy.tools.tools import multigroup_in_components
+#    from mujpy.tools.tools import function_multi_in_components
 
     names, pars, epars = [], [], []
     nameloc, npars, n_locals = [], -1, 0# inner list, components
@@ -1268,7 +1213,7 @@ def min2int_multigroup(dashboard,p,e):
     input:
         userpardicts_guess from dashboard 
             (each dict corresponds to a Minuit parameter)
-x\            used only to retrieve "function" 
+            used only to retrieve "function" 
             and "error_propagation_multi"
             p,e Minuit best fit parameter values and std
     output: for all parameters
@@ -1280,10 +1225,11 @@ x\            used only to retrieve "function"
     # 
     # initialize
     #
-    from mujpy.tools.tools import multigroup_in_components
-    # print('min2int_multigroup in tools debug: dash {}'.format(dashboard))
-    mask_function_multi = multigroup_in_components(dashboard)
+    from mujpy.tools.tools import function_multi_in_components
+    from numpy import cos, sin, tan, sinh, cosh, tanh, log, pi, exp, sqrt, real, abs, arctan
 
+    for k in range(len(p)):
+        mask_function_multi = function_multi_in_components(dashboard)
     userpardicts = dashboard['userpardicts_guess']  
     e = [e[k] if pardict['flag']=='~' else 0 for k,pardict in enumerate(userpardicts)]
     # names = [pardict['name'] for pardict in userpardicts]
@@ -1312,6 +1258,7 @@ x\            used only to retrieve "function"
                     try:
                         epar.append(eval(pardict["error_propagate_multi"][l]))
                     except:
+                        # print('excepted')
                         epar.append(eval(pardict["function_multi"][l].replace('p','e')))
                 else:                
                     par.append(eval(pardict["function"])) # the function will be eval-uated inside mucomponents
@@ -1319,7 +1266,6 @@ x\            used only to retrieve "function"
                         epar.append(eval(pardict["error_propagate"]))
                     except:
                         epar.append(eval(pardict["function"].replace('p','e')))
-                # print('tools min2int_multigroup debug: nint = {} name = {} par = {}, epar = {}'.format(nint0,name[-1],par[-1],epar[-1]))
             pars.append(par) # middel list, model
             names.append(name)
             epars.append(epar)
@@ -1439,7 +1385,21 @@ def print_components(names,values,errors,maxlen):
 	out = [' '.join([names[k],'=',value_error(values[k],errors[k])]) for k in range(len(names))]
 	out = [out[k]+(maxlen-len(out[k]))*' ' for k in range(len(out))]
 	return " ".join(out)
-	
+
+def print_csv_components(values,errors):
+    '''
+    input: for a component
+        parameter values
+        parameter errors
+    output:
+        string to print, see print_components for this e.g.
+        "0.123,0.004,12.3,0.4,0,0,"
+        notice! ends with ","
+        '''
+    from mujpy.tools.tools import value_error_csv
+    return ''.join(value_error_csv(values[k],errors[k]) for k in range(len(values)))
+
+
 def len_print_components_multirun(names,values,errors):
 	'''
 	input: for a component
@@ -1580,27 +1540,17 @@ def userlocals(dashboard):
     '''
     return "userpardicts_local" in dashboard    
 
-def multigroup_in_components(dashboard):
+def function_multi_in_components(dashboard):
     '''
     input full dashboard
     output mask list, 
-        1 where "model_guess" 
-        contains at least one component (dict) 
-        whose "pardicts" (list) 
-        contains a parameter dict 
-        with at least one "function_multi":[string, string ..] key
-        0 otherwise
+        len is sum of number of parameters in components of "model_guess"
+        True where parameter pardict contains "function_multi" key
+        False otherwise
     '''
-
-    #print('multigroup_in_components tools debug: model_guess len {}'.format(len(dashboard["model_guess"])))
-    #print('multigroup_in_components tools debug: pardicts len {}'.format(len(dashboard["model_guess"][0]['pardicts'])))
-    #print('multigroup_in_components tools debug: pardict.keys len {}'.format(len(dashboard["model_guess"][0]['pardicts'][0].keys())))
 
     return ['function_multi' in pardict.keys() for component in dashboard["model_guess"]  for pardict in component["pardicts"]]                                
                             
-    # contains 1 for all parameters that have "function_multi", 0 otherwise 
-    # return [k for k,component in enumerate(component_function) if component>0]
-
 def stringify_groups(groups):
     '''
     returns a unique string for many groups
@@ -1820,8 +1770,10 @@ def derun(string):
     import re
     s = []
     try:
-    # substitute multiple consecutive spaces with ','
-        string = re.sub("\s+", ",", string.strip())
+    # substitute ',' followed by spaces by plain ','
+        string = re.sub(r",\s+", ",", string.strip())
+    # substitute multiple consecutive spaces with ',' in strings separated by spaces only
+        string = re.sub(r"\s+", ",", string) #
     # systematic str(int(b[])) to check that b[] ARE integers
         for b in string.split(','): # csv
             kminus = b.find(':-1') # '-1' means reverse order
@@ -1947,8 +1899,13 @@ def get_datafilename(datafile,run):
     '''
     
     import re
-    dot_suffix = datafile[-4:]
-    padded = re.match('.*?([0-9]+)$', datafile[:-4]).group(1) # run string of digits
+    datafile_suffix = datafile[-5:].split('.')[1]
+    dot = '.'
+    dot_suffix = dot+datafile_suffix
+    datafile_nosuffix = datafile.split(dot_suffix)[0]
+    # print(datafile_nosuffix)    
+    # assuming that the datafile_nosuffix is path+datafile_header+run_number e.g. path+'deltat_tdc_gps_3245'
+    padded = re.match('.*?([0-9]+)$', datafile_nosuffix).group(1) # run string of digits, including padding zeros
     oldrun = str(int(padded)) # strip padding zeros
     datafileprefix = datafile[:datafile.find(oldrun)] # prefix up to original zero padding
     if len(run)-len(oldrun)>0:
@@ -1961,6 +1918,7 @@ def get_datafilename(datafile,run):
         datafilename = datafileprefix+'000'+run+dot_suffix
     else:
         datafilename = datafileprefix+run+dot_suffix
+    # print('datafilename in tools: {}'.format(datafilename))
     return datafilename
 
 def get_datafile_path_ext(datafile,run):
@@ -2053,34 +2011,32 @@ def getname(fullname):
     '''
     return fullname[0]
 
-def initialize_csv(Bstr, filespec, the_run ):
+def init_csv_row(Bstr, filespec, the_run, group = False):
     '''
     writes beginning of csv row 
     with nrun T [T eT T eT] B 
     for ISIS [PSI]
     '''
     nrun = the_run.get_runNumber_int()
-    # print('tools initialize_csv debug: nrun {}'.format(nrun))
     if filespec=='bin' or filespec=='mdu':
         TsTc, eTsTc = the_run.get_temperatures_vector(), the_run.get_devTemperatures_vector()
         n1,n2 = spec_prec(eTsTc[0]),spec_prec(eTsTc[1]) # calculates format specifier precision
-        form = '{},{:.'
-        form += '{}'.format(n1)
-        form += 'f},{:.'
-        form += '{}'.format(n1)
-        form += 'f},{:.'
-        form += '{}'.format(n2)
-        form += 'f},{:.'
-        form += '{}'.format(n2)
-        form += 'f},{}' #".format(value,most_significant)'
-        return form.format(nrun, TsTc[0],eTsTc[0],TsTc[1],eTsTc[1], Bstr[:Bstr.find('G')])
+        form = '{},{:.'+'{}'.format(n1)+'f},{:.'+'{}'.format(n1)
+        form += 'f},{:.'+'{}'.format(n2)+'f},{:.'+'{}'.format(n2)+'f},{:.0f},'
+        if group:
+            form += '{},'
+            return form.format(nrun, TsTc[0],eTsTc[0],TsTc[1],eTsTc[1], float(Bstr[:Bstr.find('G')]),group)
+        else:
+            return form.format(nrun, TsTc[0],eTsTc[0],TsTc[1],eTsTc[1], float(Bstr[:Bstr.find('G')]))
     elif filespec=='nxs':
         Ts = the_run.get_temperatures_vector()
         n1 = '1'       
-        form = '{},{:.'
-        form += '{}'.format(n1)
-        form += 'f},{}' #".format(value)
-        return form.format(nrun, Ts[0], Bstr[:Bstr.find('G')])
+        form = '{},{:.'+'{}'.format(n1)+'f},{},' 
+        if group:
+            form += '{},'
+            return form.format(nrun, Ts[0], Bstr[:Bstr.find('G')],group)
+        else:
+            return form.format(nrun, Ts[0], Bstr[:Bstr.find('G')])
 
 def minparam2_csv(dashboard,values_in,errors_in,multirun=0):
     '''
@@ -2110,19 +2066,11 @@ def minparam2_csv(dashboard,values_in,errors_in,multirun=0):
             row = ''
             for parvalue,parerror in zip(parvalues,parerrors):
                 n1 = spec_prec(parerror) # calculates format specifier precision
-                form = ',{:.'
-                form += '{}'.format(n1)
-                form += 'f},{:.'
-                form += '{}'.format(n1)
-                form += 'f}'
+                form = ',{:.'+'{}'.format(n1)+'f},{:.'+'{}'.format(n1)+'f}'
                 row += form.format(parvalue,parerror)
             for parvalue,parerror in zip(values[0],errors[0]): # globals replicated in every row
                 n1 = spec_prec(parerror) # calculates format specifier precision
-                form = ',{:.'
-                form += '{}'.format(n1)
-                form += 'f},{:.'
-                form += '{}'.format(n1)
-                form += 'f}'
+                form = ',{:.'+'{}'.format(n1)+'f},{:.'+'{}'.format(n1)+'f}'
                 row += form.format(parvalue,parerror)
             rows.append(row) # these are as many rows as runs     
     else:
@@ -2134,12 +2082,8 @@ def minparam2_csv(dashboard,values_in,errors_in,multirun=0):
         rows = '' # this is a single row, really
         for parvalues, parerrors in zip(values,errors): 
             for parvalue,parerror in zip(parvalues,parerrors):
-                n1 = spec_prec(parerror) # calculates format specifier precision
-                form = ',{:.'
-                form += '{}'.format(n1)
-                form += 'f},{:.'
-                form += '{}'.format(n1)
-                form += 'f}'
+                n1 = spec_prec(parerror) # calculates format specifier precision 
+                form = ',{:.'+'{}'.format(n1)+'f},{:.'+'{}'.format(n1)+'f}'
                 rows += form.format(parvalue,parerror)
     return rows
     
@@ -2215,28 +2159,21 @@ def prevrun(datapath):
 
     return run, datafile
     
-def chi2_csv(chi2,lowchi2,hichi2,groups,offset):
+def chi2_csv(chi2,lowchi2,hichi2,alpha,offset):
     '''
     input:
-        chi2, chi2-sdt, chi2+sdt, groups, offset (bins)
-        groups is suite.groups and its len, 1 or more, identifies multigroup
+        chi2, chi2-sdt, chi2+sdt, alpha, offset (bins)
     output:
         cvs partial row with these values and timestring
     '''
     from time import localtime, strftime
     
-    echi = max(chi2-lowchi2,hichi2-chi2)
+    echi = min(chi2-lowchi2,hichi2-chi2) # was max
     n1 = spec_prec(echi) # calculates format specifier precision
-    form = ',{:.'
-    form += '{}'.format(n1)
-    form += 'f},{:.'
-    form += '{}'.format(n1)
-    form += 'f},{:.'
-    form += '{}'.format(n1)
-    form += 'f}' # ' {} {}'
-    row = form.format(chi2,chi2-lowchi2,hichi2-chi2)
-    for group in groups:
-        row += ',{}'.format(group["alpha"])
+    form = ',{:.'+'{}'.format(n1)+'f},{:.'+'{}'.format(n1)+'f}'
+    form += ',{:.'+'{}'.format(n1)+'f}'
+    row = form.format(chi2,lowchi2,hichi2)
+    row += ',{:.4f}'.format(alpha)
     row += ',{},{}'.format(offset,strftime("%d.%b.%H:%M:%S", localtime()))
     return row
 
@@ -2249,7 +2186,7 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
         the_run, run instance (first one for added runs)
         file_csv, full path/filename to csv file 
         filespec, 'bin', 'mdu' or 'nsx'
-        scan, T, B or None
+       scan: T, B or None
     output:
         two strings to write on console
     writes onto csv finding the right line
@@ -2275,18 +2212,27 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
         try: # the file exists
             lineout = [] # is equivalent to False
             with open(file_csv,'r') as f_in:
-                notexistent = True # the line does not exist
+                notexistent = True # assume row yet non-existent fit
                 for nline,line in enumerate(f_in.readlines()):
                     if nline==0:
-                        if header!=line: # different headers, substitute present one
+                        if header!=line: # different headers, use more recent
+#                           warn = '**** write_csv\n{}\n{}\n'.format(header,line)
                             raise # exits this try 
                         else:
                             lineout.append(header)
-                    elif float(re.split(" |,|, ",line)[csv_index]) < rowvalue: # append line first
+                            checkgroup =[x for x, g in enumerate(re.split(" |,|, ",header)) if g.find('group')+1]
+                    elif float(re.split(" |,|, ",line)[csv_index]) < rowvalue: # reinsert older fit
                         lineout.append(line)
-                    elif float(re.split(" |,|, ",line)[csv_index]) == rowvalue: # substitute an existing fit
-                        lineout.append(row) # insert before last existing fit
-                        notexistent = False
+                    elif float(re.split(" |,|, ",line)[csv_index]) == rowvalue:
+                        if checkgroup: 
+                            if re.split(" |,|, ",line)[checkgroup[0]]== re.split(" |,|, ",row)[checkgroup[0]]:
+                                lineout.append(row) # substitute existing fit, multigroup sequential
+                                notexistent = False
+                            else:
+                                lineout.append(line) # reinsert older fit, multigroup sequential
+                        else:
+                            lineout.append(row) # substitute existing fit, singlegroup
+                            notexistent = False
                     else: 
                         if notexistent:
                             lineout.append(row) # insert before last existing fit
@@ -2299,8 +2245,9 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
                 for line in lineout:
                     f_out.write(line)
             file_csv = file_csv[file_csv.rfind('/')+1:]
+            strgrp = re.split(" |,|, ",row)[checkgroup[0]] if checkgroup else '--'
             return 'Run {}: {} ***'.format(nrun,
-                   get_title(the_run)), '.  Log added to {}'.format(file_csv)
+                                           get_title(the_run)), '{} {}:  Log added to {}'.format(nrun,strgrp,file_csv)
 
         except: # incompatible headers, save backup and write a new file
             os.rename(file_csv,file_csv+'~')
@@ -2308,12 +2255,13 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
                 f.write(header)
                 f.write(row)
             file_csv = file_csv[file_csv.rfind('/')+1:]
-            return 'Run {}: {} ***'.format(nrun,
+            return 'Run {}: {}'.format(nrun,
                     get_title(the_run)),'.  Log in NEW {} [backup in {}]'.format(
                                                                          file_csv,
                                                                          file_csv+'~')
             
     else: # csv does not exist
+        print('file {} os.path.isfile False'.format(file_csv))
         with open(file_csv,'w') as f:
             f.write(header)
             f.write(row)
@@ -2361,7 +2309,6 @@ def get_nruns(the_suite):
     get nrun strings
     '''
     nruns = []
-    print
     for k,run in enumerate(the_suite._the_runs_):
         nruns.append(str(run[0].get_runNumber_int()))
     return nruns
@@ -2410,7 +2357,7 @@ def p2x(instring):
     n = patterna.findall(instring) # all indices of parameters
     outstring = instring
     for k in n:
-        strin = r"p\["+re.escape(k)+"\]"
+        strin = r"p\["+re.escape(k)+r"\]"
         patternb = re.compile(strin)
         stri = r"x"+re.escape(k)  # variable
         outstring = patternb.sub(stri,outstring)
@@ -2559,7 +2506,7 @@ def path_dialog(path,title):
 ################
 
 def plot_parameters(nsub,labels,fig=None): 
-    '''
+    r'''
     standard plot of fit parameters vs B,T (or X to be implemente)
     input
        nsub<6 is the number of subplots
@@ -2739,7 +2686,6 @@ def rebin(x,y,strstp,pack,e=None):
     '''
     from numpy import floor, sqrt, zeros
     start,stop = strstp
-#    print('tools rebin debug: start, stop, pack = {}, [], []'.format(start, stop, pack))
     m = int(floor((stop-start)/pack)) # length of rebinned xb
     mn = m*pack # length of x slice 
     xx =x[start:start+mn] # slice of the first 1d array
@@ -2787,76 +2733,6 @@ def rebin(x,y,strstp,pack,e=None):
     else:
         return xr,yr
 
-def rebin_decay(x,yf,yb,bf,bb,strstp,pack):
-    '''
-    input:
-        x is 1D intensive (time)
-        yf, yb 1D, 2D, 3D extensive arrays to be rebinned
-        bf, bb are scalars or arrays (see musuite.single_for_back_counts and musuite.single_multigroup_for_back_counts)
-        pack > 1 is the rebinning factor, e.g it returns::
-    
-        xr = array([x[k*pack:k*(pack+1)].sum()/pack for k in range(int(floor((stop-start)/pack)))])
-        yr = array([y[k*pack:k*(pack+1)].sum() for k in range(int(floor((stop-start)/pack)))])
-    
-        strstp = [start,stop] is a list of slice indices 
-       
-        rebinning of x,y is done on the slice truncated to the approrpiate pack multiple, stopm
-             x[start:stopm], y[start:stopm]        
-    use::
-
-        xr,yfr, ybr, bfr, bbr, yfmr, ybmr = rebin(x,yf,yb,bf,bb,yfm,ybm,strstp,pack)
-    '''
-    from numpy import floor, sqrt, exp, zeros, mean
-    from mujpy.tools.tools import TauMu_mus
-
-    start,stop = strstp
-    m = int(floor((stop-start)/pack)) # length of rebinned xb
-    mn = m*pack # length of x slice 
-    xx =x[start:start+mn] # slice of the first 2D array
-    xx = xx.reshape(m,pack) # temporaty 2d array
-    xr = xx.sum(1)/pack # rebinned first ndarray
-    bfr, bbr = bf*pack, bb*pack
-    if len(yf.shape)==1:
-        yfr = zeros(m)
-        ybr = zeros(m) 
-        yfr = yf[start:start+mn]  # slice row
-        ybr = yb[start:start+mn]  # slice row
-        yfr = yfr.reshape(m,pack)  # temporaty 2d
-        ybr = ybr.reshape(m,pack)  # temporaty 2d
-        yfr = yfr.sum(1) # rebinned row extensive          
-        ybr = ybr.sum(1) # rebinned row extensive       
-        yfmr, ybmr = mean((yfr-bfr)*exp(xr/TauMu_mus())), mean((ybr-bbr)*exp(xr/TauMu_mus()))   
-    elif len(yf.shape)==2:
-        nruns = yf.shape[0] # number of runs
-        yfr = zeros((nruns,m))
-        ybr = zeros((nruns,m)) 
-        for k in range(nruns): # each row is a run, or a group
-            yyf = yf[k][start:start+mn]  # slice row
-            yyf = yyf.reshape(m,pack)  # temporaty 2d
-            yfr[k] = yyf.sum(1) # rebinned row extesive
-            yyb = yb[k][start:start+mn]  # slice row
-            yyb = yyb.reshape(m,pack)  # temporaty 2d
-            ybr[k] = yyb.sum(1) # rebinned row extesive
-            bfr, bbr = bf[k]*pack, bb[k]*pack
-            # print('tools,rebin_decay,debug: bfr {}, bbr {}'.format(bfr, bbr))
-            yfmr, ybmr = mean((yfr[:][k]-bfr)*exp(xr/TauMu_mus())), mean((ybr[:][k]-bbr)*exp(xr/TauMu_mus()))
-            
-    elif len(yf.shape)==3:        # probably never used unless calib mode becomes a C2 case
-        ngroups,nruns = yf.shape[0:2] # number of runs
-        yfr = zeros((ngroups,nruns,m))
-        ybr = zeros((nruns,m)) 
-        for k in range(ngroups): 
-            for j in range(nruns):  
-                yyf = yf[k][j][start:start+mn]  # slice row
-                yyf = yyf.reshape(m,pack)  # temporaty 2d
-                yfr[k][j] = yyf.sum(1) # rebinned row extesive
-                yyb = yb[k][j][start:start+mn]  # slice row
-                yyb = yyb.reshape(m,pack)  # temporaty 2d
-                ybr[k][j] = yyb.sum(1) # rebinned row extesive
-                bfr, bbr = bf[k][j]*pack, bb[k][j]*pack
-                yfmr, ybmr = mean((yfr[:][k][j]-bfr)*exp(xr/TauMu_mus())), mean((ybr[:][k][j]-bbr)*exp(xr/TauMu_mus()))
-    return xr,yfr,ybr,bfr,bbr,yfmr,ybmr
-
 def safetry(string):
     '''
     Used by muvalid
@@ -2869,7 +2745,6 @@ def safetry(string):
     safe_dict={}
     for k in safe_list:
         safe_dict[k]=locals().get(k)
-    #    print(safe_dict[k])
     return eval(string,{"__builtins__":None},safe_dict)
 
 def scanms(y,n):
@@ -2906,7 +2781,7 @@ def spec_prec(a):
 
     '''
     import numpy as np
-    return int(abs(min(0.,np.floor(np.log10(a))))) 
+    return int(abs(min(0.,np.floor(np.log10(abs(a)))))) 
 
 def shorten(path,subpath):
     '''
@@ -2960,7 +2835,7 @@ def translate_multirun(functions_in,n_locals,kloc,nruns):
                     outer list is components of the model, 
                     middle list is runs,
                     inner list is component parameter functions 
-    used in int2_multirun_user_method_key and int2_multirun_grad_method_key
+    used in int2_multigroup_method_keyrun_user_method_key and int2_multirun_grad_method_key
     '''
     # print('debug tools translate_multirun functions_in = {}'.format(functions_in))
     korig = kloc # minuit index index of first component first parameter in the single run model
@@ -3078,7 +2953,7 @@ def translate(nint,lmin,function_in):
     '''
     input: 
         nint: dashbord index, 
-        lmin: list of minuit indices replacement, one for each dashboard index, -1 is blanck
+        lmin: list of minuit indices replacement, one for each dashboard index, -1 is blank
         function: single function string, of dashboard index nint, to be translated
     output: 
         function_out: single translated function
@@ -3161,6 +3036,31 @@ def value_error(value,error):
             form = '"{}(0)".format(value)' # too small error
     return eval(form)
     
+def value_error_csv(value,error):
+    '''
+    value_error_csv(v,e)
+    returns a string of the format v, e with the correct precision
+    '''
+    from numpy import floor, log10, seterr
+    eps = 1e-10 # minimum error
+    if error>eps: # normal error
+        exponent = int(floor(log10(error)))  
+        most_significant = int(round(error/10**exponent))
+        if most_significant>9:
+            exponent += 1
+            most_significant=1
+        exponent = -exponent if exponent<0 else 0
+        form = '"{:.'
+        form += '{}'.format(exponent)
+        form += 'f},{:.'
+        form += '{}'.format(exponent)
+        form += 'f},".format(value,error)'
+    else:
+        if abs(value)<eps:
+            form = '"0,0,"' # too small both
+        else:
+            form = '"{},0,".format(value)' # too small error
+    return eval(form)
     
 def results():
     '''
@@ -3189,8 +3089,8 @@ def results():
     script = script + '\nversion = "1"'
     script = script + "\ngrp_calib = [{'forward':'3', 'backward':'4', 'alpha':1.13}]"
     script = script + "\ngroupcalibfile = '3-4.calib'"
-    script = script + "\ninputsuitefile = 'input.suite'"
-    script = script + "\ndashboard = modelname+'.'+re.search(r'\d+', runlist).group()+'.'+groupcalibfile[:groupcalibfile.index('.')]+'.'+version+jsonsuffix"
+    script = script + "\ninputsuitefile = 'input.suite'\n"
+    script = script + r"dashboard = modelname+'.'+re.search(r'\d+', runlist).group()+'.'+groupcalibfile[:groupcalibfile.index('.')]+'.'+version+jsonsuffix"
     script = script + '\nif not isfile(logpath+dashboard):' 
     script = script + "\n    print('Model definition dashboard file {} does not exist. Make one.'.format(logpath+dashboard))\n"
     script = script + "\n#  Can add 'scan': 'T' or 'B' for orderinng csv for increasing T, B, otherwise increasing nrun"
@@ -3207,7 +3107,7 @@ def results():
     script = script + "\n    json.dump(grp_calib,f)"
     
     script = script + "\nthe_suite = suite(logpath+inputsuitefile,mplot=False) # the_suite implements the class suite according to input.suite\n"
-    script = script + "\n# End of suite definition, this suiete is a single run"
+    script = script + "\n# End of suite definition, this suite is a single run"
     script = script + "\n# Now let's fit it according to the dashboard"
     script = script + "\nthe_fit = mufit(the_suite,logpath+dashboard)\n"
     script = script + "\n# Let's now plot the fit result"
@@ -3231,4 +3131,25 @@ def signif(x, p):
     x_positive = where(isfinite(x) & (x != 0), abs(x), 10**(p-1))
     mags = 10 ** (p - 1 - floor(log10(x_positive)))
     return round(x * mags) / mags
-        
+
+def version_flag(mufit_method):
+    '''
+    generate a label with the fit type A1-C2
+    to be included in the log and csv filename version 
+    '''
+    if mufit_method.A1() or mufit_method.A1_calib():
+        return "A1"
+    elif mufit_method.A20() or mufit_method.A20_calib():
+        return "A20"
+    elif mufit_method.A21() or mufit_method.A21_calib():
+        return "A21"
+    elif mufit_method.B1():
+        return "B1"
+    elif mufit_method.B2():
+        return "B2"
+    elif mufit_method.C1():
+        return "C1"
+    elif mufit_method.C2():
+        return "C2"
+    else:
+        return "_"

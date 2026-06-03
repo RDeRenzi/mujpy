@@ -1,11 +1,24 @@
 class suite(object):
     '''
     A suite class, 
+      file read through musr2py (bin, mdu), muroot2py (root, old and MusrRoot), muisis2py (nxs)
+      muroot2py provides methods equivalent to all MuSR_td_PSI_bin(), same syntax (but data are always numpy arrays) 
+      
+      Different Instruments/Facilities require different methods for setting t0, specifically:
+            HAL not known
+            GPS, GPD, DOLLY, FLAME, LTF, determine a prompt position by identifying the count maximum
+                                         and fit a prompt peak over a given interval around the peak
+            LEM trust the instrument tof calibration encoded in the header
+            NXS fit the edge ISIS function, common to all instrument hence to the nxs file spec
+      Instrument identification as of 2024 is BY FILE SPEC: mdu ->   HAL (hifi), bin -> GPS, FLAME, GPD, DOLLY, nxs -> ISIS
+      However, from 2023 on root can be any instrument 
+      Instrument identification must be performed early in the method. Root contains it. Bin can be oly gps, gpd, flame, dolly, ltf so it's ok.
+      mdu is only hifi. nxs is also fine (and it may contain  
     self._init_ reads input fixed variables
         console, runlist, datafile 
         grp_calib, offset 
         (console(string) must print string somewhere)
-        t0 parameters are fixed depending on bin or mdu spec
+        t0 parameters are fixed depending on bin mdu root spec
     
     Self.groups = grp.calib contains a list of dictionaries for forward, backward groups and their alpha values
         where groups may be in shorthand notation
@@ -19,7 +32,7 @@ class suite(object):
     self._the_runs_ is a list of lists of musr2py instances
     self._the_runs_[k]  is a list of musr2py instances to be added
 
-    invokes prompfit(self) calls and calculates t = 0 parameters
+    invokes prompfit(self) calls and calculates t = 0 parameters. modify to accommodate root
 
     self.timebase returns time, always 1d array
     self.single_for_back_counts(runs,grouping) acts on runs
@@ -41,7 +54,7 @@ class suite(object):
     def __init__(self, datafile , runlist , grp_calib , offset , startuppath, console = 'print',dash=None, mplot=False):
                  
         '''
-        * Initiates an instance of suite, 
+        * Initiates an instance of suite, x x   
         * inputs: 
             the suite_input_file a dict containing
                     datafile,   containing the full path 
@@ -59,7 +72,7 @@ class suite(object):
                                'forward' and 'backward' lists of detector indices
                 promptfit(): determines t0
                 timebase(): stores self.time (1d)  
-        if dash = None and cosole = 'print' self.console will exec print(string)
+        if dash = None and console = 'print' self.console will exec print(string)
         if dash = self in mudash calls to suite, and console = 'self.dash.log'   
               self.console will exec self.dash.log(string), i.e. write on board output                           
         '''
@@ -70,17 +83,18 @@ class suite(object):
         from mujpy._version import __version__
         self.__version__ = __version__
         # print('__init__ now ...')
-        self.firstbin = 0
-        self.loadfirst = False  
-        self._the_runs_ = [] # initialized 
+        self.firstbin = 5 # common to all data file specs, to evaluate background for subtraction 
+        self.loadfirst = False  # non initialized trivialities in the present instance of self.suite
+        self._the_runs_ = [] # initialized to empty
 #        with open(suite_input_file,"r") as f:
 #            suite_input_json = f.read()
 #            suite_input = json.loads(suite_input_json)
         self.dash = dash
-        self.console_method = console
+        self.console_method = console # either 'print' for scripts or 'self.dash.log' for mudash.py calls, eg. from jupyter-lab or ipython
         try:
             if not dash: # not a call from a mudash instance
                 self.console('******************* SUITE *********************')
+                # self.console('debug')
             else:
                 self.console('')
         except:
@@ -96,7 +110,9 @@ class suite(object):
             return  # with console error message
         if os.path.isfile(datafile):
             self.datafile = datafile
-            if self.datafile[-3:]=='bin': 
+            if self.datafile[-4:]=='root':
+                self.thermo = 0 # sample thermometer is always a single value list
+            elif self.datafile[-3:]=='bin': 
                 self.thermo = 1 # sample thermometer is 1 on gps (check or adapt to other instruments)
                 self.prepostpk = [50, 50]
             elif self.datafile[-3:]=='mdu':
@@ -105,7 +121,7 @@ class suite(object):
             self.loadfirst = True
         else:
             self.console('* File {} not found'.format(datafile))
-            self.console('* CHECK YOUR ACCESS (e.g. klog)')
+#            self.console('* CHECK YOUR ACCESS (e.g. klog)')
             self.console('**************************************')
             return None  # with console error message
         try: # working directory, in which, in case, to find mujpy_setup.pkl 
@@ -126,16 +142,17 @@ class suite(object):
         self.__cachepath__ = self.__startuppath__+'/cache/'
         # reverse of tools get_grouping is tools get_group
         self.offset = int(offset) # offset belongs to suite, that needs it for asymmetries
-        self.load_runs() #           load data instances in self._the_runs_
-        self.groups = grp_calib
+        if self.load_runs(): #           load data instances in self._the_runs_
+            self.groups = grp_calib
         # grp_calib is a list of dictionaries, one per group, with keys 'forward,'backward','alpha'
         # where groups may be in shorthand notation
-        self.grouping = [] # reproduce the same with arrays of histogram numbers, done by tools get_grouping
-        self.store_groups() #        in self.grouping        self.promptfit(mplot)   #    to be done: make switch for ISIS
-        self.promptfit(mplot)   #    to be done: make switch for ISIS
-        self.timebase()
+            self.grouping = [] # reproduce the same with arrays of histogram numbers, done by tools get_grouping
+            self.store_groups() #        in self.grouping        self.promptfit(mplot)   #    to be done: make switch for ISIS
+            self.promptfit(mplot)   #    to be done: switch for ISIS broken and root LEM wip
+            self.timebase()
         # self.console('... end of initialize suite')
-
+        else:
+            self.console('*********************** suite exits without loading data ****************************')
     def add_runs(self,k):
         '''
         Tries to load one or more runs to be added together
@@ -143,31 +160,50 @@ class suite(object):
         self.runs is a list of strings containing integer run numbers 
         Returns -1 and quits if musr2py or muisis2py complain, 0 otherwise
         '''
-        
+        from mujpy.muroot2py.muroot2py import muroot2py as rootload 
         from musr2py import MuSR_td_PSI_bin as psiload
-        from mujpy.muisis2py.muisis2py import muisis2py as isisload
+        from mujpy.muisis2py.muisis2py import munxs2py as isisload
         # muisis2py has the same methods as musr2py
         from mujpy.tools.tools import get_datafilename, get_title
+        
+        def instrument(run):
+            instrument_set = set(['gps','gpd','dolly','flame','ltf','hifi'])
+            return list(set(run.Filename().split('_')).intersection(instrument_set))[0].upper()
 
         read_ok = True
         runadd = []
         for j,run in enumerate(self.runs[k]): # run is a single run number
-            path_and_filename =  get_datafilename(self.datafile,run)
-            if self.datafile[-3:]=='bin' or self.datafile[-3:]=='mdu':
+            path_and_filename =  get_datafilename(self.datafile,run) 
+            # print('path_and_filename in suite: {}'.format(path_and_filename))
+            if self.datafile[-4:]=='root':
+                try:
+                    runadd.append(rootload(path_and_filename))
+                    self._the_instrument_ = runadd[-1].get_instrument()
+                    self._the_facility_ = 'PSI'
+                except:
+                    read_ok = False
+            elif self.datafile[-3:]=='bin' or self.datafile[-3:]=='mdu':
                 runadd.append(psiload())
                 if runadd[j].read(path_and_filename) != 0:
                     read_ok = False # THE RUN DATA FILE IS LOADED HERE
+                else:
+                    self._the_instrument_ = instrument(runadd[j])
+                    self._the_facility_ = 'PSI'
+
             elif self.datafile[-3:]=='nxs': 
                 try: 
                     #self.console('{} ns'.format(isisload(path_and_filename,'r').get_binWidth_ns()))
                     runadd.append(isisload(path_and_filename,'r'))  # adds a new instance of isisload
                     #self.console('path = {}'.format(path_and_filename))
+                    self._the_instrument_ = runadd[-1].get_instrument()
+                    self._the_facility_ = 'ISIS'
                 except:
                     read_ok = False
             if read_ok==True:
                 self._the_runs_.append(runadd) # 
-               	self.console('{} loaded'.format(path_and_filename))
-               	self.console('Run {}: {}'.format(run,get_title(self._the_runs_[-1][0])))
+                    
+                self.console('{} loaded:'.format(path_and_filename))
+                self.console('Run {}: {}'.format(run,get_title(self._the_runs_[-1][0])))
 #                import sys
 #                self.console('sys.__stdout__ is {}, sys.__stderr__ is {}'.format(sys.__stdout__,sys.__stderr__))
 
@@ -177,20 +213,20 @@ class suite(object):
                           self._the_runs_[k][0].get_binWidth_ns() == 
                           self._the_runs_[0][0].get_binWidth_ns()]
                     if not all(ok): 
-                        self._the_runs_=[self._the_runs_[0]] # leave just the first one
-                        self.console('\nFile {} has wrong histoNumber or binWidth'.format(
+                        self.console(r'\nFile {} has wrong histoNumber or binWidth'.format(
                                   get_datafilename(self.datafile,self._the_runs_[k][0].get_runNumber_int())))
                         return -1  # this leaves the first run of the suite
 
                 return True
             else:
-           	    self.console('\nRun file: {} does not exist'.format(path_and_filename))
-           	    self.console('            if reading from afs check that klog is not expired!')
-           	    return False
+                # print(path_and_filename)
+                self.console(r'\nRun file: {} does not exist'.format(path_and_filename))
+           	    #self.console('            if reading from afs check that klog is not expired!')
+                return False
 
     def load_runs(self):
         '''
-        load musr2py or muisis2py instances
+        load musr2py. muroot2py or muisis2py instances
         stored as a list of lists 
         self._the_runs_[0][0] a single run, or the first of a suite 
         self._the_runs_[k][0] the k-th run of a run suite
@@ -210,9 +246,22 @@ class suite(object):
 
     def check_group(self,group):
         '''
-        check that this is a group of existing detectors
+        rough check that this is a group of existing detectors
         '''
-        return (group>=0).all()*(group<self._the_runs_[0][0].get_numberHisto_int()).all()
+        # numberHisto_int is the number of physics detectors
+        # RedGreen mode has more than one period (in Isis parlance) for different stimuli ON or OFF 
+        # for this purpose nexus detector counts have three indices: period, detector, bin
+        # MusrRoot instead has offsets, typically [0,20,40,80] or [0,10,20,30], reflected in the label Histo No
+        # whereas the list self._histo.counts() has two indices: histogram, bin, and histogram numbers are contiguous
+        # e.g. on lem for numberHisto_int = 8 and offsets [0,10] indices 0,...,7 are the original histos and 8,...,15 are PPC
+        numberHisto = self._the_runs_[0][0].get_numberHisto_int()
+        periods = 1
+        if 'get_RedGreen_offsets' in self._the_runs_[0][0].__dir__(): # RedGreen may be present
+            periods = len(self._the_runs_[0][0].get_RedGreen_offsets()) # are there RedGreen copies (periods>1)?
+        if 'get_beamline' in self._the_runs_[0][0].__dir__(): # PSI only
+            numberHisto = numberHisto*periods           
+        #print('group = {} nH =  {} p = {}'.format(group,numberHisto,periods))
+        return (group>=0).all()*(group<numberHisto).all()
 
     def store_groups(self):
         '''
@@ -223,6 +272,9 @@ class suite(object):
         for k,group in enumerate(self.groups):
             fgroup, bgroup, alpha = get_grouping(group['forward']), get_grouping(group['backward']), group['alpha']
             if alpha>0 and self.check_group(fgroup) and self.check_group(bgroup): # checks legal grpcalib_file
+            #a,b = self.check_group(fgroup), self.check_group(bgroup)
+            # print('fwd = {} bwd = {}'.format(a,b))
+            #if alpha>0 and a and b:
                 self.grouping.append({'forward':fgroup, 'backward':bgroup, 'alpha':alpha})
                 # fgroup bgroup are two np.arrays of integers
             else:
@@ -233,6 +285,11 @@ class suite(object):
         return True
 
     def console(self,string):
+        '''
+           when suite invoked without console, self.console_method defaults top 'print'
+           when invoked from dash, self.console_method = 'self'
+        '''
+        #print('string = '+string+r'\nconsole_method = '+self.console_method)
         exec(self.console_method+'("'+string+'")')
                
     def t_value_error(self,k):
@@ -249,7 +306,7 @@ class suite(object):
             t_value = sum([self._the_runs_[k][j].get_temperatures_vector()[self.thermo]
                               *weight[j] for j in range(m)])
             t_error = sqrt(sum([(self._the_runs_[k][j].get_devTemperatures_vector([self.thermo])
-                              *weight[j])**2 for j in range(m)])) if self.datafile[-3:]=='bin' or self.datafile[-3:]=='mdu' else 0
+                              *weight[j])**2 for j in range(m)])) if self.datafile[-3:] in ['oot','bin','mdu'] else 0
         else:
             t_value, t_error = 0, 0
         return t_value, t_error
@@ -257,6 +314,14 @@ class suite(object):
 
     def promptfit(self,mplot, mprint = False):
         '''
+        new:
+        indentifies t0 and stores self.nt0 array (all intruments) as
+        t0 prompt fit method for PSI gps, gpd, dolly, ltf, flame identified by muroot2py.get_instrument() or by musr2py.readbin
+        t0 bin value for PSI lem by muroot2py.get_t0_int()
+        t0 edge method for ISIS (all), now broken
+        t0 guess method for PSI hifi 
+        
+        old:
         launches t0 prompts fit::
 
             fits peak positions 
@@ -267,9 +332,9 @@ class suite(object):
         refactored for run addition and
         suite of runs
 
-        WARNING: this module is for PSI only        
+        WARNING: this module is tenporarily for PSI only, included root        
         '''
-        from numpy import array, where, arange, zeros, mean, ones, sqrt, linspace
+        from numpy import array, where, arange, zeros, zeros_like, mean, ones, sqrt, linspace
         from iminuit import Minuit, cost
         
         import matplotlib.pyplot as P
@@ -277,7 +342,7 @@ class suite(object):
         from mujpy.mucomponents.muedge import muedge
         from mujpy.tools.tools import TauMu_mus, scanms, step, set_fig 
     
-        if mplot:  # setup figure window
+        if mplot:  # setup figure window if a plot of the prompt peak or edge fits is required
             font = {'family' : 'Ubuntu','size'   : 8}
             P.rc('font', **font)
             dpi = 100. # conventional screen dpi
@@ -304,8 +369,15 @@ class suite(object):
                 title = 'Edge t0 fit'
             fig_counters,ax_counters = set_fig(num,nrow,ncol,title,**kwargs)
             fig_counters.canvas.set_window_title(title)
-                
-        if self.datafile[-3:] == 'bin':  # PSI gps, flame, dolly, gpd
+        
+        if self._the_instrument_  == 'LEM':
+            # t0 calibration encoded in file, override only by setting self.nt0 by hand
+            self.nt0 = array([int(self._the_runs_[0][0].get_t0_int(k)) for k in range(self._the_runs_[0][0].get_numberHisto_int())])
+            self.dt0 = zeros_like(self.nt0) # fraction of bin, ignored with tdc resolution of 195 pds  
+            self.lastbin = self.nt0.min() # unused for lem
+
+            
+        elif self._the_instrument_ in ['GPS','GPD','DOLLY','FLAME','LTF']: # self.datafile[-3:] == 'bin': # PSI gps, flame, ltf, dolly, gpd
             second_plateau = 100
             peakheight = 100000.
             peakwidth = 1.
@@ -372,7 +444,7 @@ class suite(object):
                     x_text,y_text = npeaks[counter]+10,0.8*max(y)
                     prompt_fit_text[counter] = ax_counters[
                                                   divmod(counter,3)].text(x_text,y_text,
-                     'Det #{}\nt0={}bin\n$\delta$t0={:.2f}'.format(counter+1,
+                     r'Det #{}\nt0={}bin\n$\delta$t0={:.2f}'.format(counter+1,
                      x0.round().astype(int)[counter],x0[counter]-x0.round().astype(int)[counter]))
 
                 ##############################################################################
@@ -393,7 +465,7 @@ class suite(object):
             self.dt0 = x0-self.nt0 # fraction of bin, nd.array of shape run.get_numberHisto_int() 
             self.lastbin = self.nt0.min() - self.prepostpk[0] # nd.array of shape run.get_numberHisto_int() 
 
-        elif self.datafile[-3:] =='mdu': # PSI HIFI
+        elif self._the_instrument_ == 'HIFI' and self._the_facility_ == 'PSI': # self.datafile[-3:] =='mdu': # PSI HIFI
             first_plateau = - 500
             second_plateau = 1500
             #############################
@@ -466,7 +538,7 @@ class suite(object):
             self.nt0 = x0 # bin of peak, nd.array of shape run.get_numberHisto_int() 
             self.dt0 = zeros(x0.shape) # fraction of bin, nd.array of shape run.get_numberHisto_int()
 
-        elif self.datafile[-3:]=='nxs': # ISIS
+        elif self._the_facility_ == 'ISIS': # self.datafile[-3:]=='nxs': # ISIS
             histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
             for counter in range(self._the_runs_[0][0].get_numberHisto_int()):
                 for k in range(len(self._the_runs_[0])): # may add runs
@@ -562,111 +634,10 @@ class suite(object):
         
         if self.datafile[-3:]=='bin' or self.datafile[-3:]=='mdu': # PSI
             self.time += self.mean_dt0()*binwidth_mus # mean dt0 correction (fraction of a bin, probaby immaterial)
-             
-    def single_for_back_counts(self,runs,grouping):
-        """
-        * input: 
-        *         runs, runs to add
-        *         grouping, dict with list of detectors 
-                            grouping['forward'] and grouping['backward']
-        * output:
-        *         yforw, ybackw  
-        *                        = sum_{i=for or back}(data_i - background_i), PSI, 
-        *                        = sum_{i=for or back}data_i, ISIS
-        *         background_forw  =
-        *         background_backw = average backgrounds
-        *         yfbmean        = mean of (yforw-bf)*exp(t/TauMu)
-        *         ybackw         = mean of (ybackw-bb)*exp(t/TauMu)
-        * used both by self.asymmetry_single (see) in normal fits (alpha is fixed)
-        * and directly in calibration fits (alpha is a parameter)
-        * all are 1D numpy arrays
-        """
-        from numpy import zeros, array, mean, exp, where
-        from mujpy.tools.tools import TauMu_mus
 
-        filespec = self.datafile[-3:] # 'bin', 'mdu' or 'nsx'
-        if self.loadfirst:
-            
-    #       initialize to zero self.histoLength, maximum available good bins valid for all histos 
-            n1 = self.nt0[0] + self.offset # ISIS
-            n2 = n1 + self.histoLength # ISIS
-#            print('musuite single_for_back_counts debug: n1 {}, n2 {}, self.histoLength {}'.format(n1,n2,self.histoLength))
-            yforw, ybackw = zeros(self.histoLength), zeros(self.histoLength) # counts 
-            background_forw, background_backw = 0., 0. # background estimate
-                           
-            for j, run in enumerate(runs): # Add runs
-                #print(run)
-                for counter in grouping['forward']: # first good bin, last good bin from data array start
-                
-                    histo = array(run.get_histo_vector(counter,1)) # counter data array in forw group
-#                    if array(where(histo==0)).size:
-#                        print('musuite single_for_back_counts debug: run {} counter fwd {} contains {}  zeros'.format(run.get_runNumber_int(),counter,array(where(histo==0)).size))
-                    if filespec =='bin' or filespec=='mdu': # PSI, counter specific range                  
-                        n1 = self.nt0[counter] + self.offset
-                        n2 = n1 + self.histoLength 
-                        background_forw += mean(histo[self.firstbin:self.lastbin])  # from prepromt estimate
-                    yforw += histo[n1:n2]
-                        
-                for counter in grouping['backward']: # first good bin, last good bin from data attay start
-                
-                    histo = array(run.get_histo_vector(counter,1)) # counter data array in back group
-#                    if array(where(histo==0)).size:
-#                        print('musuite single_for_back_counts debug: run {} counter bkw {} contains {}  zeros'.format(run.get_runNumber_int(),counter,array(where(histo==0)).size))
-                    if filespec=='bin' or filespec=='mdu': #  PSI, counter specific range  
-                        n1 = self.nt0[counter] + self.offset
-                        n2 = n1 + self.histoLength 
-                        background_backw += mean(histo[self.firstbin:self.lastbin])  # from prepromt estimate
-                    ybackw += histo[n1:n2]              
-
-            x = exp(self.time/TauMu_mus())
-            yfm = mean((yforw-background_forw)*x)
-            ybm = mean((ybackw-background_backw)*x)
-            return yforw, ybackw, background_forw, background_backw, yfm, ybm
-        else:
-            return None, None, None, None, None, None
-            
-        # Error eval box:
-        # Nf(t), Nb(t) are row counts from the two groupings, forward and backward
-        # A(t) = y  with background corrected counts Nfc(t) = Nf(t) - bf = yf, 
-        #                                            Nbc(t) = Nb(t) - bb = yb
-        # errors eA(T) with renormalized counts
-        #                                 Nf(t) = cf,
-        #                                 Nb(t) = cb
-
-        #############################################################
-        #  ISIS)         Error evaluation, no backgrounds:          #
-        # Brewers trick to avoid double error propagation:          #
-        # the denominator is evaluated as an average                #
-        #       A = [yf(t) - alpha yb(t)]/d          with           #
-        #    d = (<yf e^t/tau> + alpha <yb e^t/tau>)e-t/tau         #
-        # yf = sum_{i in f) Ni        yb = sum_{i in b} Ni          #
-        # ef^2 = yf                   eb^2 = yb                     #
-        #          eA = sqrt(yf + alpha^2 yb)/d                     #
-        #-----------------------------------------------------------#
-        # PSI)          With background                             #
-        # evaluate bf, bb before prompt for yf, yb respectively     #
-        #                                                           #
-        #  A = [yf-bf - alpha(yb-bb)]/[yf-bf + alpha(yb-bb)]        #
-        #           ef^2, eb^2 are the same                         #
-        # d = [<(yf-bf)e^t/tau)> + alpha <(yb-bb)e^t/tau>] e^-t/tau #
-        #   =   [<yfbe>     +    alpha     <ybbe>] e^-t/tau         #
-        #                                                           #
-        #     A = [yf - alpha yb - (bf - alpha bb)]/d               #
-        #                                                           #
-        #    eA = sqrt(yf + alpha^2 yb)/d                           #
-        #-----------------------------------------------------------#
-        # if alpha is a paramter                                    #
-        # compute and return yf, yb, bf, bb, <yfbe>, <ybbe>         #
-        # mumodel must compute   d,  A, eA                          #
-        #############################################################
-        # for ISIS the PSI formula work with bb and bf zero         #
-        #############################################################
-        # rebin eA works for ISIS, must be corrected for PSI        #
-        # yfm, ybm depend on binning   
-
-#    def single_multigroup_for_back_counts(self,runs,groupings):
+# old, see old mucomponent._add_calib_multigroup_           
+#    def single_for_back_counts(self,runs,grouping):
 #        """
-#        # unused?!
 #        * input: 
 #        *         runs, runs to add
 #        *         grouping, dict with list of detectors 
@@ -679,28 +650,215 @@ class suite(object):
 #        *         background_backw = average backgrounds
 #        *         yfbmean        = mean of (yforw-bf)*exp(t/TauMu)
 #        *         ybackw         = mean of (ybackw-bb)*exp(t/TauMu)
-#        * used only by calib multigroups
-#        * yforw, ybackw are 2D numpy arrays, the last four output items are arrays 
+#        * used both by self.asymmetry_single (see) in normal fits (alpha is fixed)
+#        * and directly in calibration fits (alpha is a parameter)
+#        * all are 1D numpy arrays
 #        """
-#        from numpy import vstack,array
-#        bf,bb,yfm,ybm = [],[],[],[]
-#        for k,grouping in enumerate(groupings):
-#            yforw, ybackw, background_forw, background_backw, yforwm, ybackwm = self.single_for_back_counts(runs,grouping)
-#            bf.append(background_forw)
-#            bb.append(background_backw)
-#            yfm.append(yforwm)
-#            ybm.append(ybackwm)
-#            if k:
-#                yf = vstack((yf,yforw))
-#                yb = vstack((yb,ybackw))
-#            else:
-#                yf = yforw
-#                yb = ybackw
-#        bf = array(bf)
-#        bb = array(bb)
-#        yfm = array(yfm)
-#        ybm = array(ybm)
-#        return yf,yb,bf,bb,yfm,ybm
+#        from numpy import zeros, array, mean, exp, where
+#        from mujpy.tools.tools import TauMu_mus
+
+#        filespec = self.datafile[-3:] # 'bin', 'mdu' or 'nsx'
+#        if self.loadfirst:
+#            
+#    #       initialize to zero self.histoLength, maximum available good bins valid for all histos 
+#            n1 = self.nt0[0] + self.offset # ISIS
+#            n2 = n1 + self.histoLength # ISIS
+##            print('musuite single_for_back_counts debug: n1 {}, n2 {}, self.histoLength {}'.format(n1,n2,self.histoLength))
+#            yforw, ybackw = zeros(self.histoLength), zeros(self.histoLength) # counts 
+#            background_forw, background_backw = 0., 0. # background estimate
+#                           
+#            for j, run in enumerate(runs): # Add runs
+#                #print(run)
+#                for counter in grouping['forward']: # first good bin, last good bin from data array start
+#                
+#                    histo = array(run.get_histo_vector(counter,1)) # counter data array in forw group
+##                    if array(where(histo==0)).size:
+##                        print('musuite single_for_back_counts debug: run {} counter fwd {} contains {}  zeros'.format(run.get_runNumber_int(),counter,array(where(histo==0)).size))
+#                    if filespec =='bin' or filespec=='mdu': # PSI, counter specific range                  
+#                        n1 = self.nt0[counter] + self.offset
+#                        n2 = n1 + self.histoLength 
+#                        background_forw += mean(histo[self.firstbin:self.lastbin])  # from prepromt estimate
+#                    yforw += histo[n1:n2]# - background_forw
+#                        
+#                for counter in grouping['backward']: # first good bin, last good bin from data attay start
+#                
+#                    histo = array(run.get_histo_vector(counter,1)) # counter data array in back group
+##                    if array(where(histo==0)).size:
+##                        print('musuite single_for_back_counts debug: run {} counter bkw {} contains {}  zeros'.format(run.get_runNumber_int(),counter,array(where(histo==0)).size))
+#                    if filespec=='bin' or filespec=='mdu': #  PSI, counter specific range  
+#                        n1 = self.nt0[counter] + self.offset
+#                        n2 = n1 + self.histoLength 
+#                        background_backw += mean(histo[self.firstbin:self.lastbin])  # from prepromt estimate
+#                    ybackw += histo[n1:n2]# - background_backw             
+
+#            x = exp(self.time/TauMu_mus())
+#            yfm = mean((yforw-background_forw)*x)
+#            ybm = mean((ybackw-background_backw)*x)
+#            return yforw, ybackw, background_forw, background_backw, yfm, ybm
+#        else:
+#            return None, None, None, None, None, None
+#            
+#        # Asymmetry as 
+##        denominator = yfm_ + alpha*self._ybm_)*exp(-x/TauMu_mus()) # f+b normalization count
+##        A = (yf - alpha*yb - (bf - alpha*bb)) / (yfm+alpha*ybm)*exp(-x/TauMu_mus()) 
+##        errexp = sqrt(yf + alpha**2*yb) # equivalent f+b counts
+##        errexp[where(errexp==0)] = 1  #   set to 1 the minimum error for zero equivalent f+b counts
+##        self._e_ = errexp / denominator 
+
+#        # Error eval box:
+#        # Nf(t), Nb(t) are row counts from the two groupings, forward and backward
+#        # A(t) = y  with background corrected counts Nfc(t) = Nf(t) - bf = yf, 
+#        #                                            Nbc(t) = Nb(t) - bb = yb
+#        # errors eA(T) with renormalized counts
+#        #                                 Nf(t) = cf,
+#        #                                 Nb(t) = cb
+
+#        #############################################################
+#        #  ISIS)         Error evaluation, no backgrounds:          #
+#        # Brewers trick to avoid double error propagation:          #
+#        # the denominator is evaluated as an average                #
+#        #       A = [yf(t) - alpha yb(t)]/d          with           #
+#        #    d = (<yf e^t/tau> + alpha <yb e^t/tau>)e-t/tau         #
+#        # yf = sum_{i in f) Ni        yb = sum_{i in b} Ni          #
+#        # ef^2 = yf                   eb^2 = yb                     #
+#        #          eA = sqrt(yf + alpha^2 yb)/d                     #
+#        #-----------------------------------------------------------#
+#        # PSI)          With background                             #
+#        # evaluate bf, bb before prompt for yf, yb respectively     #
+#        #                                                           #
+#        #  A = [yf-bf - alpha(yb-bb)]/[yf-bf + alpha(yb-bb)]        #
+#        #           ef^2, eb^2 are the same                         #
+#        # d = [<(yf-bf)e^t/tau)> + alpha <(yb-bb)e^t/tau>] e^-t/tau #
+#        #   =   [<yfbe>     +    alpha     <ybbe>] e^-t/tau         #
+#        #                                                           #
+#        #     A = [yf - alpha yb - (bf - alpha bb)]/d               #
+#        #                                                           #
+#        #    eA = sqrt(yf + alpha^2 yb)/d                           #
+#        #-----------------------------------------------------------#
+#        # if alpha is a paramter                                    #
+#        # compute and return yf, yb, bf, bb, <yfbe>, <ybbe>         #
+#        # mumodel must compute   d,  A, eA                          #
+#        #############################################################
+#        # for ISIS the PSI formula work with bb and bf zero         #
+#        #############################################################
+#        # rebin eA works for ISIS, must be corrected for PSI        #
+#        # yfm, ybm depend on binning   
+
+    def single_for_back_counts(self,runs,grouping):
+        """
+        * input: 
+        *         runs, runs to add
+        *         grouping, dict with list of detectors 
+                            grouping['forward'] and grouping['backward']
+        *         [all instruments and facilities are treated the same way]                    
+        * output:
+        *         yfc, ybc     = sum_{d in forw or backw}(data_d - b_d), for PSI, 
+        *                        with b_d = b = mean(data_d) over n bins before the muon arrival
+        *                      = sum_{d in forw or backw} data_d, same for ISIS (b = 0)
+        *         eyfc, eyfc   = sqrt(sum_{i=for or back}(data_d + (b_d + p(0,b)/n))
+        *                 with error e = sqrt(N+(b+p(0,b))/n), 
+        *                 where p(0,b) is probability for 0 count, either
+        *                 p_0b = normal probability , 'Poisson' std sqrt(b)
+        *                      = exp(-b/2)/sqrt(2*pi*b)          , or
+        *                 P_0b = true Poisson = exp(-b) for zero events <--- implemented
+        * This method is used both by self.asymmetry_single (see) in normal fits (alpha is fixed)
+        * and, directly, in calibration fits, where alpha is a minuit parameter (neglecting partial A/partial alpha)
+        #        NOTE: in calib fits alpha is a fit parameter with an error unknown while minimizing
+        #              at the minimum e_alpha is typically 2e-3 on PSI calib runs
+        #              Neglected here, could recalculate chi_square at minimum including error from non corrected chi_square
+        #        eA = 2*alpha/(self._yfc_ - alpha*self._ybc_)**2 * sqrt((self._ybc_*self._eyfc_)**2 + (self._yfc_*self._eybc_)**2) 
+
+        * all output objects are 1D numpy arrays
+        """
+        from numpy import zeros, array, mean, exp, where, sqrt
+        from mujpy.tools.tools import TauMu_mus
+
+        filespec = self.datafile[-3:] # 'bin', 'mdu', "oot" or 'nsx'
+        if self.loadfirst:
+            
+#            n1 = self.nt0[0] + self.offset # ISIS and lem PSI root
+#            n2 = n1 + self.histoLength # ISIS and lem PSI root
+#            print('musuite single_for_back_counts debug: n1 {}, n2 {}, self.histoLength {}'.format(n1,n2,self.histoLength))
+            yfc, eyfc = zeros(self.histoLength), zeros(self.histoLength) # counts 
+            ybc, eybc = zeros(self.histoLength), zeros(self.histoLength) # counts 
+            back_f, back_b = 0., 0.             # background initialized
+            n = self.lastbin-self.firstbin+1    # n of bins in back estimation 
+                           
+            for j, run in enumerate(runs): # Add runs
+                #print(run)
+                for counter in grouping['forward']: 
+                
+                    histo = array(run.get_histo_vector(counter,1)) # counter data array in forw group
+#                    if array(where(histo==0)).size:
+#                        print('musuite single_for_back_counts debug: run {} counter fwd {} contains {}  zeros'.format(run.get_runNumber_int(),counter,array(where(histo==0)).size))
+                    if filespec =='bin' or filespec=='mdu' or filespec=='oot': # PSI, counter specific range                  
+                        n1 = self.nt0[counter] + self.offset # first good bin
+                        n2 = n1 + self.histoLength           # last good bin
+                        back_f += mean(histo[self.firstbin:self.lastbin]) # before muon arrival
+                    yfc += histo[n1:n2] # counts 
+                p_0b =  exp(-back_f) if back_f > 0 else 0. # true Poisson probability for zero counts
+                eyfc = sqrt(yfc+(back_f+p_0b)/n) # error accounting also for zero counts
+                yfc -= back_f # counts corrected for background, valid also for ISIS
+                yfc[where(yfc<0)] = 0
+                        
+                for counter in grouping['backward']: # first good bin, last good bin from data attay start
+                
+                    histo = array(run.get_histo_vector(counter,1)) # counter data array in back group
+#                    if array(where(histo==0)).size:
+#                        print('musuite single_for_back_counts debug: run {} counter bkw {} contains {}  zeros'.format(run.get_runNumber_int(),counter,array(where(histo==0)).size))
+                    if filespec=='bin' or filespec=='mdu' or filespec=='oot': #  PSI, counter specific range  
+                        n1 = self.nt0[counter] + self.offset
+                        n2 = n1 + self.histoLength 
+                        back_b += mean(histo[self.firstbin:self.lastbin])  # before muon arrival
+                    ybc += histo[n1:n2]
+                p_0b =  exp(-back_b) if back_b > 0 else 0. # true Poisson probability for zero counts
+                eybc = sqrt(ybc+(back_b+p_0b)/n)
+                ybc -= back_b
+                ybc[where(ybc<0)] = 0
+             
+            return yfc, ybc, eyfc, eybc
+        else:
+            return None, None, None, None
+        #-----------------------------------------------------------#
+        # compute and return yfc, ybc, eyfc, eybc                   #
+        # asymmetry computes A, eA if alpha is constant             #
+        # mucomponents computes A, eA if alpha is a fit parameter   #
+        # eb = sqrt(sum_i y_i + p(0)*n)/n = sqrt((b+p(o))/n)        #
+        # errors eyc = sqrt(eN**2+eb**2) = sqrt(N+(b+p(0))/n) <---- #
+        #-----------------------------------------------------------#
+
+    def single_multigroup_for_back_counts(self,runs,groupings):
+        """
+        used by mufit!!!
+        * input: 
+        *         runs, runs to add
+        *         grouping, dict with list of detectors 
+                  grouping['forward'] and grouping['backward']
+        *         uses self.single_for_back_counts(runs,grouping)
+        * output:
+        *         yf, yb       = sum_{d=for or back}(d        *         yfc, ybc     = sum_{d in forw or backw}(data_d - b_d), for PSI, 
+        *                        with b_d = b = mean(data_d) over n bins before the muon arrival
+        *                      = sum_{d in forw or backw} data_d, same for ISIS (b = 0)
+        *         eyf, eyf   = sqrt(sum_{i=for or back}(data_d + (b_d + p(0,b)/n))
+        * used only by calib multigroups
+
+        * yf, yb, eyf, eyb are 2D numpy arrays 
+        """
+        from numpy import vstack,array
+        for k,grouping in enumerate(groupings):
+            yforw, ybackw, ey_forw, ey_backw = self.single_for_back_counts(runs,grouping)
+            #        all are 1D numpy arrays
+            if k:
+                yf = vstack((yf,yforw))
+                yb = vstack((yb,ybackw))
+                eyf = vstack((eyf,ey_forw))
+                eyb = vstack((eyb,ey_backw))
+            else:
+                yf = yforw
+                yb = ybackw
+                eyf = ey_forw
+                eyb = ey_backw
+        return yf,yb,eyf,eyb
         
     def asymmetry_single(self,the_run,kgroup):
         """
@@ -715,45 +873,35 @@ class suite(object):
             # can be A1 fit, but is also invoked by all others
             asymmetry and asymmetry error (1d)
          """
-        from numpy import exp, sqrt, where, array, intersect1d, finfo
-        from mujpy.tools.tools import TauMu_mus
+        from numpy import exp, sqrt, where
 
         if self.loadfirst:
             # print(the_run)
-            alpha = self.grouping   [kgroup]['alpha']
+            alpha = self.grouping[kgroup]['alpha']            
+            yf, yb, eyf, eyb = self.single_for_back_counts(the_run,self.grouping[kgroup])
             
-            yf, yb, bf, bb, yfm, ybm = self.single_for_back_counts(the_run,self.grouping[kgroup])
-            
-            # yf, yb >=0 are flaot(int) counts; bf, bb are float average background counts
-            # yfm, ybm are  <(y-b)*exp(t/tau>, could be negative?
-            # Now calculate asymmetry and error, adding inner list runs
-            # self.grouping py-index, i.e "counter 1-Backw" is  0
-            if (yfm + alpha*ybm)<=0:
-                self.console('Too low counts on run {} group {}: negative asymmetry denominator: exiting'.format(the_run[0].get_numberRun_int(),kgroup))
-                return None, None
-            denominator = (yfm + alpha*ybm)*exp(-self.time/TauMu_mus()) # yfm, ybm are mean, not == 0
-            asymm = (yf - alpha*yb - (bf - alpha*bb)) / denominator  # 1d array
+            denominator = (yf + alpha*yb)
+            denominator[where(denominator==0)] = 1  
+            asymm = (yf - alpha*yb) / denominator  # 1d array
             
             #   ey_i in fcn sum_i ((y_i-y_th)/ey_i)**2 cannot be zero, but errexp can
-            norma = yf + alpha**2*yb # could be zero, yielding zero error 
-            # norma represents (corrected) total counts, 
-            # its minimum physical value is 1 
-            # a) can be zero when both yf and yb are zeros
-            # b) can be 1 when yf = 1 and yb = 0
-            # c) can be alpha**" when yf = 1 and yb = 0, which are both fine
-            # cure by setting to 1 only case a), others take care of themselves
-            norma[norma==0] = 1.
-            asyme = sqrt(norma) / denominator
-            
-            # further check (effects of funny denominator? Maybe can be removed
-            sqepsi = sqrt(finfo('d').eps)
-            if (array(where(asyme<sqepsi))).size: # should never happen now
-                self.console('suite asymmetry_single debug: run {}, kgroup {} asyme contains {} value(s) < 1.5e-8 This should NOT happen'.format(the_run[0].get_runNumber_int(),kgroup ,(array(where(asyme<sqepsi))).size))
-                asyme[where(asyme<epsi)] = 2*sqepsi
-
+            asyme = 2*alpha/(denominator)**2*sqrt((yb*eyf)**2+(yf*eyb)**2) 
+            asyme[where(asyme==0)] = 1 # could be zero, yielding inf chi_square 
             return asymm, asyme
         else:
             return None, None
+        #############################################################
+        #  ISIS)         Error evaluation, no backgrounds:          #
+        #-----------------------------------------------------------#
+        # PSI)          With background                             #
+        # evaluate yfc, ybc, eyfc, eybc (corrected for background)  #
+        #                                                           #
+        #  A = [yfc - alpha ybc)]/[yfc + alpha ybc]                 #
+        #  eA = 2 alpha/(yfc + alpha*ybc)**2*sqrt((ybc*eyfc)**2 +   #
+        #                                         (yfcn*eybc)**2)   #
+        #############################################################
+        # for ISIS the PSI formula works with zero background       #
+        #############################################################
                         
     def asymmetry_multirun(self,kgroup):
         """

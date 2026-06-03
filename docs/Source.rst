@@ -3,20 +3,53 @@
 ====================
 Source documentation
 ====================
------
-mugui
------
-Main GUI class
+-------
+musuite
+-------
+musr data reader class
 
-
-.. automodule:: mugui
+-- automodule: musuite
     :members:
     :undoc-members:
     :private-members:
 
----
+------
+mudash
+------
+new mujpy gui class
+
+.. automodule:: mudash
+    :members:
+    :undoc-members:
+    :private-members:
+
+-----
+mufit
+-----
+iminuit fit class
+    :members:
+    :undoc-members:
+    :private-members:
+
+---------
+mufitplot
+---------
+fit plot class
+    :members:
+    :undoc-members:
+    :private-members:
+
+------
+muplot
+------
+plot service class
+    :members:
+    :undoc-members:
+    :private-members:
+
+-----
 tools
----
+-----
 Utilities
 
 .. automodule:: tools.tools
@@ -34,12 +67,12 @@ Components for data fit with iminuit
     :undoc-members:
     :private-members:
 
--------
-musr2py
--------
-wrapper to the MuSR_td_PSI.cpp class
+---------
+muisis2py
+---------
+wrapper to the nexux class
 
-.. automodule:: musr2py.musr2py
+.. automodule:: muisis2py.muisis2py
     :members:
     :undoc-members:
     :private-members:

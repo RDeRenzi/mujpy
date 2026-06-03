@@ -8,9 +8,11 @@ class dash(object):
     Public methods correspond to the main tabs (fft, fit, setup, suite, ...). 
     
     **** Output *****
-        working solution in mujpy/getstarted/Delendo/MuDosh.ipynb
-        __init__ calls self.dash_init which defines board with html style overflow: auto;, display: flex; flex-direction: column-reverse;
-        console, gui, fit, group, about are private methods (no self) of self.dash
+        working solution in example/MuDosh.ipynb
+        __init__ calls self.dash_init which defines board with html style overflow: auto; 
+        display: flex; flex-direction: column-reverse;
+
+      console, gui, fit, group, about are private methods (no self) of self.dash
       
       later (eg on_load_nxt) both end up TWICE! in log console, despite same sys.stdout & err and same __stdout__ & __stderr__
 

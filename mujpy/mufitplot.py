@@ -32,11 +32,11 @@ class mufitplot(object):
 # Maybe make another version that does multiplots from the dashboards
 #
 #
-#  the function that performs the plot is mujpy.tools.tools import set_single_fit, self_sequence_fit 
+#  the function that performs the plot is mujpy.tools.plot import set_single_fit, self_sequence_fit 
 #        invoked by self.plot_run in 
 #        plot_singlerun or plot_singlerun_multigroup_sequential or plot_singlerun_multigroup_userpar
 
-    def __init__(self,plot_range,the_fit,guess=False,rotating_frame_frequencyMHz = 0.0,fft_range = None,real=True,fig_fit=None,fig_fft=None):
+    def __init__(self,plot_range,the_fit,guess=False,pars=False,rotating_frame_frequencyMHz = 0.0,fft_range = None,real=True,fig_fit=None,fig_fft=None):
         '''
         input: 
             either
@@ -53,11 +53,13 @@ class mufitplot(object):
         from mujpy._version import __version__
         self.__version__ = __version__
         self.fit = the_fit
+        self.lastfit = the_fit.lastfit
         self.lastfits = the_fit.lastfits
         self._the_model_ = the_fit._the_model_                           
-        self._the_model_single_ = the_fit._the_model_single_                           
+        # self._the_model_single_ = the_fit._the_model_single_                           
         self.suite = the_fit.suite
         self.log = the_fit.log
+        self.pars = pars
         if not self.suite.loadfirst: 
             self.log('Sorry, no access to data... quitting mufitplot')
             ok = False
@@ -78,11 +80,11 @@ class mufitplot(object):
             if not self.guess:
                 if "model_result" in self.dashboard:
                     self.model = "model_result"
-                elif "userpardicts_guess" in self.dashboard.keys():   
-                    self.model = "model_result"  
-                else:            
-                    # self.log('Sorry no fit results yet, plotting guess instead')
-                    self.guess = True
+                elif "userpardicts_result" in self.dashboard.keys():   
+                    self.model = "userpardicts_result"  
+#                else:            
+#                     self.log('Sorry no fit results yet, plotting guess instead')
+#                    self.guess = True
             # print('__init__ mufitplot debug: model = {}, guess = {}'.format(self.model,self.guess))    
            
             if plot_range is not None:
@@ -98,7 +100,7 @@ class mufitplot(object):
         '''
             switch for single (A1), sequential (B1),
             ... 
-        #       multi_groups suite.single userpars multigroup_in_components userlocals
+        #       multi_groups suite.single userpars function_multi_in_components userlocals
         # A1     False          True        False       False               False *
         # A20    True           True        False       False               False
         # A21    True           True        True        True                False *
@@ -108,15 +110,15 @@ class mufitplot(object):
         # C1     False          False       True        False               True  *
         # C2     True           False       True        True                True  *
         '''
-        from mujpy.tools.tools import multigroup_in_components, userpars, userlocals
-        if self.suite.single(): # A1, A20, A21
-            if self.suite.multi_groups(): # A20 A21
+        from mujpy.tools.tools import function_multi_in_components, userpars, userlocals
+        if self.suite.single(): # A1, A1 calib, A20, A20 calib, A21, A21 calib
+            if self.suite.multi_groups(): # A20, A21, A20 calib, A21 calib
                 self.log('Multigroup fit animation: toggle pause/resume by clicking on the plot')
-                if sum(multigroup_in_components(self.dashboard)): # A21
-                    ok, msg = self.plot_singlerun_multigroup_userpar(plot_range)
-                else:                          # A20
-                    ok, msg = self.plot_singlerun_multigroup_sequential(plot_range)
-            else:                              # A1
+#                if sum(function_multi_in_components(self.dashboard)): # 
+                ok, msg = self.plot_singlerun_multigroup(plot_range) # was _userpar, unified
+#                else:                          # A20, A21, A20 calib, A21 calib 
+#                    ok, msg = self.plot_singlerun_multigroup_sequential(plot_range)
+            else:                              # A1 and A1 calib
                 ok, msg = self.plot_singlerun(plot_range)
         else: # B1, B2, C1, C2, no calib in this lot
             self.log('Multirun fit animation: toggle pause/resume by clicking on the plot')
@@ -126,7 +128,7 @@ class mufitplot(object):
                     ok, msg = False, 'C2'
                     pass
                 else: # B2 (means B21 group global, B20 group sequential does not exist)
-                    ok, msg = self.plot_multirun_multigrup_userpar(plot_range)
+                    ok, msg = self.plot_multirun_multigroup_userpar(plot_range)
                     pass
             else: # B1, C1
                 if self.fit.C1(): # C1
@@ -142,45 +144,94 @@ class mufitplot(object):
         '''
         input plot_range, passed to self.plot_run together with
             pars, list of one list of fit parameter values
-            asymm, asyme 1d        
-        calib pops first par and passes it as alpha to standard plot
+            asymm, asyme 1d   # A1, A1 calib      
+        calib retrieves alpha as par[0] and
+              obtains asymm, asyme = self._the_model_._asymmetry_(alpha)
+
         '''
         from mujpy.tools.tools import int2min, mixer, calib
         from numpy import cos, pi
 #        self.log('muplotfit plot_singlerun debug')
         kgroup = 0 # default single group 
         pars,_,_,_,_,_ = int2min(self.dashboard[self.model])
-        if calib(self.dashboard):
-            self.suite.grouping[kgroup]['alpha'] = pars[0] # from fit parameter to standard asymmetry mode
+        if calib(self.dashboard): # A1 calib
+            self.suite.grouping[kgroup]['alpha'] = pars[0] 
             self.suite.groups[kgroup]['alpha'] = pars[0]
-        asymm, asyme = self.suite.asymmetry_single(self.suite._the_runs_[0],0)
+            asymm, asyme = self._the_model_._asymmetry_(pars[0])
+        else: # A1
+            asymm, asyme = self.suite.asymmetry_single(self.suite._the_runs_[0],0)
         if self.rotating_frame_frequencyMHz:
             self.rrf_asymm = mixer(self.suite.time,asymm,self.rotating_frame_frequencyMHz)
             self.rrf_asyme = mixer(self.suite.time,asyme,self.rotating_frame_frequencyMHz)
         #self.log('mufitplot: Inside single plot; debug mode')
         return self.plot_run(plot_range,pars,asymm,asyme)        
 
-    def plot_singlerun_multigroup_userpar(self,plot_range):
+    def plot_singlerun_multigroup(self,plot_range):
         '''
         input plot_range, passed to self.plot_run together with
             pars, list of one list of fit parameter values
-            # A21
-            asymm, asyme 2d        
+            asymm, asyme 2d # A21, A21 calib
+        calib retrieves alpha as [par[0],par[1],...] and
+              obtains asymm, asyme = self._the_model_._asymmetry_(alpha)
         '''
-        from mujpy.tools.tools import int2min_multigroup, mixer, calib
-        from numpy import cos, pi, vstack
-        userpardicts = (self.dashboard["userpardicts_guess"] if self.guess else 
-                        self.dashboard["userpardicts_result"])
-        pardict = self.dashboard["model_guess"][0]["pardicts"][0]
-        pars,_,_,_,_,_ = int2min_multigroup(userpardicts)
-        p = pars
-        if calib(self.dashboard):
-            for kgroup,group in enumerate(self.suite.groups):
-                group['alpha'] = eval(pardict["function_multi"][kgroup])
-                self.suite.groups[kgroup]["alpha"] = eval(pardict["function_multi"][kgroup])
-        asymm, asyme = self.suite.asymmetry_multigroup()        
+        from mujpy.tools.tools import int2min_multigroup, mixer, calib, function_multi_in_components, int2_method_key, int2_multigroup_method_key, rebin
+        from numpy import vstack, array
+        
+        pars = []
+        if sum(function_multi_in_components(self.dashboard)): # A21, A21 calib 
+            pardicts = (self.dashboard["userpardicts_guess"] if self.guess else 
+                            self.dashboard["userpardicts_result"])
+            _ = None
+            pars,_,_,_,_,_ = int2min_multigroup(pardicts) if not self.pars else self.pars,_,_,_,_,_
+            pars = pars[0] # ??? int2min_multigroup(pardicts) returns values, names,... and the returns pars = [values, names, ...] despite the 
+#            print('plot_singlerun_multigroup muplotfit debug: pars = {}'.format(pars))
+        else: # A20, A20 calib
+           for lastfit in self.lastfits:
+                if self.model == "model_result":
+                    #print('single_plot_multi_sequential mufitplot debug: self model = {}',format(self.dashboard[self.model][kgroup]))
+                    values = lastfit.values                
+                else: # guess
+                    #print('single_plot_multi_sequential mufitplot debug: self model = {}',format(self.dashboard[self.model]))
+                    values,_,_,_,_,_ = int2min(self.dashboard[self.model])                
+                pars.append(values) # here pars is list of list!!
+
+        if calib(self.dashboard): # A20 calib, A21 calib
+            alpha = []
+            ngroups = len(self.suite.groups)
+            if self.fit.A20_calib() or self.fit.A21_calib():
+                for kgroup in range(ngroups):
+                    alpha.append([self.suite.groups[kgroup]['alpha']])
+                #                print('debug mufitplot.plot_singlerun_multigroup: components[0][1] {}'.format(self._the_model_._components_[0][1]))
+                #                print('debug mufitplot.plot_singlerun_multigroup: ngroups = {}'.format(len(self._the_model_._components_[0][1])))
+                #                for key in self._the_model_._components_[0][1]:
+                #                    alpha.append([key[0](pars)[0]])
+                #                print('debug mufitplot.plot_singlerun_multigroup: alpha = {}'.format(alpha))
+                #                for kgroup,al in enumerate(alpha):
+                #                    self.suite.grouping[kgroup]['alpha'] = al
+                #                    self.suite.groups[kgroup]['alpha'] = al
+                #                ngroups = len(alpha)
+                #                alpha= array(alpha)
+                #                alpha = alpha.reshape(ngroups,1) # shape is (ngroups,1)   
+            if self.fit.A20_calib():
+                returntup = (self.suite.offset,
+                             self.suite.histoLength-self.suite.nt0.max(),10) # legal, not used
+                for kgroup,group in enumerate(self.suite.grouping):
+                    yf,yb,eyf,eyb = self.suite.single_for_back_counts(self.suite._the_runs_[0],group)
+                    self._the_model_._load_calib_(self.suite.time,yf,yb,eyf,eyb,returntup,
+                                    int2_method_key(self.dashboard,self._the_model_))
+                    asym,asye = self._the_model_._asymmetry_(alpha[kgroup][0])
+                    if kgroup:
+                        asymm, asyme = vstack((asymm,asym)),vstack((asyme,asye))
+                    else:
+                        asymm, asyme = asym,asye
+            else: # adjusted to A21_calib
+                asymm,asyme = self.suite.asymmetry_multigroup() # first dim group, last bins
+        else: # A20, A21 
+            asymm, asyme = self.suite.asymmetry_multigroup()        
+            if self.fit.A21():
+                self._the_model_._load_multigroup_(self.suite.time,asymm,
+                                        int2_multigroup_method_key(self.dashboard,self._the_model_),e=asyme)
         if self.rotating_frame_frequencyMHz:
-            # print('mufitplot single_plot_multi debug: asymm.shape[0] = {}'.format(asymm.shape[0]))
             for k in range(asymm.shape[0]):
                 if not k:
                     time = self.suite.time
@@ -188,15 +239,14 @@ class mufitplot(object):
                     time = vstack((time,self.suite.time))
             self.rrf_asymm = mixer(time,asymm,self.rotating_frame_frequencyMHz)
             self.rrf_asyme = mixer(time,asyme,self.rotating_frame_frequencyMHz)
-        #self.log('mufitplot: Inside single plot; debug mode')
         return self.plot_run(plot_range,pars,asymm,asyme)        
 
-    def plot_multirun_multigrup_userpar(self,plot_range):
+    def plot_multirun_multigroup_userpar(self,plot_range):
         '''
          inputs: 
             plot_range
         # B2 fit, multirun is sequential
-        asymm, asyme d
+        asymm, asyme 3d
         '''
         from mujpy.tools.tools import int2min_multigroup, mixer, calib
         from numpy import cos, pi, vstack
@@ -212,7 +262,7 @@ class mufitplot(object):
 #                self.suite.groups[kgroup]["alpha"] = eval(pardict["function_multi"][kgroup])
         asymm, asyme = self.suite.asymmetry_multirun_multigroup()
         if self.rotating_frame_frequencyMHz:
-            for krun in range(asymm.shape[0]):
+            for krun in range(asymm.shapcalibe[0]):
                 for kgroup in range(asymm.shape[1]):
                     if not kgroup: # kgroup=0
                         tim = self.suite.time
@@ -226,42 +276,7 @@ class mufitplot(object):
             self.rrf_asyme = mixer(time,asyme,self.rotating_frame_frequencyMHz)
         #self.log('mufitplot: Inside single plot; debug mode')
         return self.plot_run(plot_range,pars,asymm,asyme)        
-   
-    def plot_singlerun_multigroup_sequential(self,plot_range):
-        '''
-        inputs: 
-            plot_range, passed to self.plot_run together with
-            pars, list of lists  of fit parameter values
-            asymm, asyme 2d
-            # A20 fit
-        if model_result
-            self.lastfit is a list of lists 
-        if model_guess
-            reproduces the same from a single guesses            
-        '''
-        from mujpy.tools.tools import int2min, mixer
-        from numpy import cos, pi, vstack
-        # dashboard is a multi_sequential thing: each sequential fit has its own
-        asymm, asyme = self.suite.asymmetry_multigroup()
-        if self.rotating_frame_frequencyMHz:
-            for k in range(asymm.shape[0]):
-                if not k:
-                    time = self.suite.time
-                else:
-                    time = vstack((time,self.suite.time))  ### TIME BECOMES MULTIDIM, NEEDED IN RRF?
-            self.rrf_asymm = mixer(time,asymm,self.rotating_frame_frequencyMHz)
-            self.rrf_asyme = mixer(time,asyme,self.rotating_frame_frequencyMHz)
-        pars = []
-        # self.log('mufitplot single_plot_multi_sequential debug')
-        for kgroup in range(asymm.shape[0]):
-            if self.model == "model_result":
-                #print('single_plot_multi_sequential mufitplot debug: self model = {}',format(self.dashboard[self.model][kgroup]))
-                values = self.fit.lastfits[kgroup].values                
-            else:
-                #print('single_plot_multi_sequential mufitplot debug: self model = {}',format(self.dashboard[self.model]))
-                values,_,_,_,_,_ = int2min(self.dashboard[self.model])                
-            pars.append(values) # here pars is list of list!!
-        return self.plot_run(plot_range,pars,asymm,asyme)        
+
 
     def plot_multirun_singlegroup_sequential(self, plot_range):
         '''
@@ -339,17 +354,18 @@ class mufitplot(object):
                                     (produces actual figures)
         Draws either static or anim figures using tools.plot functions 
         '''
-        from mujpy.tools.tools import derange, rebin, multigroup_in_components
-        from mujpy.tools.tools import get_run_title, userpars, mixer
+        from mujpy.tools.tools import derange, rebin, function_multi_in_components
+        from mujpy.tools.tools import get_run_title, userpars, mixer, calib
         from mujpy.tools.plot import set_single_fit, set_sequence_fit
         from iminuit import Minuit
         from numpy import ones 
 
 #        for par in pars:
 #            print('\ndebug mufitplot plot_run: par type = {}'.format(type(par)))
-        # print('plot_run muplotfit debug: pars = {}'.format(pars))
+#        print('plot_run muplotfit debug: pars = {}'.format(pars))
         # chi_1: single chisquare, different asymm.shape, 
         # chi_2: many chisquare, different asymm.shape, 
+        
         chi = self.chi_1 if self.single_chi() else self.chi_2
 #        print('debug mufitplot plot_run chi = {}'.format(chi))
 #        print('debug mufitplot plot_run chi_1 = {} - chi_2 = {}'.format(self.chi_1,self.chi_2))
@@ -359,8 +375,8 @@ class mufitplot(object):
         # print('plot_run mufitplot debug: single chi is {}'.format(self.single_chi()))
 
         run_title = get_run_title(self.suite)    # always a list, even for single 
-        # C1, C2, A21, B21 are globals 
-        string = 'global ' if self.fit.A21() or self.fit.B21() or self.fit.C1() or self.fit.C2() else ''  
+        # C1, C2, A21, B21 are globals calib
+        string = 'global ' if self.fit.A21_calib() or self.fit.A21() or self.fit.B21() or self.fit.C1() or self.fit.C2() else ''  
         # string = 'global ' if self.fit.A21() or self.fit.B21() or self.fit.C1() or self.fit.C2() else ''
                           
         if self.guess:
@@ -372,6 +388,10 @@ class mufitplot(object):
 #        self.log('mufitplot plot_run debug: plot_range {}, plottup {}'.format(plot_range,plottup))
         #############################
         # rebinning of data as in fit 
+        # this is not for plotting data but
+        # to represent histogram of residues
+        # and true fit chi2 with stats 
+        # requires y_fit, f_fit, e_fit, nu_fit, chi_fit
         # this works for single 
         # and for sequential
         #############################
@@ -382,22 +402,36 @@ class mufitplot(object):
         elif len(fittup)==2: # plot start stop
             fit_start, fit_stop = fittup[0], fittup[1]
 
+#        if calib(self.dashboard):
+#            start, stop, pack = self._the_model_._start, self._the_model_._stop, self._the_model_._pack
+#            self._the_model_._start, self._the_model_._stop, self._the_model_._pack = fit_start, fit_stop, fit_pack
+#            if self.fit.A1_calib():
+#                _ = self._the_model_._add_calib_(self.suite.time,*pars)
+#            else:
+#            _ =self._the_model_._add_calib_(self.suite.time,*pars)            
+#            t_fit,y_fit,ey_fit = self.suite.time,self._the_model_._y_,self._the_model_._e_
+#            nu_fit, f_fit, chi_fit = chi(t_fit,y_fit,ey_fit,pars)
+#            self._the_model_._start, self._the_model_._stop, self._the_model_._pack = start, stop, pack
+#        else:
+
         # load modules and reproduce fit
         t_fit,y_fit,ey_fit = rebin(self.suite.time,asymm,[fit_start,fit_stop],fit_pack,e=asyme)
-        # single slices as in fit 
-        # print('muplotfit plot_run debug: calling chi for f_fit')
         nu_fit, f_fit, chi_fit = chi(t_fit,y_fit,ey_fit,pars)
+#        for k in range(len(chi_fit)):
+#            print('plot_run mufitplot debug: k, chi_f = {}, {:.4f}'.format(k,chi_fit[k]))
         if self.rotating_frame_frequencyMHz: # (t_fit,y_fit,f_fit,ey_fit) the last three must be transformed to rrf
             _,y_fit,ey_fit = rebin(self.suite.time,self.rrf_asymm,[fit_start,fit_stop],fit_pack,e=self.rrf_asyme)
             f_fit = mixer(t_fit,f_fit,self.rotating_frame_frequencyMHz)
         if not nu_fit:
             return False, 'plot_run y_fit was None'
-        # function as in fit
 
-        if len(plottup)==5: 
-        ###################
-        # double range plot
-        ###################
+        if len(plottup)==5: # and not calib(self.dashboard):
+        #########################################
+        # double range plot                     #
+        #########################################
+#            if calib(self.dashboard):
+#                self.log('Double range plot is disabled for calib fits') 
+        # automatically excluded for calib fits #
             early_late = True
             start, stop, pack, last, packlate = plottup
             
@@ -450,22 +484,24 @@ class mufitplot(object):
             early_late = False
             pack = 1
             chi_fit_late, nu_fit_late, chi_fit_early, nu_fit_early = None, None, None, None
-            if len(plottup)==3: # plot start stop pack
-                start, stop, pack = plottup
-            elif len(plottup)==2: # plot start stop
+            if len(plottup)==2: # plot start stop
                 start, stop = plottup
+            else:
+                start, stop, pack = plottup[:3]
 #        self.log('plot_range= {}'.format(plot_range))
 #        self.log('start, stop, pack = {},{},{}'.format(start, stop, pack))
 
-        t,y,ey = rebin(self.suite.time,asymm,[start,stop],pack,e=asyme)
-        # rebinned single or early slices 
-        # print('muplotfit plot_run debug: calling chi for f_res')
-        nudum, f_res, _ = chi(t,None,None,pars)
+        t = self.suite.time
+#        if calib(self.dashboard):
+#            _,f_res, _ = chi(t,None,None,pars)            
+#            t,y,ey = rebin(t,asymm,[start,stop],pack,e=asyme)
+#        else:
+        t,y,ey = rebin(t,asymm,[start,stop],pack,e=asyme)
+        _,f_res, _ = chi(t,None,None,pars)
         packfit = int(pack/2)
-        tf,dum = rebin(self.suite.time,asymm,[start,stop],packfit)
-        # single or early time slice for plot function 
-        # print('muplotfit plot_run debug: calling chi for f (None)')
+        tf,_,_ = rebin(self.suite.time,asymm,[start,stop],packfit,e=asyme)
         _,f,_ = chi(tf,None,None,pars)
+#        else:
         # print('mufitplot plot_run debug: min max f_res {}, min max f {}'.format([f_res.min(),f_res.max()],[f.min(),f.max()])) 
         if self.rotating_frame_frequencyMHz: # (t,y,f_res,ey) the last three must be transformed to rrf
                                              # (tf,f) non rebinned, the last must be transformed to rrf
@@ -486,6 +522,10 @@ class mufitplot(object):
         group = [fgroup, bgroup, alpha]
         dy_fit = (y_fit-f_fit)/ey_fit
 
+        ########################################
+        # data passed to set_figure_fit: 
+        # exp data, fcn for residue plot  (t,y,ey,f_res)
+        # time and fcn for model plot (tf,f)
         data = [t, y, ey, f_res, tf, f, dy_fit]
 
         chi_dof =[nu_fit,chi_fit]
@@ -516,14 +556,15 @@ class mufitplot(object):
                                     run_title,
                                     chi_dof,
                                     data_late,
-                                    chi_dof_late,rrf=self.rotating_frame_frequencyMHz)
+                                    chi_dof_late,rrf=self.rotating_frame_frequencyMHz)#,canvas=self.suite.canvas)
         return True, ''
+    
 
     def chi_1(self,t,yin,eyin,pars):
         '''
         input:
             t, yin, eyin are time, asymmetry, error all 1d 
-            unless multigroup_in_components(self.dashboard) is True (yin eyin 2d)
+            unless function_multi_in_components(self.dashboard) is True (yin eyin 2d)
             pars list of fit parameter values for (single run or calib) 
                (fitvalues as obtained by int2min)
             kgroup index of grouping assumed 0
@@ -531,75 +572,71 @@ class mufitplot(object):
             number_dof, fit function (1d), chi2_r  scalar for single and calib
         adding fit C1
         '''
-        from mujpy.tools.tools import multigroup_in_components, int2_multigroup_method_key, int2_multirun_user_method_key
-        from mujpy.tools.tools import _nparam, calib, int2_method_key
+        from mujpy.tools.tools import function_multi_in_components, int2_multigroup_method_key, int2_multirun_user_method_key
+        from mujpy.tools.tools import _nparam, int2_method_key
         
-        # print('chi_1 mufitplot debug: {}'.format(pars)) 
-        if sum(multigroup_in_components(self.dashboard)):
-#            pardicts = self.dashboard['userpardicts_guess']
-#            # print('mufitplot chi_1 Minuit pars {}'.format([[k,pardict["name"]] for k,pardict in enumerate(pardicts)]))
-#            parfixed = sum([1 if pardict['flag'] =='!' else 0 for pardict in pardicts]) 
-#            freepars = len(pardicts) - parfixed
-            methods_keys = int2_multigroup_method_key(self.dashboard,self._the_model_)
-        elif self.fit.C1():
-            n_runs = len(self.suite._the_runs_)
-#            freepars = self.fit.lastfit.nfit
-            methods_keys = int2_multirun_user_method_key(self.dashboard,self._the_model_,n_runs)
-        else:        
-            kgroup = 0
-#            _,_, freepars = _nparam(self.dashboard['model_guess'])
-            methods_keys = int2_method_key(self.dashboard,self._the_model_)
+        f = self._the_model_._add_norebin_(t,*pars)
         if yin is None:
-            nu = None
-            # print('mufitplot chi_1 debug: yin and nu are None') 
-            f = self._the_model_._add_(t,*pars)
+            ndof = None
             chi2 = None
-        else: # yin is not None: # data are not None
-            nu = yin.size - self.fit.lastfit.nfit # degrees of freedom in plot
-            if sum(multigroup_in_components(self.dashboard)):
-                if calib(self.dashboard):
-                # must be handles as a standard global multigroup plot
-                    # print('mufitplot chi_1 debug: _load_data_multigroup_calib_')
-                    methods_keys = methods_keys[1:]
-                ok, msg = self._the_model_._load_data_multigroup_(t,
-                                                                      yin,
-                                                                      methods_keys,
-                                                                      e=eyin)
-            elif self.fit.C1():
-                ok, msg = self._the_model_._load_data_multirun_user_(t,
-                                                                      yin,
-                                                                      methods_keys,
-                                                                      e=eyin)
-            elif calib(self.dashboard):
-                methods_keys = methods_keys[1:]
-                ok, msg = self._the_model_._load_data_calib_(t,
-                                                             yin,
-                                                             methods_keys,
-                                                             e=eyin) 
-            else:
-                ok, msg = self._the_model_._load_data_(t,
-                                                       yin,
-                                                       methods_keys,
-                                                       e=eyin)             
-            if ok:
-                # print('mufitplot chi_1 debug: pars = {}'.format(pars))
-                # self.debug(pars) # works only for global fits
-                f = self._the_model_._add_(t,*pars)
-                chi2 = self._the_model_._chisquare_(*pars)/nu # chi2 in plot
-                if sum(multigroup_in_components(self.dashboard)) or self.fit.C1():
-                    # global cases: chi2 is computed on the fly 
-                    # over true plot data, loaded above by the appropriate _load_data_...
-                    self._the_model_._axis_ = 1 # this produces separate fcn values per run/grouping
-                    nu = int(nu/yin.shape[0])  # number of dof per run or grouping = total number of dof / number of runs or groupings 
-                    chi2 = self._the_model_._chisquare_(*pars)/nu # chi2 in plot
-                    self._the_model_._axis_ = 1
-                    # print('debug mufitplot chi_1: nu = {}'.format(nu))
-                    # for k in range(yin.shape[0]):
-                    #     print('* debug chi2({}) = {}'.format(k,chi2[k]))
-            else: 
-                self.log(msg)
-                return None, None, None            
-        return nu,f,chi2
+        else: # yin and data are not None
+            if len(f.shape)==1:
+                ndof = yin.size - self.fit.lastfit.nfit # degrees of freedom in plot
+#                chi2 = self.fit.lastfit.fval/ndof
+                chi2 = (((yin-f)/eyin)**2).sum()/ndof
+            else: # multigroup global, single chi2, produce partial chi2s
+                n_groups = f.shape[0]
+                ndof = yin[0,:].size - self.fit.lastfit.nfit/n_groups # approximate
+                chi2 = []
+                for k in range(n_groups):
+                    chi2.append((((yin[k,:]-f[k,:])/eyin[k,:])**2).sum()/ndof)
+
+#            if sum(function_multi_in_components(self.dashboard)):
+#                if calib(self.dashboard):
+#                # must be handles as a standard global multigroup plot
+#                    methods_keys = methods_keys[1:]
+#                    # ok, msg = self._the_model_._load_calib_multigroup_(t,yf,yb,eyf,eyb,returntup,methods_keys) # use with full methods_keys
+#                    # rebinning is done in mucomponents _add_calib_multigroup_
+#                #else:
+#                ok, msg = self._the_model_._load_multigroup_(t,
+#                                                                  yin,
+#                                                                  methods_keys,
+#                                                                  e=eyin)
+#            elif self.fit.C1():
+#                ok, msg = self._the_model_._load_multirun_user_(t,
+#                                                                      yin,
+#                                                                      methods_keys,
+#                                                                      e=eyin)
+#            elif calib(self.dashboard):
+#                methods_keys = methods_keys[1:]
+#                ok, msg = self._the_model_._load_calib_(t,
+#                                                             yin,
+#                                                             methods_keys,
+#                                                             e=eyin) 
+#            else:
+#                ok, msg = self._the_model_._load_(t,
+#                                                       yin,
+#                                                       methods_keys,
+#                                                       e=eyin)             
+#            if ok:
+#                # print('mufitplot chi_1 debug: pars = {}'.format(pars))
+#                # self.debug(pars) # works only for global fits
+#                f = self._the_model_._add_(t,*pars)
+#                chi2 = self._the_model_._chisquare_(*pars)/ndof # chi2 in plot
+#                if sum(function_multi_in_components(self.dashboard)) or self.fit.C1():
+#                    # global cases: chi2 is computed on the fly 
+#                    # over true plot data, loaded above by the appropriate _load_...
+#                    self._the_model_._axis_ = 1 # this produces separate fcn values per run/grouping
+#                    ndof = int(ndof/yin.shape[0])  # number of dof per run or grouping = total number of dof / number of runs or groupings 
+#                    chi2 = self._the_model_._chisquare_(*pars)/ndof # chi2 in plot
+#                    self._the_model_._axis_ = 1
+#                    # print('debug mufitplot chi_1: ndof = {}'.format(ndof))
+#                    # for k in range(yin.shape[0]):
+#                    #     print('* debug chi2({}) = {}'.format(k,chi2[k]))
+#            else: 
+#                self.log(msg)
+#                return None, None, None            
+        return ndof,f,chi2
         
     def chi_2(self,t,yin,eyin,pars):
         '''
@@ -612,36 +649,44 @@ class mufitplot(object):
         output:
             number_dof, fit function (2d), chi2_r (list)
         deals also with cases where only f is needed (plot function)
-        #  B1 2d (runs) sequential, pars is a list, uses _load_data_
-        #  A20 2d (groups) sequential, pars is a list, uses _load_data_
-        # to be implemented
-        #  B20 3d (group,runs) sequential, pars is a list, uses _load_data_multigroup_
+        #  B1 2d (runs) sequential, pars is a list, uses _load_
+        #  A20 2d (groups) sequential, pars is a list, uses _load_
+        # to be implementedint2_multigroup_method_key
+        #  B20 3d (group,runs) sequential, pars is a list, uses _load_multigroup_
         #  B21 3d multigroup userpar, to be done
         '''
         from mujpy.tools.tools import _nparam, int2_method_key, calib, cstack
-        
-        _,_, freepars = _nparam(self.dashboard[self.model])
-        nu = len(t) - freepars # degrees of freedom in plot
-#        print('debug mufitplot chi_2: freepars = {} nu = {}'.format(freepars,nu))
+ 
+        ndof,chi2 = None, [None for k in range(len(pars))]
+        f = cstack(self._the_model_._add_norebin_,t,*pars) # cstack vstacks the 
+        chi2 = []
         if yin is not None: # data are not None
-            mthdk = int2_method_key(self.dashboard,self._the_model_)
-            if calib(self.dashboard):
-                mthdk = mthdk[1:]
-            ok, msg = self._the_model_._load_data_(t,yin,mthdk,e=eyin) 
-            if ok:
-                f = cstack(self._the_model_._add_,t,*pars)
-#                print('mufitplot chi_2 debug: pars {}\nf.shape = {}'.format(pars,f.shape))
-            else:
-                self.log(msg)
-                return None, None, None
-            chi2 = [self.lastfits[k].fval/nu for k in range(len(self.lastfits))]
-#            for k in range(len(lastfits)): # works only for 2d cases
-#                chi2.append(lastfits[k]) # chi2 in plot
-                # print('mufitplot chi_2 debug: k {}, chi2 = {}'.format(k,chi2[-1]))
-        else: # only f is really needed, this can be called only after a call with yin = None
-            f = cstack(self._the_model_._add_,t,*pars)
-            chi2 = [None for k in range(len(pars))]
-        return nu,f,chi2
+            for k in range(len(self.lastfits)):
+                ndof = yin[k,:].size - self.fit.lastfits[k].nfit 
+                chi2.append((((yin[k,:]-f[k,:])/eyin[k,:])**2).sum()/ndof)
+         
+#        _,_, freepars = _nparam(self.dashboard[self.model])
+#        ndof = len(t) - freepars # degrees of freedom in plot
+##        print('debug mufitplot chi_2: freepars = {} nu = {}'.format(freepars,nu))
+#        if yin is not None: # data are not None
+#            mthdk = int2_method_key(self.dashboard,self._the_model_)
+#            if calib(self.dashboard):
+#                mthdk = mthdk[1:]
+#            ok, msg = self._the_model_._load_(t,yin,mthdk,e=eyin) 
+#            if ok:
+#                f = cstack(self._the_model_._add_,t,*pars)
+#                # print('mufitplot chi_2 debug: pars {}\nf.shape = {}'.format(pars,f.shape))
+#            else:
+#                self.log(msg)
+#                return None, None, None
+#            chi2 = [self.lastfits[k].fval/ndof for k in range(len(self.lastfits))]
+##            for k in range(len(lastfits)): # works only for 2d cases
+##                chi2.append(lastfits[k]) # chi2 in plot
+#                # print('mufitplot chi_2 debug: k {}, chi2 = {}'.format(k,chi2[-1]))
+#        else: # only f is really needed, this can be called only after a call with yin = None
+#            f = cstack(self._the_model_._add_,t,*pars)
+#            chi2 = [None for k in range(len(pars))]
+        return ndof,f,chi2
                 
     def fstack(self,t,*pars):
         from numpy import vstack
@@ -662,7 +707,7 @@ class mufitplot(object):
           single-multi group
           sequential-global  
         '''
-        from mujpy.tools.tools import multigroup_in_components, userlocals
+        from mujpy.tools.tools import function_multi_in_components, userlocals
         from mujpy.tools.tools import get_nruns, int2min, int2min_multigroup
         from numpy import array
 
@@ -676,7 +721,7 @@ class mufitplot(object):
             if self.suite.multi_groups(): # A2
                 # print('mufitplot choosefftplot debug: A2')
                 self.log('Multigroup fft animation: toggle pause/resume by clicking on the plot')
-                if sum(multigroup_in_components(self.dashboard)): # A21 single chi2
+                if sum(function_multi_in_components(self.dashboard)): # A21 single chi2
                     userpars = "userpardicts_guess" if self.guess else "userpardicts_results"
                     pardicts = self.dashboard[userpars]
                     pars,_,_,_,_,_ = int2min_multigroup(pardicts)
@@ -704,7 +749,7 @@ class mufitplot(object):
                     self.log('Multi group and run fft animation: toggle pause/resume by clicking on the plot')
                     if userlocals(self.dashboard): # C2
                         pass# not yet
-                    else: # B21 userpardicts, multigroup_in_components no tilde_incomponents
+                    else: # B21 userpardicts, function_multi_in_components no tilde_incomponents
                         pars = [] 
                         # not yet
 #                        for run in get_nruns(self.suite):
@@ -900,7 +945,7 @@ class mufitplot(object):
         from numpy import vstack
         _the_model = self._the_model_
         method_keys = int2_method_key(self.dashboard,self._the_model_)
-        self._the_model_._load_data_(t_fit,y_fit,method_keys)
+        self._the_model_._load_(t_fit,y_fit,method_keys)
         fft_include_components = []      
         for component in self.dashboard["model_guess"]:
             if "fft" in component.keys():
@@ -941,7 +986,7 @@ class mufitplot(object):
             True if chi_1 is required (single cost function in global mufitplot: A1,A21,C1,C2)
             False if chi_2 is required (multi cost finctions in sequential mufitplots: A20,B1,B20,B21)
         '''
-        #       multi_groups suite.single userpars multigroup_in_components userlocals  single_cost_function
+        #       multi_groups suite.single userpars function_multi_in_components userlocals  single_cost_function
         # A1     False          True        False       False               False        *
         # A20    True           True        False       False               False
         # A21    True           True        True        True                False        *
@@ -956,7 +1001,7 @@ class mufitplot(object):
 #        return (userlocals(self.dashboard) or 
 #                   (self.suite.single() and 
 #                        (not self.suite.multi_groups() or userpars(self.dashboard)))) 
-        return self.fit.A1() or self.fit.A21() or self.fit.C1() or self.fit.C2()
+        return self.fit.A1() or self.fit.A21() or self.fit.A1_calib() or self.fit.A21_calib() or self.fit.C1() or self.fit.C2()
                     
     def debug(self,pars):
         # can be deleted after debugging stage of mujpy 2.0

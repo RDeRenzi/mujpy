@@ -46,10 +46,7 @@ The text of the hidden first cell is the following three-liner (of course # mean
     ## Mujpy tester, for inline graphics specify: %matplotlib notebook, for interactive %matplotlib tk (or just    %matplotlib)
     # %matplotlib -l  lists all the possible options
     %matplotlib tk
-    # loads the distribution when a distribution is already installed 
-    from mujpy.mugui import mugui
-    MuJPy = mugui()
-    
+
 
 Cut and paste it into an empty notebook cell. Click on the left blue vertical line to toggle hide this first cell. Run it as usual 
 
