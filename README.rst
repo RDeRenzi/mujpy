@@ -4,7 +4,7 @@ MuJPy
 
 A Python MuSR data analysis based on classes, with a graphical interface designed for jupyter, released under the MIT licence.
 
-v. 2.0.alpha major refactoring. For the time being works only via python3 scripts (see example test.py) and jupyter-lab notebooks 
+v. 2.0.alpha major refactoring. See _version.py for more recent version details. For the time being works only via python3 scripts (see example test.py) and jupyter-lab notebooks 
 (mudash is broken). Once cloned, run test.py, or::
 
   jupyter-lab
