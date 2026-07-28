@@ -20,6 +20,6 @@ the_suite = suite(datafile, runlist , grp_calib , offset, startuppath)
 dashboard_file = startuppath+'/fit/mgml.822.3-4+2-1.1_fit.json' # single B, for 2B use: 'python3 mgml.822.3-4+2-1.2B_fit.py'
 the_fit = mufit(the_suite,dashboard_file)
 plot_range = '0,20000,40'
-print('>>>>>>>>>>>>>> close (x) the window to finish')
+print('>>>>>>>>>>>>>> close (x) the figure to finish')
 the_fitplot = mufitplot(plot_range,the_fit)
 P.show()

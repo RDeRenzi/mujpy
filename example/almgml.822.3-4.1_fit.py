@@ -19,6 +19,6 @@ the_suite = suite(datafile, runlist , grp_calib , offset, startuppath)
 dashboard_file = startuppath+'/fit/almgml.822.3-4.1_fit.json' # must exist
 the_fit = mufit(the_suite,dashboard_file)
 plot_range = '0,20000,40'
-print('>>>>>>>>>>>>>> close (x) the window to finish')
+print('>>>>>>>>>>>>>> close (x) the figure to finish')
 the_fitplot = mufitplot(plot_range,the_fit)
 P.show()

@@ -3,7 +3,7 @@
 ################
 
 def plot_parameters(nsub,labels,fig=None): 
-    r'''
+    r"""
     standard plot of fit parameters vs B,T (or X to be implemente)
     input
        nsub<6 is the number of subplots
@@ -20,7 +20,7 @@ def plot_parameters(nsub,labels,fig=None):
          ...
          a transverse sigma is plotflag=n and is plotted in ax[n-1]
          
-    '''
+    """
     import matplotlib.pyplot as P
     nsubplots = nsub if nsub!=5 else 6 # nsub = 5 is plotted as 2x3 
     # select layout, 1 , 2 (1,2) , 3 (1,3) , 4 (2,2) or 6 (3,2)
@@ -107,7 +107,7 @@ def plot_parameters(nsub,labels,fig=None):
 ###    
 
 def plotile(x,xdim=0,offset=0):
-    '''
+    """
     Produces a tiled plot, in the sense of np.tile e.g.
 
     ::
@@ -117,7 +117,7 @@ def plotile(x,xdim=0,offset=0):
         xt = plotile(x,4)
         yt = plotile(y,offset=0.1) 
 
-    '''
+    """
     # x is an array(x.shape[0],x.shape[1])
     # xoffset is a step offset
     # xdim = x.shape[0] if xdim == 0 else xdim
@@ -133,80 +133,52 @@ def plotile(x,xdim=0,offset=0):
         xt += tile(offset*arange(xt.shape[0]),(x.shape[1],1)).transpose()
     return xt
 
-def set_bar(n,b):
-    '''
-    service to animate histograms
-    e.g. in the fit tab
-
-    extracted from matplotlib animate 
-    histogram example
-    '''
-    from numpy import array, zeros, ones
-    import matplotlib.path as path
-
-    # get the corners of the rectangles for the histogram
-    left = array(b[:-1])
-    right = array(b[1:])
-    bottom = zeros(len(left))
-    top = bottom + n
-    nrects = len(left)
-
-    # here comes the tricky part -- we have to set up the vertex and path
-    # codes arrays using moveto, lineto and closepoly
-
-    # for each rect: 1 for the MOVETO, 3 for the LINETO, 1 for the
-    # CLOSEPOLY; the vert for the closepoly is ignored but we still need
-    # it to keep the codes aligned with the vertices
-    nverts = nrects*(1 + 3 + 1)
-    verts = zeros((nverts, 2))
-    codes = ones(nverts, int) * path.Path.LINETO
-    codes[0::5] = path.Path.MOVETO
-    codes[4::5] = path.Path.CLOSEPOLY
-    verts[0::5, 0] = left
-    verts[0::5, 1] = bottom
-    verts[1::5, 0] = left
-    verts[1::5, 1] = top
-    verts[2::5, 0] = right
-    verts[2::5, 1] = top
-    verts[3::5, 0] = right
-    verts[3::5, 1] = bottom
-    xlim = [left[0], right[-1]]
-    return verts, codes, bottom, xlim
+#####################
+# mufitplot figures #
+#####################
 
 def set_fig(num,nrow,ncol,title,**kwargs):  # NOT CLEAR WHERE IT IS USED
-    '''
-    num is figure number (static, to keep the same window) 
-    nrow, ncol number of subplots rows and columns
-    kwargs is a dict of keys to pass to subplots as is
-    initializes figures when they are first called 
+    """
+    [re]creates fix, ax
+
+        num         figure number (static, to keep the same window) 
+        nrow, ncol  number of subplots rows and columns
+        kwargs      a dict of keys to pass to subplots as is
+    initializes fig when first called 
     or after accidental killing
-    '''
+    """
+
     import matplotlib.pyplot as P
     fig,ax = P.subplots(nrow, ncol, num = num, **kwargs)
     fig.canvas.manager.set_window_title(title)
     return fig, ax  
 
 def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):#,canvas=None):
-    r'''
+    """
+    call single mufitplot with no animation
+
     input:
-        
         flags = [early_late, anim] True/False
+        model = model name
         data = [t,y,ey,f_res,tf,f,dy_fit] 
-            used to errorbar(t,y,yerr=ey), plot(tf,f), plot(t,y-f_res), chi(dy_fit)
-        if early_late:
-            data_late = [t_late,y_late,ey_late,f_res_late,tfl,fl,dy_fit_early,dy_fit_late]
+            used for errorbar(t,y,yerr=ey), 
+                     plot(tf,f), 
+                     plot(t,y-f_res), 
+                     chi(dy_fit)
         group = [fgroup,bgroup,,alpha]
-        run_title, to print on figure
-        chi_dof = [nu,chi], number of dof and chi2
-                chi are scalar in single
-        if early_late:
-            chi_dof_late = [nu_e,nu_l,chi_e,chi_l,w_e,w_l], 
-            w_e, w_l = nu_fit/nu_e\l*ones(dy_fit_early\late.shape[0])
+        run_title, for figure title
+        chi_dof = [nu,chi], number of dof and chi2 (chi scalar in single)
+        data_late = [t_late,y_late,ey_late,f_res_late,tfl,fl,dy_fit_early,dy_fit_late]
+                    if early_late else None
+        chi_dof_late = [nu_e,nu_l,chi_e,chi_l,w_e,w_l], if early_late else Nonu
+            w_e = nu_fit*ones(t_fit_early.shape[0])/nu_fit_early
+            w_l = nu_fit*ones(t_fit_late.shape[0])/nu_fit_late
     output: 
         fig, to reuse fig window
     recovers or creates figure subplots 
-    for single fit or anim
-    '''
+    for single fit
+    """
+
     import matplotlib.pyplot as P
     from matplotlib.pyplot import rcParams, suptitle
     from numpy import hstack   
@@ -298,26 +270,30 @@ def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,c
     return fig
 
 def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):
-    r'''
+    """
+    call sequence mufitplot, with animation
+
     input:
-        
         flags = [early_late, anim] True/False
+        model = model name
         data = [t,y,ey,f_res,tf,f,dy_fit] 
-            used to errorbar(t,y,yerr=ey), plot(tf,f), plot(t,y-f_res), chi(dy_fit)
-        if early_late:
-            data_late = [t_late,y_late,ey_late,f_res_late,tfl,fl,dy_fit_early,dy_fit_late]
+            used for errorbar(t,y,yerr=ey), 
+                     plot(tf,f), 
+                     plot(t,y-f_res), 
+                     chi(dy_fit)
         group = [fgroup,bgroup,,alpha]
-        run_title, to print on figure
-        chi_dof = [nu,chi], number of dof and chi2
-            chi are lists in sequence
-        if early_late:
-            chi_dof_late = [nu_e,nu_l,chi_e,chi_l,w_e,w_l], 
-            w_e, w_l = nu_fit/nu_e\l*ones(dy_fit_early\late.shape[0])
+        run_title, for figure title
+        chi_dof = [nu,chi], number of dof and chi2 (chi list in sequence)
+        data_late = [t_late,y_late,ey_late,f_res_late,tfl,fl,dy_fit_early,dy_fit_late]
+                    if early_late else None
+        chi_dof_late = [nu_e,nu_l,chi_e,chi_l,w_e,w_l], if early_late else Nonu
+            w_e = nu_fit*ones(t_fit_early.shape[0])/nu_fit_early
+            w_l = nu_fit*ones(t_fit_late.shape[0])/nu_fit_late
     output: 
         fig, to reuse fig window
-    recovers or creates figure subplots 
-    for single fit or anim
-    '''
+    recovers or creates figure subplots  
+    """
+
     import matplotlib.pyplot as P
     from matplotlib.pyplot import rcParams
 
@@ -326,15 +302,15 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
     from mujpy.tools.plot import errorb, plot_fit, decorate_data, decorate_data_late
     from mujpy.tools.plot import plot_res, decorate_res, decorate_res_late, plot_txt, plot_chi2
     from mujpy.tools.plot import draw
-    from datetime import datetime
+#    from datetime import datetime
 
     def animate_fit(i): 
-        '''
+        """
         anim function
         update errorbar data, fit, residues and their color,
                chisquares, their histograms 
 
-        '''
+        """
         from  numpy import histogram, array
         # early_late == False if data_late == None
         #early_late = False if data_late == None else False
@@ -371,8 +347,9 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
             string1 = 'F-B: {} - {}\n'.format(fgroup[0],bgroup[0])
             string1 += r'$\alpha=$ {:.4f}'.format(alpha[0])
         else:
-            string1 = 'F-B: {} - {}\n'.format(fgroup[i],bgroup[i])
-            string1 += r'$\alpha=$ {:.4f}'.format(alpha[i])
+            ig = i%len(fgroup)
+            string1 = 'F-B: {} - {}\n'.format(fgroup[ig],bgroup[ig])
+            string1 += r'$\alpha=$ {:.4f}'.format(alpha[ig])
         string1 += '\n'
         string1 += r'$\chi^2_f=$ {:.4f}'.format(chi_fit[i])
         string1 += '\n ({:.2f}-{:.2f})\n{} dof'.format(lc,hc,nu_fit) 
@@ -419,12 +396,10 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         return line, ye, fline, res, linesp, linesm, line2sp, line2sm, vertf, text1
               
     def init_animate_fit():
-        '''
-        anim init function
-        blitting (see wikipedia)
-        to give a clean slate 
+        """
+        anim init fit function, blitting (see wikipedia) to give a clean slate 
+        """
 
-        '''
         from  numpy import histogram, array
         global ax_0
 
@@ -514,8 +489,8 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         paused = not paused    
 
 ## set_sequence_fit begins here
-    now = datetime.now()
-    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")             
+    #now = datetime.now()
+    #dt_string = now.strftime("%d/%m/%Y %H:%M:%S")             
     font = {'family':'Ubuntu','size':10}
     P.rc('font', **font)
     prop_cycle = rcParams['axes.prop_cycle']
@@ -621,7 +596,7 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         ym,yM,rm,rM = y.min()-0.05,y.max()+0.01,(y-f_res).min()-0.005,(y-f_res).max()+0.005
         xtgl,ytgl = 1.125*t.min()-0.125*t.max(), 1.5*rm-0.5*rM
         ax_res.text(xtgl,ytgl,'Click to toggle pause/resume',fontsize='medium')
-        ax_fit.text(xtgl,yM,dt_string,fontsize='small')
+        ax_fit.text(xtgl,yM,' ',fontsize='small') # ' ' ex dt_string, may be used for another info!
         nu_fit_early,nu_fit_late,dy_early = n*[None], n*[None], n*[None],
         w_early,dy_late,w_late = n*[None], n*[None], n*[None]
 
@@ -662,7 +637,9 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
     return fig
 
 def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
-    '''
+    """
+    draw the mufitplot FFT figure, anim for 2,3d a, af
+
     input:
         fig_fft figure handle
         model_name e.g. "mgml"
@@ -670,8 +647,8 @@ def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
         a data fft real part slice
         af partial model fft real part slice
         e, scalar, std on a, af
-    output the figure (anim for 2,3d a, af)
-    '''
+    """
+
     from numpy import arange, array
     from mujpy.tools.tools import autops, ps, _ps_acme_score, _ps_peak_minima_score
     from copy import deepcopy
@@ -684,11 +661,11 @@ def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
     # PYPLOT ANIMATIONS
     ###################
     def animate_fft(i):
-        '''
+        """
         anim function
         update fft data, fit fft and their color 
 
-        '''
+        """
         # color = next(ax_fft._get_lines.prop_cycler)['color']
         ax_fft.set_title(run_title[i])
         marks.set_ydata(ap[i,:])
@@ -699,12 +676,12 @@ def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
 
 
     def init_animate_fft():
-        '''
+        """
         anim init function
         blitting (see wikipedia)
         to give a clean slate 
 
-        '''
+        """
         ax_fft.set_title(run_title[0])
         marks.set_ydata(ap[0,:])
         segs = [array([[q,w-a],[q,w+a]]) for q,w,a in zip(f,ap[0],ap[0]-ap[0]+ep[0])]
@@ -792,9 +769,14 @@ def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
     fig_fft.canvas.manager.window.tkraise()
     P.draw()
 
+##########################
+# Actual pyplot commands
+##########################
 
 def errorb(ax,t,y,ey,color):
-    '''
+    """
+    returns handles of ax.errorbar(t,y,yerr=ey,mfc=color,...)
+
     input:
         ax = axis handle, 
         t, y, ey = time data and error
@@ -805,14 +787,18 @@ def errorb(ax,t,y,ey,color):
     To ignore handles for single run: 
             dum, = errorb(...)
     Draws errorbar of data
-    '''
+    """
+
+    # print('tools.plot errorb t.shape, y.shape {}, {}'.format(t.shape, y.shape))
     line, xe, ye, = ax.errorbar(t,y,yerr=ey,fmt='o',elinewidth=1.0,
                                     ecolor=color,mec=color,mfc=color,
                                     ms=2.0,zorder=0, alpha=0.5) # errorbar of data
     return line, xe, ye
 
 def plot_fit(ax,t,f,color):
-    '''
+    """
+    returns captured handles calling ax.plot(t,f,yerr=ey,mfc=color,...)
+
     input:
         ax, axis handle
         t, f, time fit
@@ -822,57 +808,70 @@ def plot_fit(ax,t,f,color):
     Ignore handle for single run
         dum = plot_fit(...)
     Draws overlayed fit     
-    '''
-    from matplotlib.pyplot import rcParams
+    """
 
+    from matplotlib.pyplot import rcParams
     fline, = ax.plot(t,f,'-',lw=1.5,alpha=1,zorder=2,color=color) # fit
     return fline
      
 def decorate_data(ax,t,ym,yM):
-    '''
+    """
+    sets x limits (forces 0), y limits, writes y_label 'Asymmetry'
+
     input:
-        ax, axis handle
-         
-    sets limits, writes x_label, y_label 
-    '''
+        ax,     axis handle
+        t,      x array 0, x.max()
+        ym, yM  y limits
+    """
+
     ax.set_xlim(0,t.max())
     ax.set_ylim(ym,yM)
     ax.set_ylabel('Asymmetry')
 
 def decorate_data_late(ax,t,ym,yM):
-    '''
+    """
+    sets x strong limits, y limits, writes x_label, removes y ticks
+
     input:
-        ax, axis handle
-         
-    sets limits,writes x_label
-    '''
+        ax,     axis handle
+        t,      x array x[0] x.max()
+        ym, yM  y limits
+    """
+
     from matplotlib import ticker
     ax.set_xlim(t[0],t.max())
     ax.set_ylim(ym,yM)
     ax.yaxis.set_major_formatter(ticker.NullFormatter())# 
 
 def plot_res(ax,t,dy,color): 
-    '''
+    """
+    Draws residues, returns handle         
+
     input:
-        ax, axis handle
-        t, dy, time residues
+        ax,     axis handle
+        t, dy,  time, residues
         color_index = 0, 2 for early (whole) or late
     output:
-        res = residue line handle for animation
+        res     residue line handle for animation
     Ignore handle for single run
-        dum = plot_res(...)
-    Draws residues         
-    '''
+        dum     plot_res(...)
+    """
+
     res, = ax. plot(t,dy,'-',lw=1.0,alpha=0.8,zorder=2,color=color) # residues 
     return res
 
 def decorate_res(ax,t,ey,rm,rM):
-    '''
+    """
+    sets limits, writes x_label, y_label, draws 1-, 2-std lines 
+
     input:
-        ax, axis handle
-         
-    sets limits, writes x_label, y_label, 1 & 2 std lines 
-    '''
+        ax,     axis handle
+        t,ey,   time, std
+        rm,rM   residue limits
+    output:
+        handles to +1 -1 +2 -2 std ines
+    """
+
     from matplotlib.pyplot import rcParams
 
     prop_cycle = rcParams['axes.prop_cycle']
@@ -889,12 +888,16 @@ def decorate_res(ax,t,ey,rm,rM):
     return linesp, linesm, line2sp, line2sm
 
 def decorate_res_late(ax,t,ey,rm,rM):
-    '''
+    """
+    sets limits, writes x_label, y_label, draws 1-, 2-std lines 
+
     input:
-        ax, axis handle
-         
-    sets limits, writes x_label, 1 & 2 std lines 
-    '''    
+        ax,     axis handle
+        t,ey,   time, std
+        rm,rM   residue late limits
+    output:
+        handles to +1 -1 +2 -2 std ines            
+    """    
     from matplotlib import ticker
     from matplotlib.pyplot import rcParams
 
@@ -912,8 +915,9 @@ def decorate_res_late(ax,t,ey,rm,rM):
     return linespl, linesml, line2spl, line2sml
 
 def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,bgroup,alpha,ylim):
-    '''
-    write stuff on top right
+    """
+    write stuff at top right, returns 1 [None padded or + 2 text handles] (9 items)
+
     input: 
         ax
         nu_fit, nu_early, nu_late: dofs
@@ -923,11 +927,14 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
     background white for fit, 
                color[0] for data, data_early
                color[2] for data_late 
-    '''
+    """
+
     from scipy.special import gammainc 
     from scipy.stats import norm, chi2
     from numpy import linspace, where
     from matplotlib.pyplot import rcParams
+    from datetime import datetime
+
 
     prop_cycle = rcParams['axes.prop_cycle']
     color = prop_cycle.by_key()['color']
@@ -936,6 +943,7 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
     transalpha = 0.5
     pad = 3
     xtxt = -4.5
+    dx = 1.0
 
     mm = round(nu_fit/4)
     hb = linspace(-mm,mm,2*mm+1)
@@ -951,7 +959,9 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
     text1 = ax.text(xtxt,ylim[0]+0.55*dylim,string1,bbox={'facecolor': 'white', 'pad': pad}) 
     ax.axis('off')
     ax.set_ylim(ylim)
-
+    now = datetime.now()
+    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+    text5 = ax.text(xtxt-dx,ylim[0]+dyl,dt_string,fontsize='small')
     # print('plot_txt in tools.plot debug: chi_late = {}'.format(chi_late))
     if chi_late is not None: 
         mm = round(nu_early/4)
@@ -971,13 +981,15 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
         dyl = dylim/50
         text3 = ax.text(xtxt,ylim[0]+dyl,string3,bbox={'facecolor': color[2], 'alpha': transalpha, 'pad': pad})
         text4 = ax.text(xtxt,ylim[0]+dylim,model+' fit')
+
         return text1, lc, hc, text2, lce, hce, text3, lcl, hcl
 
     return text1, lc, hc, None, None, None, None, None, None
-    
 
 def plot_chi2(ax,dy_fit,nu_fit,dy_early,w_early,dy_late,w_late):
-    '''
+    """
+    draws histogram of chi2 distrib, returns 1 histo, bar, bottom handles, [None padded or + 2 histo, bar handles]
+
     input:
         ax, axis handle
         dy_fit, normalized deviation for fit, on fi-range
@@ -985,8 +997,8 @@ def plot_chi2(ax,dy_fit,nu_fit,dy_early,w_early,dy_late,w_late):
         w_plot, n_dof(fit)/n_dof(data_plot)*data_plot.shape[0]
         dy_late, normalized deviation for y_late, plot (late)  or None
         w_late, n_dof(fit)/n_dof(data_plot)*data_plot.shape[0] or None
-    histogram of chi2 distribution
-    '''
+    """
+
     from numpy import linspace, ndarray, histogram
     from scipy.stats import norm
     from matplotlib import ticker
@@ -1039,9 +1051,52 @@ def plot_chi2(ax,dy_fit,nu_fit,dy_early,w_early,dy_late,w_late):
     else:
         return vertf, nhistf, bottom, xbin, None, None, None, None
 
+def set_bar(n,b):
+    """
+    service to animate histograms
+
+    called in mufitplot plot_chi2
+        extracted from matplotlib animate 
+        histogram example
+    """
+
+    from numpy import array, zeros, ones
+    import matplotlib.path as path
+
+    # get the corners of the rectangles for the histogram
+    left = array(b[:-1])
+    right = array(b[1:])
+    bottom = zeros(len(left))
+    top = bottom + n
+    nrects = len(left)
+
+    # here comes the tricky part -- we have to set up the vertex and path
+    # codes arrays using moveto, lineto and closepoly
+
+    # for each rect: 1 for the MOVETO, 3 for the LINETO, 1 for the
+    # CLOSEPOLY; the vert for the closepoly is ignored but we still need
+    # it to keep the codes aligned with the vertices
+    nverts = nrects*(1 + 3 + 1)
+    verts = zeros((nverts, 2))
+    codes = ones(nverts, int) * path.Path.LINETO
+    codes[0::5] = path.Path.MOVETO
+    codes[4::5] = path.Path.CLOSEPOLY
+    verts[0::5, 0] = left
+    verts[0::5, 1] = bottom
+    verts[1::5, 0] = left
+    verts[1::5, 1] = top
+    verts[2::5, 0] = right
+    verts[2::5, 1] = top
+    verts[3::5, 0] = right
+    verts[3::5, 1] = bottom
+    xlim = [left[0], right[-1]]
+    return verts, codes, bottom, xlim
+
 def draw(fig):
-    '''
-    '''
+    """
+    brings window to focus and does P.draw()
+    """
+
     import matplotlib.pyplot as P
     cfm = P.get_current_fig_manager()
     if hasattr(cfm,'window'):

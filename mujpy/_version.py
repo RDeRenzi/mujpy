@@ -1,5 +1,10 @@
 '''
 Version history
+version  2.9   rewritten mufit and mufitplot to support all eight fit types
+               single run           A1, A20, A21 (single group, multi group sequential, multigroup global)
+               multirun sequential  B1, B20, B21 (>>          , >>                    , >>)
+               multirun global      C1, C2       (global single group, global multigroup)  
+               each with its alpha calibration version
 Version  2.8   new classes muroot2py.muroot2py muroot2py based on uproot
                and muisis2py.muisis2py munxs2py based on nexusformat.
                debugged A1 A1_calib A20 A20_calib A21 A21_calib B1 modes

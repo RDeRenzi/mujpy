@@ -1,7 +1,7 @@
 class suite(object):
-    '''
-    A suite class, 
-      file read through musr2py (bin, mdu), muroot2py (root, old and MusrRoot), muisis2py (nxs)
+    """
+    A suite class, file read through musr2py (bin, mdu), muroot2py (root, old and MusrRoot), muisis2py (nxs)
+    
       muroot2py provides methods equivalent to all MuSR_td_PSI_bin(), same syntax (but data are always numpy arrays) 
       
       Different Instruments/Facilities require different methods for setting t0, specifically:
@@ -20,7 +20,7 @@ class suite(object):
         (console(string) must print string somewhere)
         t0 parameters are fixed depending on bin mdu root spec
     
-    Self.groups = grp.calib contains a list of dictionaries for forward, backward groups and their alpha values
+    self.groups = grp.calib contains a list of dictionaries for forward, backward groups and their alpha values
         where groups may be in shorthand notation
         self.alpha value used for normal fit 
         as opposed to calibration fits where alpha is a fit parameter
@@ -50,11 +50,13 @@ class suite(object):
         Output ends up in notebook, below cell, and 
         sys.__stdout__ is <_io.TextIOWrapper name='<stdout>' mode='w' encoding='utf-8'>
         sys.__stderr__ is <_io.TextIOWrapper name='<stderr>' mode='w' encoding='utf-8'>
-    ''' 
+    """ 
+
     def __init__(self, datafile , runlist , grp_calib , offset , startuppath, console = 'print',dash=None, mplot=False):
                  
-        '''
-        * Initiates an instance of suite, x x   
+        """
+        __init__ for musuite class
+
         * inputs: 
             the suite_input_file a dict containing
                     datafile,   containing the full path 
@@ -75,7 +77,8 @@ class suite(object):
         if dash = None and console = 'print' self.console will exec print(string)
         if dash = self in mudash calls to suite, and console = 'self.dash.log'   
               self.console will exec self.dash.log(string), i.e. write on board output                           
-        '''
+        """
+
         from mujpy.tools.tools import derun
         import json
         import os
@@ -108,6 +111,8 @@ class suite(object):
         if errormessage is not None: # derun error
             self.console('Run syntax error: {}. You typed: {}'.format(errormessage,runlist))
             return  # with console error message
+
+        self.nruns = len(self.runs) # vanished on 23 July 2026 at 17:00 ?!??!  reinserted here
         if os.path.isfile(datafile):
             self.datafile = datafile
             if self.datafile[-4:]=='root':
@@ -153,18 +158,21 @@ class suite(object):
         # self.console('... end of initialize suite')
         else:
             self.console('*********************** suite exits without loading data ****************************')
+
     def add_runs(self,k):
-        '''
+        """
         Tries to load one or more runs to be added together
+
         by means of murs2py. 
         self.runs is a list of strings containing integer run numbers 
         Returns -1 and quits if musr2py or muisis2py complain, 0 otherwise
-        '''
+        """
+
         from mujpy.muroot2py.muroot2py import muroot2py as rootload 
         from musr2py import MuSR_td_PSI_bin as psiload
         from mujpy.muisis2py.muisis2py import munxs2py as isisload
         # muisis2py has the same methods as musr2py
-        from mujpy.tools.tools import get_datafilename, get_title
+        from mujpy.tools.tools import get_datafilename, get_title, short_path
         
         def instrument(run):
             instrument_set = set(['gps','gpd','dolly','flame','ltf','hifi'])
@@ -202,7 +210,7 @@ class suite(object):
             if read_ok==True:
                 self._the_runs_.append(runadd) # 
                     
-                self.console('{} loaded:'.format(path_and_filename))
+                self.console('{} loaded:'.format(short_path(path_and_filename,self.__startuppath__)))
                 self.console('Run {}: {}'.format(run,get_title(self._the_runs_[-1][0])))
 #                import sys
 #                self.console('sys.__stdout__ is {}, sys.__stderr__ is {}'.format(sys.__stdout__,sys.__stderr__))
@@ -225,9 +233,9 @@ class suite(object):
                 return False
 
     def load_runs(self):
-        '''
-        load musr2py. muroot2py or muisis2py instances
-        stored as a list of lists 
+        """
+        load musr2py. muroot2py or muisis2py instances stored as a list of lists [[runs to add], ...]
+
         self._the_runs_[0][0] a single run, or the first of a suite 
         self._the_runs_[k][0] the k-th run of a run suite
         
@@ -236,7 +244,8 @@ class suite(object):
             if the_suite.load_runs():            # this and the following two statements load data
                 if the_suite.store_groups():     #                                       define groups
                     the_suite.promptfit(mplot=False)    #                                fit t0 = 0
-        '''
+        """
+
         read_ok = True
         for k,runs_add in enumerate(self.runs):#  runs_add can be a list of run numbers (string) to add
             read_ok = read_ok and self.add_runs(k)                
@@ -245,9 +254,10 @@ class suite(object):
         return read_ok # False with console error message in add_runs
 
     def check_group(self,group):
-        '''
+        """
         rough check that this is a group of existing detectors
-        '''
+        """
+
         # numberHisto_int is the number of physics detectors
         # RedGreen mode has more than one period (in Isis parlance) for different stimuli ON or OFF 
         # for this purpose nexus detector counts have three indices: period, detector, bin
@@ -264,10 +274,10 @@ class suite(object):
         return (group>=0).all()*(group<numberHisto).all()
 
     def store_groups(self):
-        '''
-        reads groups dictionary in dashboard shortnote
-        and appends lists of histogram numbers, alphas to self.grouping 
-        '''
+        """
+        from self.groups dashboard shorthand dict to self.grouping dict alpha, lists of histogram numbers  
+        """
+
         from mujpy.tools.tools import get_grouping
         for k,group in enumerate(self.groups):
             fgroup, bgroup, alpha = get_grouping(group['forward']), get_grouping(group['backward']), group['alpha']
@@ -285,18 +295,23 @@ class suite(object):
         return True
 
     def console(self,string):
-        '''
+        """
+        writes string to initiated self.console_method
+
            when suite invoked without console, self.console_method defaults top 'print'
            when invoked from dash, self.console_method = 'self'
-        '''
+        """
+
         #print('string = '+string+r'\nconsole_method = '+self.console_method)
         exec(self.console_method+'("'+string+'")')
                
     def t_value_error(self,k):
-        '''
+        """
         calculates T and eT values also for runs to be added
+        
         sillily, but it works also for single run 
-        '''
+        """
+
         from numpy import sqrt
 
         m = len(self._the_runs_[k]) # number of added runs
@@ -313,30 +328,21 @@ class suite(object):
 
 
     def promptfit(self,mplot, mprint = False):
-        '''
-        new:
-        indentifies t0 and stores self.nt0 array (all intruments) as
+        """
+        indentifies t0 and stores self.nt0 array (all intruments) [ISIS not yet]
+
         t0 prompt fit method for PSI gps, gpd, dolly, ltf, flame identified by muroot2py.get_instrument() or by musr2py.readbin
         t0 bin value for PSI lem by muroot2py.get_t0_int()
         t0 edge method for ISIS (all), now broken
         t0 guess method for PSI hifi 
-        
-        old:
-        launches t0 prompts fit::
-
-            fits peak positions 
-            prints migrad results
-            plots prompts and their fit (if plot checked, mprint not implemented)
-            stores bins for background and t0
 
         refactored for run addition and
         suite of runs
-
         WARNING: this module is tenporarily for PSI only, included root        
-        '''
+        """
+
         from numpy import array, where, arange, zeros, zeros_like, mean, ones, sqrt, linspace
         from iminuit import Minuit, cost
-        
         import matplotlib.pyplot as P
         from mujpy.mucomponents.muprompt import muprompt
         from mujpy.mucomponents.muedge import muedge
@@ -586,10 +592,10 @@ class suite(object):
 # ASYMMETRY
 ##########################
     def mean_dt0(self):
-        '''
-        PSI only
-        calculates average of dt0 over histograms in self.grouping       
-        '''
+        """
+        PSI only, calculates average of dt0 over histograms in self.grouping       
+        """
+
         from numpy import append, mean
         histos = append(self.grouping[0]['forward'],self.grouping[0]['backward'])
         if len(self.grouping)>1:
@@ -602,6 +608,8 @@ class suite(object):
 
     def timebase(self):
         """
+        generates self.time
+
         * initializes self histoLength 
         * fills self.time. 1D numpy array
         * all histogram selects common time
@@ -617,7 +625,8 @@ class suite(object):
         #    Then self.nt0 = n and self.dt0 = 0.5, the same formula applies
         # 3) Assume the prompt is 0.45 in n and 0.55 in n+1. 
         #    Then self.nt0 = n+1 and self.dt0 = -0.45, the same formula applies.
-        """ 
+        """
+
         import numpy as np
    
         ##################################################################################################
@@ -635,69 +644,7 @@ class suite(object):
         if self.datafile[-3:]=='bin' or self.datafile[-3:]=='mdu': # PSI
             self.time += self.mean_dt0()*binwidth_mus # mean dt0 correction (fraction of a bin, probaby immaterial)
 
-# old, see old mucomponent._add_calib_multigroup_           
-#    def single_for_back_counts(self,runs,grouping):
-#        """
-#        * input: 
-#        *         runs, runs to add
-#        *         grouping, dict with list of detectors 
-#                            grouping['forward'] and grouping['backward']
-#        * output:
-#        *         yforw, ybackw  
-#        *                        = sum_{i=for or back}(data_i - background_i), PSI, 
-#        *                        = sum_{i=for or back}data_i, ISIS
-#        *         background_forw  =
-#        *         background_backw = average backgrounds
-#        *         yfbmean        = mean of (yforw-bf)*exp(t/TauMu)
-#        *         ybackw         = mean of (ybackw-bb)*exp(t/TauMu)
-#        * used both by self.asymmetry_single (see) in normal fits (alpha is fixed)
-#        * and directly in calibration fits (alpha is a parameter)
-#        * all are 1D numpy arrays
-#        """
-#        from numpy import zeros, array, mean, exp, where
-#        from mujpy.tools.tools import TauMu_mus
-
-#        filespec = self.datafile[-3:] # 'bin', 'mdu' or 'nsx'
-#        if self.loadfirst:
-#            
-#    #       initialize to zero self.histoLength, maximum available good bins valid for all histos 
-#            n1 = self.nt0[0] + self.offset # ISIS
-#            n2 = n1 + self.histoLength # ISIS
-##            print('musuite single_for_back_counts debug: n1 {}, n2 {}, self.histoLength {}'.format(n1,n2,self.histoLength))
-#            yforw, ybackw = zeros(self.histoLength), zeros(self.histoLength) # counts 
-#            background_forw, background_backw = 0., 0. # background estimate
-#                           
-#            for j, run in enumerate(runs): # Add runs
-#                #print(run)
-#                for counter in grouping['forward']: # first good bin, last good bin from data array start
-#                
-#                    histo = array(run.get_histo_vector(counter,1)) # counter data array in forw group
-##                    if array(where(histo==0)).size:
-##                        print('musuite single_for_back_counts debug: run {} counter fwd {} contains {}  zeros'.format(run.get_runNumber_int(),counter,array(where(histo==0)).size))
-#                    if filespec =='bin' or filespec=='mdu': # PSI, counter specific range                  
-#                        n1 = self.nt0[counter] + self.offset
-#                        n2 = n1 + self.histoLength 
-#                        background_forw += mean(histo[self.firstbin:self.lastbin])  # from prepromt estimate
-#                    yforw += histo[n1:n2]# - background_forw
-#                        
-#                for counter in grouping['backward']: # first good bin, last good bin from data attay start
-#                
-#                    histo = array(run.get_histo_vector(counter,1)) # counter data array in back group
-##                    if array(where(histo==0)).size:
-##                        print('musuite single_for_back_counts debug: run {} counter bkw {} contains {}  zeros'.format(run.get_runNumber_int(),counter,array(where(histo==0)).size))
-#                    if filespec=='bin' or filespec=='mdu': #  PSI, counter specific range  
-#                        n1 = self.nt0[counter] + self.offset
-#                        n2 = n1 + self.histoLength 
-#                        background_backw += mean(histo[self.firstbin:self.lastbin])  # from prepromt estimate
-#                    ybackw += histo[n1:n2]# - background_backw             
-
-#            x = exp(self.time/TauMu_mus())
-#            yfm = mean((yforw-background_forw)*x)
-#            ybm = mean((ybackw-background_backw)*x)
-#            return yforw, ybackw, background_forw, background_backw, yfm, ybm
-#        else:
-#            return None, None, None, None, None, None
-#            
+            
 #        # Asymmetry as 
 ##        denominator = yfm_ + alpha*self._ybm_)*exp(-x/TauMu_mus()) # f+b normalization count
 ##        A = (yf - alpha*yb - (bf - alpha*bb)) / (yfm+alpha*ybm)*exp(-x/TauMu_mus()) 
@@ -746,30 +693,33 @@ class suite(object):
 
     def single_for_back_counts(self,runs,grouping):
         """
+        basic method for single group single run count arrays
+
         * input: 
-        *         runs, runs to add
-        *         grouping, dict with list of detectors 
-                            grouping['forward'] and grouping['backward']
-        *         [all instruments and facilities are treated the same way]                    
+        *         runs, runs to add 
+        *         grouping, {'forward':[3],'backward':[4]} for 3-4 
         * output:
-        *         yfc, ybc     = sum_{d in forw or backw}(data_d - b_d), for PSI, 
-        *                        with b_d = b = mean(data_d) over n bins before the muon arrival
-        *                      = sum_{d in forw or backw} data_d, same for ISIS (b = 0)
-        *         eyfc, eyfc   = sqrt(sum_{i=for or back}(data_d + (b_d + p(0,b)/n))
+        *    for PSI, with b_j = mean(data_j before muon arrival)
+        *         yfc, ybc     = sum_{j in for or back} (data_j - b_j)
+        *    for ISIS (b_j = 0)
+        *                      = sum_{j in for or back} data_j) 
+        *         eyfc, eyfc   = sqrt(sum_{j in for or back}(data_j + (b_j + p(0,b)/n)))
         *                 with error e = sqrt(N+(b+p(0,b))/n), 
-        *                 where p(0,b) is probability for 0 count, either
-        *                 p_0b = normal probability , 'Poisson' std sqrt(b)
-        *                      = exp(-b/2)/sqrt(2*pi*b)          , or
-        *                 P_0b = true Poisson = exp(-b) for zero events <--- implemented
-        * This method is used both by self.asymmetry_single (see) in normal fits (alpha is fixed)
-        * and, directly, in calibration fits, where alpha is a minuit parameter (neglecting partial A/partial alpha)
+        *                 where p(0,b) is probability for 0 count, 
+        *                              either
+        *                 p_0b = normal probability , ~Poisson std=sqrt(b)
+        *                      = exp(-b/2)/sqrt(2*pi*b), or
+        *                 P_0b = true Poisson = exp(-b) 
+        * Method used both in self.asymmetry_single normal fits
+        * and in calib (alpha minuit parameter)
         #        NOTE: in calib fits alpha is a fit parameter with an error unknown while minimizing
         #              at the minimum e_alpha is typically 2e-3 on PSI calib runs
         #              Neglected here, could recalculate chi_square at minimum including error from non corrected chi_square
         #        eA = 2*alpha/(self._yfc_ - alpha*self._ybc_)**2 * sqrt((self._ybc_*self._eyfc_)**2 + (self._yfc_*self._eybc_)**2) 
-
+        *
         * all output objects are 1D numpy arrays
         """
+
         from numpy import zeros, array, mean, exp, where, sqrt
         from mujpy.tools.tools import TauMu_mus
 
@@ -826,42 +776,64 @@ class suite(object):
         # eb = sqrt(sum_i y_i + p(0)*n)/n = sqrt((b+p(o))/n)        #
         # errors eyc = sqrt(eN**2+eb**2) = sqrt(N+(b+p(0))/n) <---- #
         #-----------------------------------------------------------#
-
-    def single_multigroup_for_back_counts(self,runs,groupings):
+    def slice_for_back_counts(self,krun,kgroup):
         """
-        used by mufit!!!
-        * input: 
-        *         runs, runs to add
-        *         grouping, dict with list of detectors 
-                  grouping['forward'] and grouping['backward']
-        *         uses self.single_for_back_counts(runs,grouping)
-        * output:
-        *         yf, yb       = sum_{d=for or back}(d        *         yfc, ybc     = sum_{d in forw or backw}(data_d - b_d), for PSI, 
-        *                        with b_d = b = mean(data_d) over n bins before the muon arrival
-        *                      = sum_{d in forw or backw} data_d, same for ISIS (b = 0)
-        *         eyf, eyf   = sqrt(sum_{i=for or back}(data_d + (b_d + p(0,b)/n))
-        * used only by calib multigroups
-
-        * yf, yb, eyf, eyb are 2D numpy arrays 
-        """
-        from numpy import vstack,array
-        for k,grouping in enumerate(groupings):
-            yforw, ybackw, ey_forw, ey_backw = self.single_for_back_counts(runs,grouping)
-            #        all are 1D numpy arrays
-            if k:
-                yf = vstack((yf,yforw))
-                yb = vstack((yb,ybackw))
-                eyf = vstack((eyf,ey_forw))
-                eyb = vstack((eyb,ey_backw))
-            else:
-                yf = yforw
-                yb = ybackw
-                eyf = ey_forw
-                eyb = ey_backw
-        return yf,yb,eyf,eyb
+        basic methods for count array slices
         
+        input:
+            krun = index in range(len(self._the_runs_)) or -1 for [:len(self._the_runs_)]
+            kgroup = index in range(len(self.groups)) or -1 for [:len(self.groups)]
+        output
+            the corresponding yf, yb, eyf, eyb slices
+        cases:
+            slice==suite: A1, A21, C1, C2 slice is (-1,-1) but it is not really needed 
+            slice<suite:  A20 1d (0,kgroup), B1 1d (krun,0), B20 1d (krun,kgroup), B21 2d (krun,-1)  
+        """
+
+        from numpy import array, vstack
+        if krun==-1 and kgroup==-1: # 3d
+            for krun,run in enumerate(self._the_runs_):
+                for kgroup,grouping in enumerate(self.grouping):
+                    yforw, ybackw, ey_forw, ey_backw = self.single_for_back_counts(run,grouping)
+                    if kgroup:
+                        yf, yb = vstack((yf,array([yforw]))), vstack((yb,array([ybackw])))
+                        eyf, eyb = vstack((eyf,array([ey_forw]))), vstack((eyb,array([ey_backw])))
+                    else: # kgroup = 0
+                        yf, yb = array([yforw]), array([ybackw])
+                        eyf, eyb = array([ey_forw]), array([ey_backw])
+                if krun: 
+                    yfr, ybr  = vstack((yfr,array([yf]))), vstack((ybr,array([yb])))
+                    eyfr, eybr = vstack((eyfr,array([eyf]))),vstack((eybr,array([eyb])))
+                else: # krun = 0
+                    yfr, ybr = array([yf]),array([yb]) # 3rd dimension runs
+                    eyfr, eybr = array([eyf]),array([eyb])
+
+        elif krun==-1: # 2d
+            for krun,run in enumerate(self._the_runs_):
+                yforw, ybackw, ey_forw, ey_backw = self.single_for_back_counts(run,self.grouping[kgroup])
+                if krun:
+                    yfr, ybr = vstack((yfr,array([yforw]))), vstack((ybr,array([ybackw])))
+                    eyfr, eybr = vstack((eyfr,array([ey_forw]))), vstack((eybr,array([ey_backw])))
+                else: # krun = 0
+                    yfr, ybr = array([yforw]), array([ybackw])
+                    eyfr, eybr = array([ey_forw]), array([ey_backw])
+        elif kgroup==-1: # 2d
+            for kgroup,grouping in enumerate(self.grouping):
+                yforw, ybackw, ey_forw, ey_backw = self.single_for_back_counts(self._the_runs_[krun],grouping)
+                if kgroup:
+                    yfr, ybr = vstack((yfr,array([yforw]))), vstack((ybr,array([ybackw])))
+                    eyfr, eybr = vstack((eyfr,array([ey_forw]))), vstack((eybr,array([ey_backw])))
+                else: # kgroup=0
+                    yfr, ybr = array([yforw]), array([ybackw])
+                    eyfr, eybr = array([ey_forw]), array([ey_backw])
+        else: # 1d, only bins
+            yfr, ybr, eyfr, eybr = self.single_for_back_counts(self._the_runs_[krun],self.grouping[kgroup])
+        return yfr, ybr, eyfr, eybr
+
     def asymmetry_single(self,the_run,kgroup):
         """
+        basic method for plain asymmetry and errors arrays
+
         input:
             the_run = list containing the instance[s] of the run[s to be added]
             k = index of self.grouping, a list of dicts 
@@ -872,7 +844,8 @@ class suite(object):
         outputs: 
             # can be A1 fit, but is also invoked by all others
             asymmetry and asymmetry error (1d)
-         """
+        """
+
         from numpy import exp, sqrt, where
 
         if self.loadfirst:
@@ -902,9 +875,172 @@ class suite(object):
         #############################################################
         # for ISIS the PSI formula works with zero background       #
         #############################################################
+
+    def asymmetry_slice(self,krun,kgroup):
+        """
+        asymmetry for mufit (-1 index lingo), can yield slice <= suite
+
+        input:
+            krun = index in range(len(self._the_runs_)) or -1 for [:len(self._the_runs_)]
+            kgroup = index in range(len(self.groups)) or -1 for [:len(self.groups)]
+        output
+            the corresponding asymmetry slice 
+        cases:
+            slice==suite: A1  1d (0,0), A21 2d (0,-1), C1 2d (-1,0), C2 3d (-1,-1)
+                        the same is obtained with asymmetry_multirun_multigroup(self)
+            slice<suite:  A20 1d (0,kgroup), B1 1d (krun,0), B20 1d (krun,kgroup), B21 2d (krun,-1)
+        """
+
+        from numpy import array, vstack
+        if krun==-1 and kgroup==-1: # 3d
+            for krun,run in enumerate(self._the_runs_):
+                for kgroup in range(len(self.groups)):
+                    a,e = self.asymmetry_single(run,kgroup)
+                    if kgroup:
+                        asy,ase = vstack((asy,a)), vstack((ase,e)) # groups are vstacked in 2nd dimension
+                    else: # kgroup = 0
+                        asy,ase = a,e # 1d dimension bins
+                if krun:
+                    asymm, asyme  = vstack((asymm,array([asy]))), vstack((asyme,array([ase])))
+                else: # krun=0
+                    asymm, asyme = array([asy]),array([ase]) # 3rd dimension runs
+        elif krun==-1: # 2d
+            for krun,run in enumerate(self._the_runs_):
+                a,e = self.asymmetry_single(run,kgroup)
+                if krun:
+                    asymm, asyme  = vstack((asymm,a)), vstack((asyme,e)) # runs are vstacked in 2nd dimension
+                else: # krun=0
+                    asymm, asyme = a,e # 1nd dimension bins
+        elif kgroup==-1:
+            for kgroup in range(len(self.groups)):
+                a,e = self.asymmetry_single(self._the_runs_[krun],kgroup)
+                if kgroup:
+                    asymm,asyme = vstack((asymm,a)), vstack((asyme,e)) # groups are vstacked in 2nd dimension
+                else: # kgroup = 0
+                    asymm,asyme = a,e# 1d dimension bins
+        else: # 1d, only bins
+            asymm,asyme = self.asymmetry_single(self._the_runs_[krun],kgroup)
+        return asymm, asyme
+     
+    def single(self):
+        """
+        True if len(self.runs)==1
+
+        output:
+            True if there is a single run (fit type A)
+            False if there are many runs (fit types B and C)
+        """
+
+        try:
+            test = len(self._the_runs_)==1
+            
+        except:
+            self.console('Warning: data are not available: access expired?')
+        return test
+            
+    def multi_groups(self):
+        """
+        False if A1 or B1 or C1, True otherwise
+
+        output:
+            True if more groups (fits A2, B2, C2)
+            False if just one group (fits A1, B1, C1)
+        """
+        # print('multi_group suite debug: self.grouping {} len {}'.format(self.grouping,len(self.grouping)))
+        return len(self.grouping)>1     
+        
+    def multirun(self):
+        """
+        True if B1, B20, B21, C1, C2, False otherwise
+        """
+
+        return len(self._the_runs_)>1
+
+    def scan(self):
+        """
+        returns suite scan string, "T[K] " , "B[mT]", "[deg]", "#   ", False if self.single()
+
+        output
+            False if single
+            'B[mT]' if it's a B scan
+            'T[K] ' if it's a T scan
+            '[deg]' if it's an angle scan 
+            '#    ' if it's another scan
+        """
+
+        if self.single(): return False
+        elif [run[0].get_temp() for run in self._the_runs_]!=[self._the_runs_[0][0].get_temp()]*len(self._the_runs_): return 'T[K] '
+        elif [run[0].get_field() for run in self._the_runs_]!=[self._the_runs_[0][0].get_field()]*len(self._the_runs_): return 'B[mT]'
+        elif [run[0].get_orient() for run in self._the_runs_]!=[self._the_runs_[0][0].get_orient()]*len(self._the_runs_): return '[deg]'
+        else: return '#    '
+
+###############
+# Deprecated
+###############
+
+    def single_multigroup_for_back_counts(self,runs,groupings):
+        """
+        Deprecated
+
+        * input: 
+        *         runs, runs-to-add
+        *         grouping, {'forward':[3],'backward':[4]] for 3-4
+        *         uses self.single_for_back_counts
+        * output:
+        *         yf, yb, eyf, eyf = vstacks over groups
+        *         2D numpy arrays, used in calib multigroups
+        """
+
+        from numpy import vstack,array
+        for k,grouping in enumerate(groupings):
+            yforw, ybackw, ey_forw, ey_backw = self.single_for_back_counts(runs,grouping)
+            #        all are 1D numpy arrays
+            if k:
+                yf = vstack((yf,yforw))
+                yb = vstack((yb,ybackw))
+                eyf = vstack((eyf,ey_forw))
+                eyb = vstack((eyb,ey_backw))
+            else:
+                yf = yforw
+                yb = ybackw
+                eyf = ey_forw
+                eyb = ey_backw
+        return yf,yb,eyf,eyb
+
+    def multirun_multigroup_for_back_counts(self,runs,groupings):
+        """
+        Deprecated
+
+        * input: 
+        *         runs, list of list, 
+                        [[run0 runs to add],[run1 runs to add], ...] 
+        *         grouping, {'forward':[3],'backward':[4]] for 3-4
+        *         uses self.single_multigroup_for_back_counts
+        * output:
+        *         yf, yb, eyf, eyf = vstacks over runs, groups
+        *         3D numpy arrays, used in calib multirun multigroups
+        """
+
+        from numpy import vstack,array
+        for k,run in enumerate(runs):
+            yforw, ybackw, ey_forw, ey_backw = self.single_multigroup_for_back_counts(run,groupings)
+            #        all are 1D numpy arrays
+            if k:
+                yf = vstack((yf,array([yforw])))
+                yb = vstack((yb,array([ybackw])))
+                eyf = vstack((eyf,array([ey_forw])))
+                eyb = vstack((eyb,array([ey_backw])))
+            else:
+                yf = array([yforw])
+                yb = array([ybackw])
+                eyf = array([ey_forw])
+                eyb = array([ey_backw])
+        return yf,yb,eyf,eyb
                         
     def asymmetry_multirun(self,kgroup):
         """
+        Deprecated
+
         input:
                 kgroup, index forward - backward pair 
                     self.grouping[kgroup]['forward'] and ['backward']
@@ -916,6 +1052,7 @@ class suite(object):
             asymmetry and asymmetry error (2d)
                  also generates self.time (1d)
         """
+
         from numpy import vstack
 
         if self.loadfirst:
@@ -933,12 +1070,15 @@ class suite(object):
 
     def asymmetry_multigroup(self):
         """
+        Deprecated
+
         input: none
             calls self.asymmetry_single which calls self.single_for_back_counts
         outputs: 
             # can be A20, A21 fits 
             asymmetry and asymmetry error (2d)
         """
+
         from numpy import vstack
 
         if self.loadfirst:
@@ -963,76 +1103,66 @@ class suite(object):
         else:
             self.console('** CHECK ACCESS to database (or load runs first)') 
             return None, None
-            
-    def asymmetry_multirun_multigroup(self):
-        '''
-        input: none
+ 
+    def asymmetry_multirun_multigroup(self,multirun,multigroup): # 
+        """
+        Deprecated
+
+        input: 
+            multirun True/False 
+            multigroup True/False
             calls self.asymmetry_single which calls self.single_for_back_counts
         outputs: 
-            # can be B20, B21 or C2 fit 
-            asymmetry and asymmetry error (3d)
+            asymmetry and asymmetry error (3d,2d/1d)
             for run in runs:
                 for group in groups:
                     np.vstack # axis=1
                 np.vstack # axis=0
-        '''
+        A1 -> False False self.asymmetry_single
+        A20 -> False True vstack of ngroups, iterate kgroup 
+        A21 -> False True vstack of ngroups
+        B1 -> True False vstack of nruns, iterate krun
+        B20 ->  True True vstack of vstacks, iterate krun. kgroup
+        B21 -> True True vstack of vstacks, iterate krun
+        C1 -> True False vstack of nruns
+        C2 -> True True vstack of vstacks
+        """
+
         from numpy import array, vstack
+
         if self.loadfirst:
-            for krun,run in enumerate(self._the_runs_):
-                for kgroup in range(len(self.grouping)):
-                    if kgroup:
+            if multirun and multigroup: # 3d
+            
+                for krun,run in enumerate(self._the_runs_):
+                    for kgroup in range(len(self.groups)):
+
                         a,e = self.asymmetry_single(run,kgroup)
-                        if a is None: 
-                            return None, None
-                        asy,ase = vstack((asy,a)), vstack((ase,e)) # groups are vstacked
+                        if kgroup:
+                            asy,ase = vstack((asy,a)), vstack((ase,e)) # groups are vstacked in 2nd dimension
+                        else: # kgroup = 0
+                            asy,ase = a,e # 1d dimension bins
+                    if krun:
+                        asymm, asyme  = vstack((asymm,array([asy]))), vstack((asyme,array([ase])))
+                    else: # krun=0
+                        asymm, asyme = array([asy]),array([ase]) # 3rd dimension runs
+            elif multirun: # 2d
+                for krun,run in enumerate(self._the_runs_):
+                    a,e = self.asymmetry_single(run,0)
+                    if krun:
+                        asymm, asyme  = vstack((asymm,a)), vstack((asyme,e)) # runs are vstacked in 2nd dimension
+                    else: # krun=0
+                        asymm, asyme = a,e # 1nd dimension bins
+            elif multigroup:
+                for kgroup in range(len(self.groups)):
+                    a,e = self.asymmetry_single(self._the_runs_[0],kgroup)
+                    if kgroup:
+                        asymm,asyme = vstack((asymm,a)), vstack((asyme,e)) # groups are vstacked in 2nd dimension
                     else: # kgroup = 0
-                        asy,ase = self.asymmetry_single(run,kgroup)
-                if krun:
-                    asymm, asyme  = vstack((asymm,array([asy]))), vstack((asyme,array([ase])))
-                else: # krun=0
-                    asymm, asyme = array([asy]),array([ase]) # into 2nd dimension
+                        asymm,asyme = a,e# 1d dimension bins
+            else: # 1d, only bins
+                asymm,asyme = self.asymmetry_single(self._the_runs_[0],0)
             return asymm, asyme
         else:
             self.console('** CHECK ACCESS to database (or load runs first)') 
             return None, None
-               
-    def single(self):
-        '''
-        Boole test
-        output:
-            True if there is a single run (fit type A)
-            False if there are many runs (fit types B and C)
-        '''
-        try:
-            test = len(self._the_runs_)==1
-            
-        except:
-            self.console('Warning: data are not available: access expired?')
-        return test
-            
-    def multi_groups(self):
-        '''
-        Boole test
-        output:
-            True if more groups (fits A2, B2, C2)
-            False if just one group (fits A1, B1, C1)
-        '''
-        # print('multi_group suite debug: self.grouping {} len {}'.format(self.grouping,len(self.grouping)))
-        return len(self.grouping)>1     
-        
-    def scan(self):
-        '''
-        output
-            False if single
-            'B[mT]' if it's a B scan
-            'T[K] ' if it's a T scan
-            '[deg]' if it's an angle scan 
-            '#    ' if it's another scan
-        '''  
-        if self.single(): return False
-        elif [run[0].get_temp() for run in self._the_runs_]!=[self._the_runs_[0][0].get_temp()]*len(self._the_runs_): return 'T[K] '
-        elif [run[0].get_field() for run in self._the_runs_]!=[self._the_runs_[0][0].get_field()]*len(self._the_runs_): return 'B[mT]'
-        elif [run[0].get_orient() for run in self._the_runs_]!=[self._the_runs_[0][0].get_orient()]*len(self._the_runs_): return '[deg]'
-        else: return '#    '
-        
-        
+

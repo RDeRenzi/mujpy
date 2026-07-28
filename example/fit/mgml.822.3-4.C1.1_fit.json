@@ -1,0 +1,124 @@
+{
+    "version": "1new",
+    "fit_range": "0,20000,40",
+    "offset": 20,
+        "userpardicts_guess": [
+    {
+        "name": "f",
+        "value": 0.2,
+        "flag": "~",
+        "error": 0.0002,
+        "limits": [
+            0,
+            1
+        ]
+    },
+    {
+        "name": "A34",
+        "value": 0.24,
+        "flag": "~",
+        "error": 0.0002,
+        "limits": [
+            0,
+            null
+        ]
+    },     
+    {
+	"name":"B",
+	"value": 10.1,
+	"flag":"#",
+	"error": 0.1,
+	"limits": [
+		null,
+		null
+	]
+    },
+    {
+        "name": "φ",
+        "value": 34,
+        "flag": "~",
+        "error": 1.0,
+        "limits": [
+            null,
+            null
+        ]
+     },
+     {
+	"name": "σ",
+	"value": [0.3,0.3,0.3,0.4,0.5,1.5,1.7,2.7,9.0],
+        "flag": "#",
+	"error": 0.05,
+        "limits": [
+              0.0,
+              null
+        ],
+        "positive_parity": true
+     },
+     {
+        "name": "λ",
+        "value": [0.07,0.07,0.07,0.09,0.13,0.15,0.2,0.3,1.3],
+        "error": 0.002,
+        "limits": [
+              null,
+              null
+          ],
+        "flag": "#"
+     }
+   ],
+    "model_guess": [
+    {
+      "name": "mg",
+      "label": "0",
+      "pardicts": [
+        {
+          "name": "A",
+          "flag": "=",
+          "function": "p[0]*p[1]"
+          
+	},
+        {
+          "name": "B",
+          "flag": "=",
+          "function": "p[2]"
+        },
+        {
+          "name": "φ",
+          "flag": "=",
+          "function":"p[3]"
+	},
+        {
+          "name": "σ",
+          "flag": "=",
+          "function": "p[4]"	  
+	}
+ 
+      ]
+    },
+    {
+      "name": "ml",
+      "label": "1",
+      "pardicts": [
+        {
+          "name": "A",
+          "flag": "=",
+          "function": "(1-p[0])*p[1]"
+        },
+        {
+          "name": "B",
+	  "flag": "=",
+          "function": "p[2]"
+         },
+         {
+          "name": "φ",
+          "flag": "=",
+          "function":"p[3]"
+        },
+        {
+          "name": "λ",
+          "flag": "=",
+	  "function": "p[5]"
+        }
+      ]
+    }
+  ]
+}

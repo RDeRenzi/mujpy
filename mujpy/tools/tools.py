@@ -4,36 +4,22 @@
 def autops(data, fn, p0=0.0, p1=0.0):
     """
     Automated phase correction from NMRglue by https://github.com/jjhelmus
+
     These functions provide support for automatic phasing of NMR data. 
-
-
     Automatic linear phase correction
-
     Parameters
-
         data : ndarray
-
              Array of NMR data.
-
         fn : str or function
-
              Algorithm to use for phase scoring. Built in functions can be
              specified by one of the following strings: "acme", "peak_minima"
-
         p0 : float
-
             Initial zero order phase in degrees.
-
         p1 : float
-
             Initial first order phase in degrees.
-
     Returns
-
         ndata : ndarray
-
             Phased NMR data.
-
     """
 
     import numpy as np
@@ -58,16 +44,15 @@ def autops(data, fn, p0=0.0, p1=0.0):
 def _ps_acme_score(ph, data):
     """
     Phase correction using ACME algorithm by Chen Li et al.
-    Journal of Magnetic Resonance 158 (2002) 164-168
 
+    Journal of Magnetic Resonance 158 (2002) 164-168
     Parameters
     * pd : tuple, current p0 and p1 values
     * data : ndarray, array of NMR data.
-
     Returns
     * score : float, value of the objective function (phase score)
-
     """
+
     import numpy as np
 
     stepsize = 1
@@ -103,6 +88,7 @@ def _ps_acme_score(ph, data):
 def _ps_peak_minima_score(ph, data):
     """
     Phase correction using simple minima-minimisation around highest peak
+
     This is a naive approach but is quick and often achieves reasonable
     results.  The optimisation is performed by finding the highest peak in the
     spectra (e.g. TMSP) and then attempting to reduce minima surrounding it.
@@ -112,7 +98,6 @@ def _ps_peak_minima_score(ph, data):
 
     Returns
     * score : float, value of the objective function (phase score)
-
     """
 
     phc0, phc1 = ph
@@ -131,30 +116,19 @@ def ps(data, p0=0.0, p1=0.0, inv=False):
     Linear phase correction
 
     Parameters
-
         data : ndarray
-
             Array of NMR data.
-
         p0 : float
-
             Zero order phase in degrees.
-
         p1 : float
-
             First order phase in degrees.
-
         inv : bool, optional
-
             True for inverse phase correction
-
     Returns
-
         ndata : ndarray
-
             Phased NMR data.
-
     """
+
     import numpy as np
 
     p0 = p0 * np.pi / 180.  # convert to radians
@@ -166,41 +140,79 @@ def ps(data, p0=0.0, p1=0.0, inv=False):
     return apod * data
 
 ##############
-# MU FIT AUX
+# MUSUITE AUX
+##############
+
+def short_path(path,startup_path):
+    '''
+    try to shorten path keeping main log info
+
+    input path, startup_path
+        tries to remove or shorted common beginning
+    '''
+
+    from pathlib import Path
+    home = Path.home().as_posix()
+    path = path[2:] if path[0:2]=='..' else path
+    if path == startup_path:
+        return './'
+    else:
+        # print('tools short_path path {}\n startup_path {}'.format(path,startup_path))
+        index = next((i for i, (char1, char2) in enumerate(zip(path, startup_path)) if char1 != char2), None)
+
+        index = len(startup_path) if index == None else index
+        k = index -1 if path[index-1] == '/' else index
+        # print('index {}, k {}'.format(index,k))
+        short_path = '~/'+path[index:] if path[0:k] == home else '.'+path[k:]
+        return short_path
+
+##############
+# MUFIT AUX
 ##############
 
 def TauMu_mus():
-    '''
+    """
     muon mean lifetime in microsecond
+
     from Particle Data Group 2017 
     (not present in scipy.constants)
-    '''
+    """
+
     return 2.1969811 
     
 def _errors_(component,available_components):
-    '''
+    """
+    suggested steps for each mumodel component parameter
+
     inputs: one legal mucomponent name contained 
     in the _available_components_(), which must be the second input
     output: a list of errors (steps), one for each parameter of this component
-    '''
+    """
+
     #print(component,available_components)
     k = [item['name'] for item in available_components].index(component)
     return [pardict["error"] for pardict in available_components[k]['pardicts']] 
 
 def _limits_(component,available_components):
-    '''
+    """
+    suggested limits for each mumodel component parameter
+
     inputs: one legal mucomponent name contained 
     in the _available_components_(), which must be the second input
     output: a list of lists of limits (low, high), one for each parameter of this component
-    '''
+    """
+
     k = [item['name'] for item in available_components].index(component)
     return [pardict["limits"] for pardict in available_components[k]['pardicts']] 
 
 def add_step_limits_to_model(dash_in):
-    '''
+    """
+    add error and limits to model_guess components pardicts
+
     input: original dashboard dash_in, already checked 
     output: dash_out is a deepcopy including 'error' and 'limits'
-    '''
+    """
+
     from copy import deepcopy
     from mujpy.tools.tools import _available_components_, _errors_, _limits_
     
@@ -217,10 +229,10 @@ def add_step_limits_to_model(dash_in):
     return dash_out
    
 def _available_components_():
-    '''
+    """
     returns a list of template dictionaries (one per fit component):
-    retreived magically from the mucomponents mumodel class.
 
+    retreived magically from the mucomponents mumodel class.
     Each dictionary contains 'name' and 'pardicts', 
            'pardicts' = list of parameter dictionaries, 
                         keys: 
@@ -236,7 +248,8 @@ def _available_components_():
     ::  ({'name':'bl','pardicts':[{'name':'A','error':0.01,'limits'[None,None]},
                                   {'name':'λ','error':0.01,'limits'[None,None]}}, 
                                   ...)
-    '''
+    """
+
     from mujpy.mucomponents.mucomponents import mumodel
     from iminuit import describe
     
@@ -266,20 +279,21 @@ def _available_components_():
     return available_components
     
 #def _available_gradients_(component):
-#    '''
+#    """
 #    returns True if the component has an analytic gradient
 #    i.e. for component name xx in the mucomponents mumodel class, 
 #    a method _grad_xx_ in the same class.
-#    '''
+#    """
 #    from mujpy.mucomponents.mucomponents import mumodel
 #    
 #    methods_with_grad = [module[6:8] for module in dir(mumodel()) if module[0:6]=='_grad_']: # magical extraction of component names
 #    return component in methods_with_grad
     
 def validmodel(model):
-    '''
-    checks valid simple name "almlmg"
-    '''
+    """
+    checks validity of model name, e.g. "almlmg"
+    """
+
     from mujpy.tools.tools import _available_components_
     # print('validmodel: {}'.format(model))
     available_components =_available_components_() # creates list automagically from mucomponents
@@ -300,66 +314,108 @@ def validmodel(model):
     return True
 
 def get_fit_range(string):
-    '''
-    transform a valid string for fit_range
-    into a list of integers
-    '''
+    """
+    transforms a valid string for fit_range into a list of integers
+    """
+
     fit_range = []
     for chan in string.split(','):
         fit_range.append(int(chan))
     return fit_range
 
-def checkvalidmodel(name,component_names):
-    '''
-    checkvalidmodel(name) checks that name is either  
-    ::      A1, B1: 2*component string of valid component names, e.g.
-                        'daml' or 'mgmgbl'
-                                                                  
-    ::      or A2, B2: same, ending with 1 digit, number of groups (max 9 groups), 
-                        'daml2' or 'mgmgml2' (2 groups)
-    ::      or C1: same, beginning with 1 digit, number of external minuit parameters (max 9)
-                        '3mgml' (3 external parameters e.g. A, f, phi)
-    ::      or C2: same, both previous options
-                        '3mgml2' (3 external parameters, 2 groups)  
-    '''
-    from mujpy.tools.tools import modelstrip
-    
-    try:
-        name, nexternals = modelstrip(name)
-    except:
-        # self.console('name error: '+name+' contains too many externals or groups (max 9 each)')
-        error_msg = 'name error: '+name+' contains too many externals or groups (max 9 each)'
-        return False, error_msg # err code mess
-    # decode model
-    numberofda = 0
-    components = [name[i:i+2] for i in range(0, len(name), 2)]
-    for component in components: 
-        if component == 'da':
-            numberofda += 1           
-        if component == 'al':
-            numberofda += 1           
-        if numberofda > 1:
-            # self.console('name error: '+name+' contains too many da. Not added.')
-            error_msg = 'name error: '+name+' contains too many da/al. Not added.'
-            return False, error_msg # error code, message
-        if component not in component_names:
-            # self.console()
-            error_msg = 'name error: '+component+' is not a known component. Not added.'
-            return False, error_msg # error code, message
-    return True, None
+def check_function(dashboard,groups):
+    """
+    checks function syntax for max 100 parameters [must be extended]
 
+        input
+            dashboard (full dict)
+            groups (suite.groups)
+        output 
+            kc, kp, kg indices of failing component, parameter, group 
+    checks that
+        len of any 'function_multi' list is same as len(groups)
+        only model contains either 'function' or 'function_multi' (pops the empty one)
+        each string is executable
+    called in mufit._dash_load_
+    """
+
+    from numpy import linspace, cos, sin, tan, sinh, cosh, tanh, log, pi, exp, sqrt, real, abs, arctan
+    from mujpy.tools.tools import function_multi_in_components
+    # print('++++ Debug check_function')
+    try:
+        model = dashboard["model_guess"]
+        model_pardicts = [pardict for component in model for pardict in component['pardicts'] if pardict['flag'] in ['~','!']]
+        n_par = len(dashboard['userpardicts_guess']) if 'userpardicts_guess' in dashboard else len(model_pardicts)
+        #           min_pars used in 'function'/'function_multi' of model are either len(dashboard['userpardicts_guess']
+        #                                                                     or len model_pardicts
+        p = linspace(.1,2.0,n_par) # mock p values for evaluated 'function'/'function_multi' strings
+
+        # local fits min_pars coincide with non '=' model parameters 
+        if 'userpardicts_guess' in dashboard:
+        # global fits minuit parameters coincide with userpardicts, 
+            for kp, pardict in enumerate(dashboard['userpardicts_guess']):
+                if pardict['flag'] == '=': 
+                    print("++++ Wrong json syntax, only '~','!','#' flags allowed in 'userpardicts_guess'")
+                    return -1, kp, 0
+
+            for kc, component in enumerate(model):
+                for kp,pardict in enumerate(component['pardicts']):
+                    if pardict['flag'] != '=':
+                        print('++++ Wrong json syntax, only '+"'='"+' flag allowed in '+"'model_guess'")
+                        return kc, kp, 0
+                    if 'function' in pardict.keys() and len(pardict['function']):
+                        kgroup = 0 # default
+                        if 'function_multi' in pardict.keys() and len(pardict['function_multi'][0]):
+                            print("++++ Wrong json syntax, 'function','function_multi' mutually exclusive in 'model_guess'")
+                            return kc, kp, kgroup
+                        if 'function_multi' in pardict.keys(): # zero len
+                            pardict.pop('function_multi')
+                        string = pardict['function']
+                        # print('user function {}, kc,kp,kg={},{},{}'.format(string, kc,kp,kgroup))
+                        eval(string)
+                    elif 'function_multi' in pardict.keys() and len(pardict['function_multi'][0]):
+                        if 'function' in pardict.keys(): # zero len
+                            pardict.pop('function')
+                        if len(pardict['function_multi']) != len(groups):
+                            print("++++ Wrong json syntax, need as many 'function_multi' strings as groups in 'model_guess'")
+                            return kc, kp, len(groups)
+                        for kgroup in range(len(groups)): # loop groups
+                            string = pardict['function_multi'][kgroup]
+                            # print('function multi {}, kc,kp,kg={},{},{}'.format(string, kc,kp,kgroup)) 
+                            eval(string)
+                    else:
+                        print("++++ Wrong json syntax, missing 'function' or 'function_multi' strings in 'model_guess'")
+                        return kc, kp, 0
+
+        else: # local fit
+            kgroup = 0 # default
+            for kc,component in enumerate(model):
+                for kp,pardict in enumerate(component['pardicts']):
+                    if pardict['flag'] == '=':
+                        if 'function' in pardict.keys() and len(pardict['function']):
+                       # print('function {}, kc,kp,kg={},{},{}'.format(string, kc,kp,kgroup))
+                            eval(pardict['function'])
+                        else:
+                            print("++++ Wrong json syntax, missing or empty 'function' in 'model_guess'")
+                            return kc, kp, 0
+        return -1,-1,-1 # none has failed the syntax check
+        # this is not  yet, a full sanity check (e.g. parameter indices must refere to user/previous pars) 
+    except Exception as e:
+        print('++++ Wrong json syntax. Exception msg: {}'.format(e))
+        print('     offending syntax: {}'.format(string))
+        return kc, kp, kgroup # the syntax failing function
 ######################
 # GET_TOTALS
 ######################
 def get_totals(suite):
-    '''
-    calculates the grand totals and group totals 
-    of a single run 
-    iput is self.suite of class musuite
-    returns strings totalcounts groupcounts nsbin maxbin
+    """
+    calculates the grand totals and group totals f a single run 
 
-    '''
-    import numpy as np
+    input is self.suite of class musuite
+    returns strings totalcounts groupcounts nsbin maxbin
+    """
+
+    from numpy import array, concatenate
     # called only by self.suite after having loaded a run or a run suite
 
     ###################
@@ -370,9 +426,9 @@ def get_totals(suite):
     
     for k,d in enumerate(suite.grouping):
         if not k:
-            gr = np.concatenate((suite.grouping[k]['forward'],suite.grouping[k]['backward']))
+            gr = concatenate((suite.grouping[k]['forward'],suite.grouping[k]['backward']))
         else:
-            gr = np.concatenate((gr,np.concatenate((suite.grouping[k]['forward'],suite.grouping[k]['backward']))))
+            gr = concatenate((gr,concatenate((suite.grouping[k]['forward'],suite.grouping[k]['backward']))))
     ts,gs =  [],[]
 
     for k,runs in enumerate(suite._the_runs_):
@@ -382,7 +438,7 @@ def get_totals(suite):
             for counter in range(run.get_numberHisto_int()):
                 if suite.datafile[-3:]=='bin' or suite.datafile[-3:]=='mdu':
                     n1 = suite.offset+suite.nt0[counter] 
-                histo = np.array(run.get_histo_vector(counter,1)).sum() 
+                histo = array(run.get_histo_vector(counter,1)).sum() 
                 tsum += histo
                 if counter in gr:
                     gsum += histo
@@ -409,10 +465,13 @@ def get_totals(suite):
 
 
 def _nparam(model):
-    '''
+    """
+    return numbers of internal, minuit and free ('~'] parameters
+
     input: dashboard['model_guess']
     output: ntot, nmintot, nfree
-    '''
+    """
+
     number_components = len(model)
     ntot = sum([len(model[k]['pardicts']) 
                                  for k in range(number_components)]) # total number of component parameters
@@ -421,39 +480,43 @@ def _nparam(model):
     nfree = nmintot - sum([1 for k in range(ntot) if flag[k]=='!']) # ntot minus number of fixed parameters 
     return ntot, nmintot, nfree
     
-##################################################################
-# int2min methods: generate guess values, errors and limits
-#                  of minuit parameters
-#  int2min : 
-#  int2min_multigroup : assumes all parameters are in userpardicts
-#  int2min_multirun : assumes both userpardicts and active parameters
-#                    must generate daughters for local parameters
-##################################################################
+###############################################################################
+# int2min methods: generate guess values, errors, fixed, limits, names, pospar
+#                  for minuit parameters
+#  int2min :        model_guess directs the fit
+#  int2min_global : userpardicts lists Minuit parameters
+###############################################################################
 
-def int2min(model):
-    '''
+def int2min(dashboard,runs,guess=True):
+    """
+    returns values, errors, fixed, limits, names, pospar to initialize Minuit A1 A20 B1 B20 & calib
+    
     input: 
-        model 
-            either dashboard["model_guess"] (after add_step_limits_to_model)
-            or  dashboard["model_guess"] both lists of dicts
+        dashboard (json file)
+        runs,              not used, compatibility with other int2min_global
+        guess = True  dashboard["model_guess"], default, lists of dicts
+                False dashboard["model_results"] 
     output: a list of lists:  
         values: minuit parameter values, either guess of result
-        errors: their steps
+        errors: their steps/stds
         fixed: True/False for each
-        limits: [low, high] limits for each or [None,None]  
+        limits: [low, high] limits for either or [None,None]  
         names: name of parameter 'x_label' for each parameter
         pospar: parameter for which component is positive parity, eg s in e^{-(s*t)^2/2}
-    '''
+    """
+
+    # no userpardicts, Minuit performs a 1d asymmetry fit 
     from mujpy.tools.tools import _nparam
 
+    model = dashboard['model_guess'] if guess or 'model_results' not in dashboard.keys() else dashboard['model_results']
     dum, ntot, dum  = _nparam(model)
     
+    positive_parity = ['Δ','σ']                                                    
     #####################################################
     # the following variables contain the same as input #
     # parameters to iMinuit, removing '='s (functions)  #
     #####################################################
     
-    positive_parity = ['Δ','σ']                                                    
     val, err, fix, lim = [], [], [], []           
     names = []
     pospar = [] # contains index of positive parity parameters, to rerun with no limits
@@ -474,183 +537,128 @@ def int2min(model):
 
     return val, err, fix, lim, names, pospar
 
-def int2min_multigroup(pardicts):
-    '''
-    input: 
-        pardicts 
-            either dashboard["userpardicts_guess"] if guess = True
-            or  dashboard["userpardicts_result"] if guess = False
-    output: a list of lists:  
-        values: minuit parameter values, either guess of result
-        errors: their steps
-        fixed: True/False for each
-        limits: [low, high] limits for each or [None,None]  
-        name: name of parameter 'x_label' for each parameter
-        pospar: parameter for which component is positive parity, eg s in e^{-(s*t)^2/2}
-    this works for A2 single fit, multigroup with userpardicts parameters = Minuit parameters
-    '''
-    
-    #####################################################
-    # the following variables contain the same as input #
-    # parameters to iMinuit, removing '='s (functions)  #
-    #####################################################
-                                                        
-    val, err, fix, lim = [], [], [], []           
-    name = []
-    pospar = [] # contains index of positive parity parameters, to rerun with no limits
+def int2min_global(dashboard,runs,guess=True):
+    """
+    returns values, errors, fixed, limits, names, pospar to initialize Minuit C1 C2 A21 B21 & calib
+     
+    input:
+        dashboard: json loaded dict, contains "userpardicts" 
+        runs: list of lists of run numbers (strings)
+    output:
+        val, err, fix, lim, nam, pospar: ordered lists of minuit parameters
+            N userpardicts, in internal order
+               ("_"+runs[0] added to the M "#" parameter name) 
+            replicas of groups of the M "#" parameters, in internal precedence, 
+                for runs[1:] with "_"+runs[k] added to name
+    total: min_par = N-M+len(runs)*M minuit parameters (not an output)
+    Works for any global fit, both plain and calib, identified by the presence of userpardicts
+        multirun global fits C1 C2 contain hash "#" user parameter flag(s)
+    """
 
-    for k,pardict in enumerate(pardicts):  # scan the model components
-        if 'positive_parity' in pardict.keys(): pospar.append(k)
-        errstd = 'error' if 'error' in pardict.keys() else 'std'
-        val.append(float(pardict['value']))
-        name.append(pardict['name']) 
-        err.append(float(pardict[errstd]))
-        if 'error' in pardict.keys():
-            lim.append(pardict['limits'])
-        if 'flag' in pardict.keys():
-            if pardict['flag'] == '!':
-                fix.append(True)
-            elif pardict['flag'] == '~':
-                fix.append(False)
-            else:
-                return False,_,_,_,_,_,_
-        # self.console('val = {}\nerr = {}\nfix = {}\nlim = {}\python list with more repeated valuesncomp name = {},\npar name = {} '.format(val,err,fix,lim,name)) 
-    return val, err, fix, lim, name, pospar
+    # C1 C2 have hashes, A21 and B21 do not, B21 is ok if runs is sliced to one (at a time) 
 
-def int2min_multirun(dashboard,runs):
-    '''
-    input: 
-        dashboar for single group multirun
-            containins both
-               dashboard["userpardicts_guess"] or dashboard["userpardicts_result"]
-               dashboard["model_guess"] (after add_step_limits_to_model) or dashboard["model_result"]
-        runs = list of run numbers
-    output: a list of lists, each list containing minuit internal parameters for a run 
-        values: minuit parameter values, either guess of result
-        errors: their steps
-        fixed: True/False for each
-        limits: [low, high] limits for each or [None,None]  
-        names: name of parameter 'x_label' for each parameter
-        pospar: parameter for which component is positive parity, eg s in e^{-(s*t)^2/2}
-    Note: this method knows the model, hence it can generate only minuit parameters
-          mucomponents, i.e. the cost function, needs to feed also non minuit parameters to the components
-          e.g. mg with A global B1 local phi global s1 global will have only two minuit parameters per run
-          , the second and the fourth, and it must know which value to use for the first and third
-          This is accomplished by _add_multirun_singlegroup_ in mucomponents, using self._components_
-    '''
-    #####################################################
-    # the following variables contain the same as input #
-    # parameters to iMinuit, removing '='s (functions)  #
-    #####################################################
-                                                        
-    positive_parity = ['Δ','σ']                                                    
-    val, err, fix, lim = [], [], [], []           
-    name = []
-    user_local = []
-    pospar = [] # contains index of positive parity parameters, to rerun with no limits
-    pospar_loc = []
-    nlocals = 0
-    # first scan the global and local user parameters 
-    
-    pardicts = dashboard["userpardicts_result"] if "userpardicts_result" in dashboard.keys() else dashboard["userpardicts_guess"]    
-    # REMIND: insert plot guess option for _result dashboard
-    model = dashboard["model_result"] if "model_result" in dashboard.keys() else dashboard["model_guess"]
-    for k,pardict in enumerate(pardicts):  # scan the model components
+    # positive_parity = ['Δ','σ']  # not used
+    val, err, fix, lim, nam, pospar = [], [], [], [], [], []           
+
+    # first scan userpardicts and model "#" parameters
+    pardicts = dashboard["userpardicts_guess"] if guess or not "userpardicts_result" in dashboard.keys() else dashboard["userpardicts_result"]
+
+    # model = dashboard["model_guess"] if guess or not "model_result" in dashboard.keys() else dashboard["model_result"]
+
+    # scan pardicts and add their val, err, fix, lim, nam, pospar to the list
+    hash_parameter_id = []
+    min_par = len(pardicts)
+    for k_internal,pardict in enumerate(pardicts): # k_internal is the internal order (same of dash) 
+        if 'flag' not in pardict.keys():
+            pardict['flag'] = '~'
+        # set defaults if not set and check lists
+        if type(pardict['value']) is list:
+            first_value = pardict['value'][0]
+            if len(pardict['value']) < len(runs):
+                last_value = pardict['value'][-1]
+                for j in range(len(pardict['value']),len(runs)):
+                    pardict['value'].append(last_value)
+        else:
+            first_value = pardict['value']
+        val.append(first_value)
+        if 'limits' not in pardict.keys():
+            pardict['limits'] = [ None, None ]
+        if 'error' not in pardict.keys():
+            pardict['error'] = first_value/20. if first_value else 0.1
+        errstd = 'error' if guess else 'std'
+        if type(pardict[errstd]) is list:
+            first_error = pardict[errstd][0]
+            if len(pardict[errstd]) < len(runs):
+                last_error = pardict[errstd][-1]
+                for j in range(len(pardict[errstd]),len(runs)):
+                     pardict[errstd].append(last_error)
+        else:
+            first_error = pardict[errstd]
         if 'positive_parity' in pardict.keys(): 
-            if pardict["positive_parity"]:
-                pospar_loc.append(k)
+            if pardict['positive_parity']:
+                pospar.append(k_internal)
                 pardict['limits'][0] = 0. 
             # print('debug tools int2min_multirun: pospar {} lim({}) = {}'.format(pardict["name"],k, pardict['limits']))
-        errstd = 'error' if 'error' in pardict.keys() else 'std'
-        if pardict["local"] or type(pardict["value"])==list: # the local key is set to False by default
-            nlocals += 1
-            user_local.append(pardict) # set aside this parameter for the loop over runs
-            pardict['local'] = True
-        else: # the first n parameters are the global user parameters
-            val.append(pardict['value'])
-            name.append(pardict['name'])
-            err.append(pardict[errstd])
-            if 'error' in pardict.keys():
-                lim.append(pardict['limits'])
-            if 'flag' in pardict.keys():
-                if pardict['flag'] == '!':
-                    fix.append(True)
-                elif pardict['flag'] == '~':
-                    fix.append(False)
-                else:
-                    return False,_,_,_,_,_,_     
                     
+        err.append(pardict[errstd])
+        lim.append(pardict['limits'])
+        if pardict['flag'] in ['~','!']:
+            nam.append(pardict['name'])
+            fix.append(False)
+            if pardict['flag'] == '!':
+                fix.append(True)
+        elif pardict['flag'] == '#': # for A21, B21 fits this is never the case and leaves hash_parameter_id empty
+            nam.append(pardict['name']+'_'+runs[0][0])
+            hash_parameter_id.append(k_internal)
+            fix.append(False)
+        else: # 'flag' is an unidentified character
+            return False,_,_,_,_,_,_     
 
-    kloc = k-nlocals
-    # print('debug tools int2min_multirun: pospar_local {}\nuser_local = {}'.format(pospar_loc,user_local))
-#    print('debug tools int2min_multirun: kloc = {}, len(fix) is {}'.format(kloc,len(fix)))
-#    print('first the userpars\nval = {}\nerr = {}\nfix = {}\nlim = {}\ncomp name = {},\npar name = {} '.format(val,err,fix,lim,name)) 
-        
-    # now scan the runs andcreate as many replicas of the local paratmeters
-    for krun,run in enumerate(runs): # run[0] is a string with the run number
-        # "value" may be a single guess value for all or a list of guess values, one per run, checked at start
-        for kusr,usr in enumerate(user_local): # first the local user parameter names 
-            kloc += 1
-            fix.append(False) # can only be not-fixed 
-            if kusr in pospar_loc: 
-                pospar.append(kloc) # this parameter is run version of a positive parity user local par
-            if type(usr["value"])==list: 
-                # print('list = {}, krun = {}'.format(usr["value"],krun))
-                val.append(usr["value"][krun])
+# now scan the other runs
+    for krun,run in enumerate(runs[1:]): # run is a list of run number strings
+        # the loop is skipped for A21, B21
+
+        krun += 1 # first '#' minuit parameter is already allocated with userpars
+        for k_internal in hash_parameter_id:
+            if type(pardicts[k_internal]['value']) is list:
+                value = pardicts[k_internal]["value"][krun]
             else:
-                val.append(usr["value"])
-            name.append(usr["name"]+'_'+run[0])
-            errstd = 'error' if 'error' in usr.keys() else 'std'
-            if type(usr[errstd])==list: 
-                err.append(usr[errstd][krun]) 
-            else: 
-                err.append(usr[errstd])
-            lim.append(usr['limits'])
+                value = pardicts[k_internal]["value"]
+            # either list of guess values, one per run, or single guess value 
+            name = pardicts[k_internal]["name"]+'_'+run[0]
+            keys = pardicts[k_internal].keys()
+            err_std = 'error' if guess or 'std' not in keys else 'std'
+            if type(pardicts[k_internal][err_std]) is list:
+                errstd = pardicts[k_internal][err_std][krun]
+            else:
+                errstd = pardicts[k_internal][err_std]
+            limits = pardicts[k_internal]['limits']
+            fix.append(False) # can only be not-fixed 
+            if 'positive_parity' in keys: 
+                pospar.append(min_par)
+            val.append(value)
+            nam.append(name)
+            err.append(errstd)
+            lim.append(limits)
             
-        for component in model:  # then scan the model components and add only non "="-flag parameters
-            label = component['label']
-            for k,pardict in enumerate(component['pardicts']):  # list of dictionaries
-                if pardict['flag'] != '=': # minuit parameter
-                    kloc += 1
-                    if pardict["name"][0] in positive_parity: 
-                        pospar.append(kloc)
-                        pardict['limits'][0] = 0.
-                        # print('debug tools int2min_multirun: pospar {} lim({}) = {}'.format(pardict["name"],k, pardict['limits']))
-                    if pardict['flag'] == '~':
-                        fix.append(False)
-                    elif pardict['flag'] == '!':
-                        fix.append(True)
-#                    else:
-#                        print('debug tools int2min_multirun: kloc = {}, pardict["flag"] is {}'.format(kloc,pardict['flag']))
-                    if type(pardict["value"])==list: 
-                        #print('val = {}, krun = {}'.format(pardict["value"],krun))
-                        val.append(pardict["value"][krun]) 
-                    else: 
-                        val.append(pardict["value"])
-                    name.append(pardict['name']+'_'+label+'_'+run[0]) 
-                    errstd = 'error' if 'error' in pardict.keys() else 'std'
-                    if type(pardict[errstd])==list: 
-                        err.append(pardict[errstd][krun])
-                    else: 
-                        err.append(pardict[errstd])
-                    lim.append(pardict['limits'])
-                    pre = 0
-                    for k in pospar_loc:
-                        if k not in pospar: 
-                            pospar.insert(pre,k)
-                            pre += 1
-#    print('debug tools int2min_multirun: kloc = {}, len(fix) is {}'.format(kloc,len(fix)))
-    return val, err, fix, lim, name, pospar # all simple lists of sequential parameters, minuit order 
+            min_par += 1 # increment after, final min_par is number of minuit parametersi
+
+#    print('debug tools int2min multirun multigroup: names {}, values {}'.format(nam[0],val[0]))
+#    for k in range(1,len(val)):
+#        print('                                       {},        {}'.format(nam[k],val[k]))
+#    print('int2_multirun_multigroup len(val) {}, len(err) {}, len(fix) {}, len(nam) {}'.format(len(val), len(err), len(fix), len(nam)))
+    return val, err, fix, lim, nam, pospar # all simple lists of sequential parameters, minuit order 
 
 def int2fft(model):
-    '''
+    """
+    retrieves which components to subtract for residues
     input: 
         model 
             dashboard["model_guess"] 
     output: 
         fft_subtract: a list of boolean values, one per model component
             fft flag True, component subtracted in residues 
-    '''
+    """
     from mujpy.tools.tools import _nparam
     fft_flag = []
     fft_name = []
@@ -666,15 +674,17 @@ def int2fft(model):
 # method and key methods: provide component methods 
 #                           and parameter key for eval(key) in _add_
 #   int2_method_key :                single run single group 
-#   int2_multigroup_method_key :     single run multi group
-#   int2_multirun_user_method_key :  multirun single group user
+#   int2_global_method_key :         single run multi group
 #   int2_multirun_grad_method_key :  same with grad
 
-def int2_method_key(dashboard,the_model):
-    '''
+def int2_method_key(dashboard,the_model,nruns):
+    """
+    returns A1, A20, B1, B20 & calib [[method [keys ...]], ...] for mumodel._load_
+
     input: 
        dashboard, the dashboard dict structure 
        the_model,  a fit model instance (not necessarily loaded)
+       nruns,        unused here, for homogeneity with int2_global_model_key
     output: 
        a list of lists, the inner lists contain each
          method,  a mumodel component method, in the order of the model components
@@ -684,12 +694,13 @@ def int2_method_key(dashboard,the_model):
     This function applies tools.translate to the parameter numbers in formulas:
     dashboard "function" is written in terms of the internal parameter index,
     while Minuit parameter index skips shared or formula-determined ('=') parameters  
-    '''
+    """
+
     from mujpy.tools.tools import translate, set_key
 
-    model_guess = dashboard['model_guess']  # guess surely exists
+    model_guess = dashboard['model_guess']  # guess surely exists and model is the same
 
-    ntot = sum([len(model_guess[k]['pardicts']) for k in range(len(model_guess))])
+    ntot = sum([len(model_guess[k]['pardicts']) for k in range(len(model_guess))]) # max nint >= max nmin
     lmin = [] # initialize the minuit parameter index of dashboard function indices 
     nint = -1 # initialize the number of internal parameters
     nmin = -1 # initialize the number of minuit parameters
@@ -699,21 +710,23 @@ def int2_method_key(dashboard,the_model):
         name = model_guess[k]['name']
         # print('name = {}, model = {}'.format(name,self._the_model_))
         is_al = name=='al'
-        bndmthd = [] if is_al else the_model.__getattribute__(name) 
-                            # this is the method to calculate a component, to set alpha, dalpha apart
-        keys = []
+        bndmthd = None if is_al else the_model.__getattribute__(name) 
+
+        keys = [] # keys are appended also for 'al' (never used)
         flag = [item['flag'] for item in model_guess[k]['pardicts']]
         for j,pardict in enumerate(model_guess[k]['pardicts']): 
             nint += 1  # internal parameter incremente always   
             if flag[j] == '=': #  function is written in terms of nint
                 # nint must be translated into nmin 
-                string = translate(nint,lmin,pardict['function']) # here is where lmin is used
+                string = translate(lmin,pardict['function']) # here is where lmin is used
+                if not string: # there was a exception in translate, stopping the fit
+                    return False
                 # translate substitutes lmin[n] where n is the index read in the function (e.g. p[3])
                 # n is the parameter index but previous indices may also be "=", i.e. not in the minuit indices
                 #print('debug int2_method_key: key = {}, p =  {}'.format(
                 key_as_lambda = set_key(string) # NEW! calculates simple functions and speedup
                 keys.append(key_as_lambda) # the function key in keys will be evaluated, key(p), inside mucomponents
-                lmin.append(0)
+                lmin.append(ntot) # an illegal index, cannot exceed ntot-1
             else:# flag[j] == '~' or flag[j] == '!'
                 nmin += 1
                 key_as_lambda = set_key('p['+str(nmin)+']') # NEW! calculates simple functions and speedup
@@ -723,123 +736,263 @@ def int2_method_key(dashboard,the_model):
         method_key.append([bndmthd,keys]) 
     return method_key
 
-def int2_multigroup_method_key(dashboard,the_model):
-    '''
+def int2_global_method_key(dashboard,the_model,nruns):
+    """
+    returns A21, B21, C1, C2 & calib [[method [keys ...]], ...] for mumodel._load_
+
     input: 
-        dashboard, the dashboard dict structure
-        fit._the_model_ is an instance of mumodel 
-            (number of groups from dashboard)
-    output: method_key = [method, keys] for mumodel._add_multigroup_ 
-            method is 2d vector-function(t,*par) 
-                e.g mumodel.bl(x,A,λ) for a two group fit 
-                method accepts argument (t,[A1, A2],[λ1,λ2])               
-                obtained evaluating algebra in string key (in keys, list of group-lists)          
-                that calculate method parameters for each group, 
-    '''
-    from mujpy.tools.tools import function_multi_in_components, cstack, set_key
-    
-    model = dashboard['model_guess']  
-    ntot = sum([len(model[k]['pardicts']) for k in range(len(model))])
-    method_key = []
+        dashboard, the  full dashboard dict structure
+        the_model, i.e. fit._the_model_, is an instance of mumodel
+        nruns = len(runs) in fit slice (not from suite!), ngroups = from dashboard "function_multi")
+    output: method_key = [method, keys] for all mumodel._add_ versions
+                method is nfunc(t,*par) with pars list: 
+                2d vector nfunc(t,*par) by cstack, pars list of lists for A21, B21, C1 fits
+                3d vector nfunc(t,*par) by ccstack, pars list of lists of lists for C2 fits
+                (calib included)
+                :: 
+                     e.g mumodel.bl(t,A,λ) for runs [['252'],['253'],['254']], 2-group fit 
+                         with userpars A1, A2 '~', and  λ '#'
+                the 3d method arguments are
+                (t,[[[A1,λ_252],[A2,λ_252]],[[A1,λ_253],[A2,λ_253]],[[A1, λ_254],[A2, λ_254]])
+                    run0 gr0        gr1     run1 gr0       gr1      run3 gr0        gr1        
+                encoded in a lambda function for each key string 
+                the run-list of group-lists of strings from "function", "function_multi" 
+                with run-specific minuit parameters for λ '#'
+    calls relocate_keys to sort the lambda functions
+    """
+
+    from mujpy.tools.tools import function_multi_in_components, ccstack, cstack, nostack
+    from mujpy.tools.tools import relocate_keys
+    #from numpy import array, array_equal
+
+    ################################################################
+    # New unified global scheme: A21, B21, C1, C2 + calib versions #
+    #                                                              #
+    #    minuit parameters are userpardicts (guess or _results)    #
+    #         flag =  '~' global                                   #
+    #                 '!' fixed                                    #
+    #                 '#' local, replicated for each run           #
+    #    model parameters all have '=' flag,                       #
+    #                               either function or f_multi     #
+    #      (when k_int, k'_int are '#' local userpars              #
+    #        strings can only be 'p[k_in]'  (function)             #
+    #        or ['p[k_int]','p[k'_int]',...] (function_multi)      #
+    #      more complex functions only refer to global userpars)   #
+    ################################################################
+
+    model = dashboard['model_guess'] # same model as for '_results'
+    mask_function_multi = function_multi_in_components(dashboard)# True for function_multi, False otherwise
     pardicts = [pardict for component in model for pardict in component['pardicts']]
-    mask_function_multi = function_multi_in_components(dashboard) # True for function_multi, False for function
-
-    if sum(mask_function_multi):
-        ngroups = len(pardicts[mask_function_multi.index(1)]["function_multi"]) # counts groups
-    else:
-        return []
-    nint = -1 # initialize the index of the dashboard component parameters
+    ngroups = len(pardicts[mask_function_multi.index(True)]['function_multi']) if sum(mask_function_multi) else 1 # counts groups
+    # dofit_ must check that the global multigroup fits do have at least one 'function_multi'
+    stack = ccstack if nruns > 1 and ngroups > 1 else cstack if nruns > 1 or ngroups > 1 else nostack 
     bndmthd = {} # to load the [name] key
-    for j,component in enumerate(model):  # scan the pardicts of model components  
-        name = component['name']
-        keys = []
-        bndmthd[name] = lambda x,*pars, name=name : cstack(the_model.__getattribute__(name),x,*pars)
-        bndmthd[name].__doc__ = '"""'+name+'"""'
-        nint0 = nint # increments nint0 for next component
-        for l in range(ngroups):
-            key = []  
-            nint = nint0 # starts from same nint0 for both groups
-            for pardict in component['pardicts']: 
-                nint += 1  # internal parameter index incremented always 
-                if mask_function_multi[nint]:
-                    key_as_lambda = set_key(pardict["function_multi"][l]) 
-                else:                
-                    key_as_lambda = set_key(pardict["function"]) 
-                key.append(key_as_lambda) # evaluated as key(p) in mucomponents
-            keys.append(key)
-        method_key.append([bndmthd[name],keys]) # vectorialized method, with keys 
-        # keys = [[strp0g0, strp1g0,...],[strp0g1, strp1g1, ..],[strp0g2, strp1g2,...]..]
-        # pars = [[p0g0, p1g0, ...],[p0g1, p1g1, ..],[p0g2, p1g2,...]..]
-    return method_key
-
-def int2_multirun_user_method_key(dashboard,the_model,nruns):
-    '''
-    input: 
-        dashboard, the dashboard dict structure
-        the_model is fit._the_model_ i.e. an instance of mumodel 
-        nruns is the numer of runs in the suite
-    output: a list of methods and a list of lists of keys, [[key,...,key],...,[key,..,key]]
-    the internal list is same parameter, different runs
-    the model components 
-            for the use of mumodel._add_multirun_.
-            method is a component function 
-            accepting time and a list of parameters, e.g mumodel.bl(x,A,λ)
-            key is string defining a lambda function that produces one method parameter for a specific run, 
-            the list is for the same parameter over diffenet runs 
-            keys is a list of lists for all the parameters (any flag) of the component
-            the list of [binding,keys] is over the components of the model
-    This list of [binding, keys] allows mumodel _add_multirun_ to use the minuit p list
-    (n_globals global user values, followed by nruns replica of 
-     n_locals local user values and a model specific number of local (~,!) component par values)
-    to produce component-driven vectorized values, as many values in the vector as the runs
-    In this way minuit fcn is a vector, one fcn per run,
-    likewise asymm, asyme are vectors (see suite for multirun)
-    and mumodel._chisquare_ cost function sums over individual runs for a unique global chisquare
-    Invoked by the iMinuit initializing call
-             self._the_model_._load_data_multirun_user_
-    just before submitting migrad
-    '''
-    from mujpy.tools.tools import cstack, translate_multirun, set_key#, function_multi_in_components
-    from mujpy.tools.tools import get_functions_in
-#            self._components_ is a list [[method,[key,...,key]],...,[method,[key,...,key]]], 
-#                produced by int2_multirun_user_method_key() from mujpy.tools.tools
-#                where method is an instantiation of a component, e.g. self.ml 
-#                and value = eval(key) produces the parameter value
-    model = dashboard['model_guess']  # guess surely exists, it is a list of component dicts, e.g. for mgbl 2 dicts
     method_key = []
-    bndmthd = {} # to avoid same name
-    n_locals =  [pardict["local"] for pardict in dashboard["userpardicts_guess"]].count(True)
-    n_globals = len(dashboard["userpardicts_guess"])-n_locals
-    kloc = n_globals+n_locals
-    functions_in = get_functions_in(model,kloc-1)
-    functions_out = translate_multirun(functions_in,n_locals,kloc,nruns)   
-    
-
-    # print('\n\ndebug tools int2_multirun_user_method_key functions_out = {}'.format(functions_out))
-    for j,component in enumerate(model):  # scan the model components (as for the first run)
-        name = component['name']
-        keys = []
-        # this method uses pars, a list of lists (runs) of parameter for this component, obtained by key(p) from minuit p
-        
-        bndmthd[name] = lambda x,*pars, name=name : cstack(the_model.__getattribute__(name),x,*pars)
-        bndmthd[name].__doc__ = '"""'+name+'"""'
-                            # no alpha in global multirun!
-        # its pars are generated as a list of lists of the key_as_lambda functions
-        for funcs in functions_out[j]: # funcs is a run, in the suite of runs
-            key = []
-            for func in funcs: # this is a parameter for this run, in the component parameters 
-                #print('debug tools int2_multirun_user_method_key func = {}'.format(func))
-                key_as_lambda = set_key(func) # NEW! calculates simple functions and speedup
-                # function key will be evaluated as key(p) inside mucomponents
-                key.append(key_as_lambda) # collect parameter key(s) of the component  
-            keys.append(key) # create outer list adding component parameters for this run
-        method_key.append([bndmthd[name],keys]) # vectorialized method, with its keys list of lists
-        # appended to a list of [method,
-        # print('debug tools int2_multirun_user_method_key: locals =\n{}'.format(globals()))
+    relkeys = relocate_keys(dashboard,nruns,ngroups)
+    for kc,component in enumerate(model):  # scan model components  
+        name = component['name'] # must mnatch those in mucomponents
+        is_al = name=='al'
+        bndmthd[name] = None if is_al else lambda x,*pars, name=name : stack(the_model.__getattribute__(name),x,nruns,ngroups,*pars)
+        # A21, B21, C1, C2
+        if nruns >1 and ngroups > 1: # C2 needs a run list of group lists of parameter lists for component kc
+            # keys = [[keygroup[kc]] for keyrun in relkeys for keygroup in keyrun]
+            keys = [[keygroup[kc] for keygroup in keyrun] for keyrun in relkeys]
+        #elif ngroups > 1: # A21 or B21, same fit, need a group list of parameter lists for component kc
+        #    keys = [keygroup[kc] for keygroup in relreys]
+        #elif nruns > 1: # C1 needs a run list of parameter lists for component kc
+        #    keys = [keyrun[kc] for keyrun in relkeys]
+        else:
+            keys = [k[kc] for k in relkeys] # k stands for keygroup (A21 or B21) or keyrun (C1)
+        method_key.append([bndmthd[name],keys]) # vectorialized method, with keys 
     return method_key
+
+def relocate_keys(dashboard,nruns,ngroups):
+    """
+    activates keys for function or function_multi strings in global fits
+
+    input
+        dashboard
+        nruns       number of runs in fit slice
+        ngroups     number of groups in suite
+    output
+        keys        list of ... lists (list_depth 2 for A21, B21, C1, or 3, for C2)
+    """
+
+    from mujpy.tools.tools import  translate, get_indices, set_key
+
+    model = dashboard['model_guess'] # same model as for '_results'
+    userpardicts = dashboard['userpardicts_guess'] # same as '_results'
+    mask_hash =  [pardict['flag'] == '#' for pardict in userpardicts] # True for flag = "#", they also must have either function of function_multi strings
+    hash_indices = [k for k,m in enumerate(mask_hash) if m] # e.g. 3,5 if userpar[3,5] are hash user parameters]
+    hash_strings = [str(k) for k in hash_indices]
+    #print('mufit int2_global_method_key hash_indices = {}'.format(hash_indices))
+    khash = len(userpardicts) # index for the next minuit parameter, the first nhash being userparameters
+    lmin = list(range(khash)) # initially just the indices of the userparameter
+
+
+    if nruns >1 and ngroups > 1: # C2
+        keys = []
+        for krun in range(nruns):
+            keygroup = []
+            store = []
+            for kgroup in range(ngroups):
+                keycomp = []
+                #print('mufit int2_global_method_key -------------- krun kgroup {} {}'.format(krun,kgroup))
+                for kc,component in enumerate(model):  # scan model components  
+                    # nintcomp = nint # increments nintcomp for next component
+                    key = []
+                    for pardict in component['pardicts']:
+                        string = pardict["function"] if "function" in pardict.keys() else pardict["function_multi"][kgroup]
+                        # string is either 'p[k1]' or e.g. '(1-p[k1)*p[k2])]
+                        ind_strings =  get_indices(string)
+                        #print('string is {}'.format(string))
+                        if krun!=0: # skip krun=0, already in userpars, doesn't need translation
+                            ind = [int(k) for k in ind_strings] # substitute the indices of the first run
+                            for k in ind: 
+                                if k in hash_indices: # a hash parameter
+                                    #print('mufit int2_g k, lmin[k], khash] {},{},{}'.format(k, lmin[k],khash)) 
+                                    if not k in store: 
+                                        lmin[k] = khash # update lmin for this translation
+                                        store.append(k)
+                                        khash += 1 # increment after encoding, finishes with khash = number of minuit parameters
+                                    string = translate(lmin,string) # substitutes nhash, encoded in lmin to k_internal 
+                                    #print('translated string is {}'.format(string))
+                                    if not string: # there was a exception in translate, stopping the fit
+                                        return False
+                        key_as_lambda = set_key(string) # key(p), non hash is encoded as is
+                        key.append(key_as_lambda) # key are for all parameters of component kc
+                    keycomp.append(key) # over components
+                keygroup.append(keycomp)
+            keys.append(keygroup)
+    elif ngroups>1: # A21 or B21 no hash parameters
+        keys = []
+        for kgroup in range(ngroups):
+            keycomp = []
+            #store = []
+            for kc,component in enumerate(model):  # scan model components  
+                # nintcomp = nint # increments nintcomp for next component
+                key = []
+                for pardict in component['pardicts']:
+                    string = pardict["function"] if "function" in pardict.keys() else pardict["function_multi"][kgroup]
+                    # string is either 'p[k1]' or e.g. '(1-p[k1)*p[k2])]
+                    #ind_strings =  get_indices(string)
+                    #print('string is {}'.format(string))
+                    #if kgroup!=0: # skip krun=0, already in userpars, doesn't need translation
+                        #ind = [int(k) for k in ind_strings] # substitute the indices of the first run
+                        #print('mufit int2_global_method_key ind = {}'.format(ind))
+                        #for k in ind: 
+                            #if k in hash_indices: # a hash parameter
+                                #print('mufit int2_g k, lmin[k], khash] {},{},{}'.format(k, lmin[k],khash)) 
+                                #if not k in store: 
+                                #    lmin[k] = khash # update lmin for this translation
+                                #    store.append(k)
+                                #    khash += 1 # increment after encoding, finishes with khash = number of minuit parameters
+                                #string = translate(lmin,string) # substitutes nhash, encoded in lmin to k_internal 
+                                #if not string: # there was a exception in translate, stopping the fit
+                                #    return False
+                    key_as_lambda = set_key(string) # key(p), non hash is encoded as is
+                    key.append(key_as_lambda) # for all parameters of component kc
+                keycomp.append(key) # over components
+            keys.append(keycomp) # over runs
+    elif nruns > 1: # C1, pure hash translation
+        keys = []
+        for krun in range(nruns):
+            keycomp = []
+            store = []
+            for component in model:  # scan model components  
+                # nintcomp = nint # increments nintcomp for next component
+                key = []
+                for pardict in component['pardicts']:
+                    string = pardict["function"]
+                    # string is either 'p[k1]' or e.g. '(1-p[k1)*p[k2])]
+                    ind_strings =  get_indices(string)
+                    #print('string is {}'.format(string))
+                    if krun!=0: # skip krun=0, already in userpars, doesn't need translation
+                        ind = [int(k) for k in ind_strings] # substitute the indices of the first run
+                        #print('mufit int2_global_method_key ind = {}'.format(ind))
+                        for k in ind: 
+                            if k in hash_indices: # a hash parameter
+                                #print('mufit int2_g k, lmin[k], khash] {},{},{}'.format(k, lmin[k],khash)) 
+                                if not k in store: 
+                                    lmin[k] = khash # update lmin for this translation
+                                    store.append(k)
+                                    khash += 1 # increment after encoding, finishes with khash = number of minuit parameters
+                                string = translate(lmin,string) # substitutes nhash, encoded in lmin to k_internal 
+                                if not string: # there was a exception in translate, stopping the fit
+                                    return False
+                    #print('tools int2_global_method_keys krun {} string {}'.format(krun,string))
+                    key_as_lambda = set_key(string) # key(p). non hash is encoded as is
+                    key.append(key_as_lambda) # for all parameters of the component
+                keycomp.append(key) # for all components of the model
+            keys.append(keycomp) # for all runs 
+    return keys
+
+
+def set_alpha(pars,nrun,ngroup):
+    """
+    returns np.array of alpha values from Minuit pars to multiply mumodel._yb_
+
+    input pars, minuit parameters of an al.... multi(run, group, both)  fit
+          nrun, number of runs in slice
+          ngoup, number of groups in slice
+    """
+
+    from numpy import array, kron, ones, newaxis
+    #alpha = pars[0:ngroup] # expects an many al parameters as the number of detector groups
+    # is converted into numy array that allows direct numpy multiplication with the backward yb array 
+    # to produce an array of the same shape as yb
+    #return kron(ones((nrun,1)),kron(alpha,ones((1,1))))[:,:,newaxis]
+    #print('tools set_alpha pars =  {}'.format(pars))
+    if (nrun,ngroup) == (1,1): # 1d
+        return array([pars[0]])
+    elif nrun == 1: # 2d
+        return array([[pars[k]] for k in range(ngroup)])
+    elif ngroup == 1: # 2d
+        return array([[pars[0]] for k in range(nrun)])
+        #return array([pars[0] for k in range(nrun)])
+    else: # 3d
+        alpha = array([[[pars[k]] for k in range(ngroup)] for kr in range(nrun)])
+        #print('tools set_alpha alpha {}'.format(alpha))
+        return alpha 
+
+def set_key(string):   
+    """
+    coding p=[0.1,0.2,0.3], key = set_key('p[2]'), key(p) produces 0.3
+
+    input: the function string from the json or the mudash dashboard
+         e.g. that written in the json file as 'function':'p[0]*(0.5+1/pi*arctan(p[2])'
+              or typed into mudash text widget as 'p[0]*(0.5+1/pi*arctan(p[2])',
+              (for global fits: indices are already translated!)  
+    output: key, a python method, such that in mumodel mucomponents _add_ the command 
+            key(p) evaluates the formula 
+            the evaluation knows simple numpy functions, see the import in string code, below
+    COMMENTS: maybe not the simplest, but it works
+    try the following in ipython3
+        from mujpy.tools.tools import set_key
+        p = [1,2,3,4]
+        key = set_key('p[2]')
+        key(p)
+    Out[] 3
+    """
+
+#    print('debug tools set_key: string = {}'.format(string))
+    code = """
+from numpy import cos, sin, tan, sinh, cosh, tanh, log, pi, exp, sqrt, real, abs, arctan
+def foo():
+"""
+    string = "    key = eval('"+'lambda p: '+string +"')"
+    # print('string ={}'.format(string))
+    code = code + string + """
+    return key
+"""
+    # print('code = {}'.format(code))
+    exec(code,globals(),globals())   # foo is defined by executing code
+    return eval('foo()') # key = set_key('p[2') when p = [10,11,12,13], key(p) returns 12  
 
 def int2_multirun_grad_method_key(dashboard,the_model,nruns):
-    '''
+    """
+    methods_keys for analytic gradients [not refurbished]
+
     input: 
         dashboard, the dashboard dict structure
         the_model is fit._the_model_ i.e. an instance of global multirun mumodel 
@@ -865,7 +1018,8 @@ def int2_multirun_grad_method_key(dashboard,the_model,nruns):
         Assuming asymmetry data end errors y(k;i), ey(k;i), the expression for the chisquare gradient is
                sum_i,k {2(sum_n y_n(k;i,*par(k,n))-y(k;i))/ey(k;i)^2} * sum_n,j {partial y_n(k;i,*par(k,n)/partial par[k,n,j]} * {partial par[k,n,j]/partial p[m]}
           hereafter            dcdf                                   * sum_n,j           dkndj                                *               djdm        
-    '''
+    """
+
     from mujpy.tools.tools import get_functions_in, diffunc, get_indices, get_number_minuit_internal
     from mujpy.tools.tools import translate_multirun, set_key #, function_multi_in_components
     # firts generate dmethod_keys
@@ -897,7 +1051,773 @@ def int2_multirun_grad_method_key(dashboard,the_model,nruns):
                     grad_list.append([k_run,n_component,j_parameter,grad_bndmthd,set_key(dfunc)]) 
     return minuit_ordered_grad_list
 
+#    def fstack(f,n,val):
+#    """
+#    stack one layer of mumodel functions of any dimension
+#    """
+#    from numpy import vstack
+#
+#        for k in range(1,n):
+#            f = vstack(f,[self._add_(x,*val[k])])
+#        return f
+        
+def nostack(npfunc,x,nruns,ngroup,*pars):
+    """
+    mock stacking
+    x dummy
+    nruns duummy
+    ngroups dummy
+    pars dummy
+          no need to pass args, mucomponents expect (x,*pars)
+    output is npfunc
+    """
+    return npfunc
+
+def cstack(npfunc,x,nruns,ngroups,*pars):
+    """
+    vectorialize npfunc
+    input: 
+        npfunc numpy function with input (x,*argv)
+        x time
+        nruns 1 or >1
+        ngroups 1 or >1 (for compatibility with ccstack)
+        *pars is a list of lists of parameters, 
+              list len n is the output_function_array.shape[0]
+    output:
+        output_function_array
+            stacks vertically n replica of npfunc distributing parameters as in
+            (x, *argv[i]) for each i-th replica 
+    """
+    # cstack reproduces the parameter input of a component according to         
+    # self._components_ = [[method,[key,...,key]],...,[method,[key,...,key]]], and eval(key) produces the parmeter value
+    # where the outer list a replica of the same component method 
+    # either over several groups (multigroup) or over several runs (multirun)
+    # as of now this method does not work for the multirun multigroup userpar case (C2)
+
+    from numpy import array #concatenate #try with A21 before replacing
+    # print('debug tools.cstack: npfunc = {} pars = {}'.format(npfunc,pars))
+    # reshape(-1,x-shape[0]) makes as many rows as necessary, each with x.shape[0] columns   
+    #return concatenate([npfunc(x,*par) for par in pars]).reshape(max(nruns,ngroups),x.shape[0])
+    if nruns == 1:
+        return array([npfunc(x,*par) for par in pars])
+    else:
+        return array([[npfunc(x,*par)] for par in pars])
+ 
+def ccstack(npfunc,x,nruns,ngroups,*pars):
+    """
+    vectorialize npfunc
+    input: 
+        npfunc numpy function with input (x,*pars)
+        x time
+        *pars is a list of lists of lists of parameters, 
+    output:
+        output_function_array
+            stacks vertically n replica of npfunc distributing parameters as in
+            (x, *argv[i]) for each i-th replica 
+            output_function_array(x,*argv) produces an array of shape (nruns,ngroups,x.shape[0])
+    """
+    # cstack reproduces the parameter input of a component according to         
+    # self._components_ = [[method,[key,...,key]],...,[method,[key,...,key]]], and eval(key) produces the parmeter value
+    # where the outer list a replica of the same component method 
+    # either over several groups (multigroup) or over several runs (multirun)
+    # as of now this method does not work for the multirun multigroup userpar case (C2)
+
+    from numpy import array
+    return array([[npfunc(x,*par) for par in parg] for parg in pars])
+
+def min2int(dashboard,values_in,errors_in,krun,kgroup,nruns,ngroups):
+    """
+    returns names, values, stds, shared list of parameter lists for summary print_components
+
+    input:
+        dashboard
+        values_in Minuit.values
+        errors_in Minuit.errors
+        krun,kgroup:    index of run and group in suite._the_runs_
+        nruns, ngroups: slice dimensions
+              last four not used, homogeneity with the _global version
+    output: for all model_guess parameters
+        names      component list of parameter lists of names
+        values_out component list of parameter lists of values 
+        errors_out component list of parameter lists of stds
+        shared     component list of parameter list of 'flag'=='=' 
+    ready for for print_components in summary
+    works for: A1 and its calib
+               A20, B1, B20 and their calib, iterated in mufit.dofit_
+    """
+
+    from mujpy.tools.tools import translate
+    # 
+    # initialize
+    #
+    model_guess = dashboard['model_guess']
+    ntot = sum([len(model_guess[k]['pardicts']) for k in range(len(model_guess))]) 
+    # total number of internal parameters >= number of Minuit parameters
+    
+    names, values_out, p, errors_out, e, shared = [], [], [], [], [], []
+    nint = -1 # initialize
+    nmin = -1
+    lmin = []
+    flag = [pardict['flag'] for component in model_guess for pardict in component['pardicts']]
+    for k,component in enumerate(model_guess):  # scan the model
+        component_name = component['name']
+        name, value, error, share = [], [], [], []
+        label = model_guess[k]['label']
+        
+        for j,pardict in enumerate(model_guess[k]['pardicts']): # list of dictionaries, par is a dictionary
+            nint += 1  # internal parameter incremented always
+            if j==0:
+                name.append('{}{}_{}'.format(component_name,pardict['name'],label))
+            else:
+                name.append('{}_{}'.format(pardict['name'],label))
+            if flag[nint] != '=': #  skip functions, they are not new minuit parameter
+                nmin += 1
+                lmin.append(nmin)
+                p.append(values_in[nmin]) # needed also by functions
+                value.append(values_in[nmin])
+                # print('diretto p_in[{}] = {} -> {}'.format(nmin,p[-1],value[-1]))
+                e.append(errors_in[nmin])
+                error.append(errors_in[nmin]) # parvalue item is a string
+                share.append(False)
+            else: # functions, calculate as such
+                # nint must be translated into nmin 
+                string = translate(lmin,pardict['function'])  
+                p.append(eval(string))
+                value.append(eval(string))
+                # print('{} shared p_in = {} -> {}'.format(string,p[-1],value[-1]))
+                e.append(eval(string.replace('p','e')))
+                error.append(eval(string.replace('p','e'))) # this is where e is used
+                share.append(True)
+                lmin.append(ntot) # an illegal index, was working with lmin.append(0)
+        names.append(name)
+        values_out.append(value)
+        errors_out.append(error)
+        shared.append(share)
+    return names, values_out, errors_out, shared # list of parameter values 
+ 
+def min2int_global(dashboard,p,e,krun,kgroup,nruns,ngroups):
+    """
+    names, values, stds, nonhash list of parameter lists for summary_global print_components
+
+    input:
+        dashboard
+        p               Minuit.values
+        e               Minuit.errors
+        krun,kgroup:    indices of run, group in suite._the_runs_
+        nruns, ngroups  slice dimensions
+    output: for all the dashboard['model_guess'] parameters
+        names      component list of parameter lists of names
+        values_out component list of parameter lists of their values 
+        errors_out component list of parameter lists of their stds
+        nonhash    component list of parameter list True if 'flag'!='#'
+    ready for for print_components in summary_global
+    iterated in mufit.dofit_ for A21 B21 C1 C2 & calib
+    """
+
+    from mujpy.tools.tools import function_multi_in_components, error_propagation, get_indices
+    from numpy import cos, sin, tan, sinh, cosh, tanh, log, pi, exp, sqrt, real, abs, arctan
+
+    userpardicts = dashboard['userpardicts_guess'] # values are taken from p,e, anyway
+    model = dashboard['model_guess']
+    pardicts = [pardict for component in model for pardict in component['pardicts']]
+    mask_function_multi = ['function_multi' in pardict.keys() for component in model for pardict in component['pardicts']]
+    mask_hash =  [pardict['flag'] == '#' for pardict in userpardicts]  # works also for A21, B21, no hashes, masl_hash = []
+    lmin = list(range(len(userpardicts))) # initialized to [0,1,2,3 ...]#)
+    hash_indices = [k for k,m in enumerate(mask_hash) if m]
+    new_hash_indices = [k for k,m in enumerate(mask_hash) if m] 
+    if mask_hash:
+        for k in range(len(hash_indices),len(p)):
+            new_hash_indices.append(k) # builds indices of run specific Minuit parameters
+    #print('tools min2int_global new_hash_ind {}'.format(new_hash_indices))
+    names, values_out, stds_out, nonhash = [],[],[],[]
+    khash = len(userpardicts)
+    #print('tools min2int_global nruns ngroups krun kgroup {} {} {} {}'.format(nruns,ngroups,krun,kgroup))
+    for kr in range(nruns):
+        store = hash_indices if kr==0 else []
+        for kg in  range(ngroups):
+            for component in model:  # scan model components  
+                component_name = component['name']
+                label = component['label']
+                namep, valp, stdp, nonhp = [],[],[],[]
+                for j,pardict in enumerate(component['pardicts']): 
+                    if j==0: # first parameter of this component
+                        namep.append('{}: {}_{}'.format(component_name,pardict['name'],label))
+                    else:
+                        namep.append('{}_{}'.format(pardict['name'],label))
+                    string = pardict["function_multi"][kgroup] if 'function_multi' in pardict.keys() else pardict["function"]
+                    ind_strings = get_indices(string) # string is 'p[k_internal]'
+                    ind = [int(k) for k in ind_strings] # substitute the function/function_multi indices for hash parameters 
+                    for k in ind: 
+                        if k in hash_indices: # a hash parameter
+                            if not k in store:
+                                #print('tools min2int_global lmin k khash {} {} {}'.format(lmin,k,khash))
+                                lmin[k] = new_hash_indices[khash] # update lmin for this translation
+                                store.append(k)
+                                khash += 1
+                    ishash = True if any([k in hash_indices for k in ind]) else False
+                    string = translate(lmin,string) if ishash else string
+                    if kr==krun and kg==kgroup:
+                        if not ishash:
+                            nonhp.append(True) 
+                        else:
+                            nonhp.append(False)# does not appènd to the ur hash parameter (krun=0)
+                        key = set_key(string)
+                        val = key(p)
+                        err = eval(error_propagation(string))
+                        valp.append(val) #csv_format.format(val)) # formatted value
+                        stdp.append(err) #csv_format.format(err)) # formatted error
+                if kr==krun and kg==kgroup:
+                    #print('tools min2int_global kr = {}, kg = {}'.format(kr,kg))
+                    names.append(namep)
+                    values_out.append(valp) # all groups in the same run list
+                    stds_out.append(stdp) # formats the error
+                    nonhash.append(nonhp)
+                # always a component list of parameter lists, list_depth = 2
+
+    return names, values_out, stds_out, nonhash
+
+def min2int_names(dashboard):
+    """
+    like min2int, produces only names
+
+    input: dashboard
+    output: names, component list of parameter lists, for csv
+            name of parameter[0] contains component name, 
+            all names end with '_'+label, eg mgA_0, B_0, φ_0, σ_0 
+    called by mufit.prepare_csv_row and prepare_usercsv_row
+    """
+
+    model_guess = dashboard['model_guess']
+    names = []
+    nint = -1 # initialize
+    nmin = -1
+    for k,component in enumerate(model_guess):  # scan the model
+        component_name = component['name']
+        name = []
+        label = model_guess[k]['label']
+        for j,pardict in enumerate(model_guess[k]['pardicts']): # list of dictionaries, par is a dictionary
+            nint += 1  # internal parameter incremented always
+            if j==0:
+                name.append('{}{}_{}'.format(component_name,pardict['name'],label))
+            else:
+                name.append('{}_{}'.format(pardict['name'],label))
+        names.append(name)
+    return names # list of lists of parameter names
+
+def chunk(seq,size):
+    """
+    use as    for v in chuck(a,n):  to extract n items at a time from a
+    """
+
+    return (seq[pos:pos + size] for pos in range(0, len(seq), size))
+
+def list_depth(L):
+    """
+    returns max depth of a list of ... lists
+    """
+
+    if isinstance(L, list):
+        return 1 + max(list_depth(item) for item in L)
+    else:
+        return 0 
+            
+def print_components(names,values,errors,shared,global_fit=False):
+    """
+    returns string with all name = value(std) formatted parameters of a model component
+
+    input: for a component
+    	parameter names 
+    	parameter values 
+    	parameter errors 
+        parameter shared (boolean) / nonhash (boolean)
+                      is 'flag' == '='     not global_fit
+                         'flag' != '#'     global_fit  
+        global_fit = False (default), boolean
+    output:
+        string to print
+        "bl.A_fast 0.123(4) bl.λ_fast 12.3(4)S bl.σ_fast 0(0)"
+        adds 'G' (global_fit) or 'S' to error of global or shared parameters
+    """
+
+    from mujpy.tools.tools import value_error
+    ch = '' if global_fit else 's'
+    val_err = [value_error(values[k],errors[k])+ch if shared[k] else value_error(values[k],errors[k]) for k in range(len(shared))]
+    out = [' '.join([names[k],'=',val_err[k]]) for k in range(len(names))]
+    maxlen = len(max(out,key=len))
+    return " ".join([out[k]+(maxlen-len(out[k]))*' ' for k in range(len(out))])
+
+def print_csv_components(values,errors):
+    """
+    returns string with csv formatted value, std, per all parameters of all model components
+
+    input: for a component
+        parameter values
+        parameter errors
+    output:
+        string to print, see print_components for this e.g.
+        "0.123,0.004,12.3,0.4,0,0,"
+        notice! ends with ","
+    """
+
+    from mujpy.tools.tools import value_error_csv
+    return ''.join(value_error_csv(values[k],errors[k]) for k in range(len(values)))
+
+def mixer(t,y,f0):
+    """
+    returns rotating frame version of input t at frequency f0 [MHz]
+
+    mixer of a time-signal with a reference 
+    input
+        t time
+        y the time-signal
+        f0 frequency of the cosine reference
+    output
+        y_rrf = 2*y*cos(2*pi*f0*t)  
+    t is 1d and y is 1-d, 2-d or 3-d but t.shape[0] == y.shape[-1]
+    t is vstack-ed to be the same shape as y
+    """
+
+    from mujpy.tools.tools import fft_filter
+    from numpy import pi, cos, vstack, fft, delete
+    ydim, tdim = len(y.shape), len(t.shape)
+    # print('tools mixer debug 1: y t shape {}, {}'.format(y.shape,t.shape))
+    if tdim == 1: # must replicate t to the same dimensions as y 
+        if ydim ==2:
+            for k in range(ydim):
+                if k:
+                    time = vstack((time,t))
+                else:
+                    time = t
+            t = time
+        elif ydim==3: # max is ydim = 3
+            for j in range(len.shape[-1]):
+                for k in len.shape[-2]:
+                    if k:
+                        time = vstack((time,t))
+                    else:
+                        time = t
+                if j:
+                    for l in len.shape[-1]:
+                        tim = vstack((tim,time))
+                    else:
+                        tim = time
+            t = tim 
+    n = t.shape[-1] # apodize by zero padding to an even number
+    yf = fft.irfft(fft_filter(t,fft.rfft(2*y*cos(2*pi*f0*t),n=n+1),f0),n=2*n)
+    # now delete padded zeros 
+    mindex = range(n,2*n)
+    yf =delete(yf,mindex,-1)
+    # print('tools mixer debug 3: yf shape {}'.format(yf.shape))
+    return yf
+    
+def fft_filter(t,fy,f0):
+    """
+    returns fy filtered above the 0.2*fy peak freq 
+
+    works for 1-2 d
+    """
+
+    from numpy import arange, mgrid, where
+    # determine max frequency fmax
+    leny = len(fy.shape)
+    if leny == 1:
+        dt = t[1]-t[0]
+        # array f of fourier component indices (real fft, 0 to fmax)
+        m = fy.shape
+        f = arange(m) 
+    elif leny == 2:
+        dt = t[0,1]-t[0,0]
+        # find peak in rfft below the rrf frequency f0
+        # array f of fourier component indices (real fft, 0 to fmax)
+        n,m = fy.shape
+        _,f = mgrid[0:n,0:m] 
+    else:
+        dt = t[0,0,1]-t[0,0,0]
+        l,n,m = fy.shape
+        _,_,f = mgrid[0:l,0:n,0:m] 
+                
+    fmax = 1/2/dt
+    mask = (f<=f0/fmax*m).astype(int)
+    # find where fy has a peak, below the rrf frequency f0
+    if leny == 1:
+        npeak = where(abs(fy)==abs(mask*fy).max()).max()
+    elif leny == 2:
+        npeak = where(abs(fy)==abs(mask*fy).max())[1].max()
+    else:
+        npeak = where(fy==(mask*fy).max())[2].max()    
+    mask = (f<=2*npeak).astype(int)
+    # print('tools fft_filter debug 2: fy {},mask {} shape'.format(fy.shape,mask.shape))    
+    return fy*mask
+    
+def model_name(dashboard):
+    """
+    returns the conventional model name (e.g. 'mgbgbl')
+
+    input the dashboard dictionary structure
+    """
+
+    return ''.join([item for component in dashboard["model_guess"] for item in component["name"]])
+    
+def userpars(dashboard):
+    """
+    True if there are userpardicts in the fit dashboard (aka global_fit, redundant)
+
+    alias of global type fit, of any kind (gg, gr, G)
+    [not used] by mufit 
+    """
+
+    return "userpardicts_guess" in dashboard
+
+def function_multi_in_components(dashboard):
+    """
+    list of True/False for model_guess components pardicts if they contain the 'function_multi' key
+
+    input full dashboard
+    output mask list, 
+        len is sum of number of parameters in components of "model_guess"
+        True where parameter pardict contains "function_multi" key
+        False otherwise
+    """
+
+    return ['function_multi' in pardict.keys() for component in dashboard["model_guess"]  for pardict in component["pardicts"]]                                
+def stringify_group(group):
+    """
+    returns a unique string for a group
+
+    to use in file names and in mufit.prepare_csv_row
+    """
+
+    fgroup, bgroup = group['forward'],group['backward']
+    return fgroup.replace(',','_')+'-'+bgroup.replace(',','_')
+
+def stringify_groups(groups,joinch='_'):
+    """
+    returns a unique string for many groups
+
+    to use in json file name
+    """
+
+    from mujpy.tools.tools import stringify_group
+    strgrp = []
+    for group in groups: 
+        strgrp.append(stringify_group(group))
+    return joinch.join(strgrp)
+
+def rshp(y):
+    '''
+    reshape numpy array from suite to plot shape
+
+    suite array are 3d 2d or 1d 
+    plot must be 1d, for static plot
+                 2d, for anim
+    returns a squeezed version and 3d is reshaped to 2d
+    '''
+
+    if len(y.shape)==3:
+        n0,n1 = (y.shape[0]*y.shape[1], y.shape[2]) 
+        y_out = y.reshape((n0,n1)).squeeze()
+    else:
+        y_out = y.squeeze()
+    return y_out
+
+####################
+# Deprecated methods
+####################
+    
+def int2_calib_method_key(dashboard,the_model):
+    """
+    NOT USED, remove
+    input: the dashboard dict structure and the fit model 'alxx..' instance
+           the actual model contains 'al' plus 'xx', ..
+           the present method considers only the latter FOR PLOTTING ONLY 
+           (USE int2_method for the actual calib fit)
+    output: a list of methods for calib fits, in the order of the 'xx..' model components 
+            (skipping al) for the use of mumodel._add_single_.
+    Invoked by the iMinuit initializing call
+             self._the_model_._load_data_, 
+    just before submitting migrad, 
+    self._the_model_ is an instance of mumodel 
+     
+    This function applies tools.translate to the parameter numbers in formulas
+    since on the dash each parameter of each component gets an internal number,
+    but alpha is popped and shared or formula-determined ('=') ones are not minuit parameters  
+    """
+    from mujpy.tools.tools import translate
+
+    model_guess = dashboard['model_guess']  # guess surely exists
+
+    ntot = sum([len(model_guess[k]['pardicts']) for k in range(len(model_guess))])-1 # minus alpha
+    lmin = [] # initialize the minuit parameter index of dashboard function indices 
+    nint = -1 # initialize the number of internal parameters
+    nmin = -1 # initialize the number of minuit parameters
+    method_key = []
+    function = [pardict['function'] for component in model_guess for pardict in component['pardicts']]
+    for k in range(1,len(model_guess)):  # scan the model popping 'al' and its parameter 'alpha'
+        name = model_guess[k]['name']
+        # print('name = {}, model = {}'.format(name,self._the_model_))
+        bndmthd = the_model.__getattribute__(name) 
+        keys = []
+        # isminuit = [] not used
+        flag = [item['flag'] for item in model_guess[k]['pardicts']]
+        for j,pardict in enumerate(model_guess[k]['pardicts']): 
+            nint += 1  # internal parameter incremente always   
+            if flag[j] == '=': #  function is written in terms of nint
+                # nint must be translated into nmin 
+                string = translate(lmin,pardict['function']) # here is where lmin is used
+                # translate substitutes lmin[n] where n is the index read in the function (e.g. p[3])
+                keys.append(string) # the function will be eval-uated, eval(key) inside mucomponents
+                # isminuit.append(False)
+                lmin.append(ntot+1) # an illegal index, was working with lmin.append(0)
+            else:# flag[j] == '~' or flag[j] == '!'
+                nmin += 1
+                keys.append('p['+str(nmin)+']')  # this also needs direct translation                      
+                lmin.append(nmin) # 
+                # isminuit.append(True)
+        method_key.append([bndmthd,keys]) 
+    return method_key
+
+
+#def int2min_multirun(dashboard,runs,guess=True):
+#    """
+#    deprecated
+#    input: 
+#        dashboard
+#        runs not used, for compatibility
+#        guess = True (defaut), False for results in nmufitplot
+#            either dashboard["userpardicts_guess"] if guess = True
+#            or  dashboard["userpardicts_result"] if guess = False
+#    output: a list of lists:  
+#        values: minuit parameter values, either guess of result
+#        errors: their steps
+#        fixed: True/False for each
+#        limits: [low, high] limits for each or [None,None]  
+#        name: name of parameter 'x_label' for each parameter
+#        pospar: parameter for which component is positive parity, eg s in e^{-(s*t)^2/2}
+#    """
+#
+#    pardicts = dashboard["userpardicts_result"] if "userpardicts_result" in dashboard.keys() else dashboard["userpardicts_guess"]    
+#    model = dashboard["model_result"] if "model_result" in dashboard.keys() else dashboard["model_guess"]
+#
+#    positive_parity = ['Δ','σ']                                                    
+#    #####################################################
+#    # the following variables contain the same as input #
+#    # parameters to iMinuit, removing '='s (functions)  #
+#    #####################################################
+#                                                        
+#    val, err, fix, lim = [], [], [], []           
+#    name = []
+#    pospar = [] # contains index of positive parity parameters, to rerun with no limits
+#    hash_parameter_id = []
+#    # first scan the global and local user parameters 
+#    
+#    for k,pardict in enumerate(pardicts):  # scan the model components
+#        if 'positive_parity' in pardict.keys(): 
+#            if pardict["positive_parity"]:
+#                posparc.append(k)
+#                pardict['limits'][0] = 0. 
+#            # print('debug tools int2min_multirun: pospar {} lim({}) = {}'.format(pardict["name"],k, pardict['limits']))
+#        errstd = 'error' if 'error' in pardict.keys() else 'std'
+#        val.append(pardict['value'])
+#        name.append(pardict['name'])
+#        err.append(pardict[errstd])
+#        if 'limits' in pardict.keys():
+#            lim.append(pardict['limits'])
+#        if 'flag' in pardict.keys():
+#            if pardict['flag'] == '!':
+#                    fix.append(True)
+#                elif pardict['flag'] == '~':
+#                    fix.append(False)
+#                elif pardict['flag'] == '#':
+#                    fix.append(False)
+# 
+#        else: # no 'flag' assume '~'
+#            fix.append(False)
+#    kloc = k-nlocals
+#    # print('debug tools int2min_multirun: pospar_local {}\nuser_local = {}'.format(pospar_loc,user_local))
+##    print('debug tools int2min_multirun: kloc = {}, len(fix) is {}'.format(kloc,len(fix)))
+##    print('first the userpars\nval = {}\nerr = {}\nfix = {}\nlim = {}\ncomp name = {},\npar name = {} '.format(val,err,fix,lim,name)) 
+#        
+#    # now scan the runs andcreate as many replicas of the local paratmeters
+#    for krun,run in enumerate(runs): # run[0] is a string with the run number
+#        # "value" may be a single guess value for all or a list of guess values, one per run, checked at start
+#        for kusr,usr in enumerate(user_local): # first the local user parameter names 
+#            kloc += 1
+#            fix.append(False) # can only be not-fixed 
+#            if kusr in pospar_loc: 
+#                pospar.append(kloc) # this parameter is run version of a positive parity user local par
+#            if type(usr["value"])==list: 
+#                # print('list = {}, krun = {}'.format(usr["value"],krun))
+#                val.append(usr["value"][krun])
+#            else:
+#                val.append(usr["value"])
+#            name.append(usr["name"]+'_'+run[0])
+#            errstd = 'error' if 'error' in usr.keys() else 'std'
+#            if type(usr[errstd])==list: 
+#                err.append(usr[errstd][krun]) 
+#            else: 
+#                err.append(usr[errstd])
+#            lim.append(usr['limits'])
+#            
+#        for component in model:  # then scan the model components and add only non "="-flag parameters
+#            label = component['label']
+#            for k,pardict in enumerate(component['pardicts']):  # list of dictionaries
+#                if pardict['flag'] != '=': # minuit parameter
+#                    kloc += 1
+#                    if pardict["name"][0] in positive_parity: 
+#                        pospar.append(kloc)
+#                        pardict['limits'][0] = 0.
+#                        # print('debug tools int2min_multirun: pospar {} lim({}) = {}'.format(pardict["name"],k, pardict['limits']))
+#                    if pardict['flag'] == '~':
+#                        fix.append(False)
+#                    elif pardict['flag'] == '!':
+#                        fix.append(True)
+##                    else:
+##                        print('debug tools int2min_multirun: kloc = {}, pardict["flag"] is {}'.format(kloc,pardict['flag']))
+#                    if type(pardict["value"])==list: 
+#                        #print('val = {}, krun = {}'.format(pardict["value"],krun))
+#                        val.append(pardict["value"][krun]) 
+#                    else: 
+#                        val.append(pardict["value"])
+#                    name.append(pardict['name']+'_'+label+'_'+run[0]) 
+#                    errstd = 'error' if 'error' in pardict.keys() else 'std'
+#                    if type(pardict[errstd])==list: 
+#                        err.append(pardict[errstd][krun])
+#                    else: 
+#                        err.append(pardict[errstd])
+#                    lim.append(pardict['limits'])
+#                    pre = 0
+#                    for k in pospar_loc:
+#                        if k not in pospar: 
+#                            pospar.insert(pre,k)
+#                            pre += 1
+##    print('debug tools int2min_multirun: kloc = {}, len(fix) is {}'.format(kloc,len(fix)))
+#    return val, err, fix, lim, name, pospar # all simple lists of sequential parameters, minuit order 
+
+#    print('debug tools int2min_multirun: pospar_local {}\nuser_local = {}'.format(pospar_loc,user_local))
+#    print('debug tools int2min: runs {}'.format([runs[k][0] for k in range(len(runs))])) 
+
+def int2min_multigroup(dashboard,runs,guess=True):
+    """
+    Deprecated
+
+    input: 
+        dashboard
+        runs not used, for compatibility
+        guess = True (defaut), False for results in nmufitplot
+            either dashboard["userpardicts_guess"] if guess = True
+            or  dashboard["userpardicts_result"] if guess = False
+    output: a list of lists:  
+        values: minuit parameter values, either guess of result
+        errors: their steps
+        fixed: True/False for each
+        limits: [low, high] limits for each or [None,None]  
+        name: name of parameter 'x_label' for each parameter
+        pospar: parameter for which component is positive parity, eg s in e^{-(s*t)^2/2}
+    """
+
+    pardicts = dashboard['userpardicts_guess'] if guess or 'userpardicts_results' not in dashboard.keys() else dashboard['userpardicts_results']
+    
+    #####################################################
+    # the following variables contain the same as input #
+    # parameters to iMinuit, removing '='s (functions)  #
+    #####################################################
+ 
+    val, err, fix, lim = [], [], [], []           
+    name = []
+    pospar = [] # contains index of positive parity parameters, to rerun with no limits
+    for k,pardict in enumerate(pardicts):  # scan the model components
+        if 'positive_parity' in pardict.keys(): pospar.append(k)
+        errstd = 'error' if 'error' in pardict.keys() else 'std'
+        val.append(float(pardict['value']))
+        name.append(pardict['name']) 
+        err.append(float(pardict[errstd]))
+        if 'error' in pardict.keys():
+            lim.append(pardict['limits'])
+        if 'flag' in pardict.keys():
+            if pardict['flag'] == '!':
+                fix.append(True)
+            elif pardict['flag'] == '~':
+                fix.append(False)
+            else:
+                return False,_,_,_,_,_,_
+        # self.console('val = {}\nerr = {}\nfix = {}\nlim = {}\python list with more repeated valuesncomp name = {},\npar name = {} '.format(val,err,fix,lim,name)) 
+    return val, err, fix, lim, name, pospar
+
+
+#def int2_multirun_user_method_key(dashboard,the_model,nruns):
+#    """
+#    deprecated
+#    input: 
+#        dashboard, the dashboard dict structure
+#        the_model is fit._the_model_ i.e. an instance of mumodel 
+#        nruns is the numer of runs in the suite
+#    output: a list of methods and a list of lists of keys, [[key,...,key],...,[key,..,key]]
+#    the internal list is same parameter, different runs
+#    the model components 
+#            for the use of mumodel._add_multirun_.
+#            method is a component function 
+#            accepting time and a list of parameters, e.g mumodel.bl(x,A,λ)
+#            key is string defining a lambda function that produces one method parameter for a specific run, 
+#            the list is for the same parameter over diffenet runs 
+#            keys is a list of lists for all the parameters (any flag) of the component
+#            the list of [binding,keys] is over the components of the model
+#    This list of [binding, keys] allows mumodel _add_multirun_ to use the minuit p list
+#    (n_globals global user values, followed by nruns replica of 
+#     n_locals local user values and a model specific number of local (~,!) component par values)
+#    to produce component-driven vectorized values, as many values in the vector as the runs
+#    In this way minuit fcn is a vector, one fcn per run,
+#    likewise asymm, asyme are vectors (see suite for multirun)
+#    and mumodel._chisquare_ cost function sums over individual runs for a unique global chisquare
+#    Invoked by the iMinuit initializing call
+#             self._the_model_._load_data_multirun_user_
+#    just before submitting migrad
+#    """
+#    from mujpy.tools.tools import cstack, translate_multirun, set_key#, function_multi_in_components
+#    from mujpy.tools.tools import get_functions_in
+##            self._components_ is a list [[method,[key,...,key]],...,[method,[key,...,key]]], 
+##                produced by int2_multirun_user_method_key() from mujpy.tools.tools
+##                where method is an instantiation of a component, e.g. self.ml 
+##                and value = eval(key) produces the parameter value
+#    model = dashboard['model_guess']  # guess surely exists, it is a list of component dicts, e.g. for mgbl 2 dicts
+#    method_key = []
+#    bndmthd = {} # to avoid same name
+#    n_locals =  [pardict["local"] for pardict in dashboard["userpardicts_guess"]].count(True)
+#    n_globals = len(dashboard["userpardicts_guess"])-n_locals
+#    kloc = n_globals+n_locals
+#    functions_in = get_functions_in(model,kloc-1)
+#    functions_out = translate_multirun(functions_in,n_locals,kloc,nruns)   
+#    
+#
+#    # print('\n\ndebug tools int2_multirun_user_method_key functions_out = {}'.format(functions_out))
+#    for j,component in enumerate(model):  # scan the model components (as for the first run)
+#        name = component['name']
+#        keys = []
+#        # this method uses pars, a list of lists (runs) of parameter for this component, obtained by key(p) from minuit p
+#        
+#        bndmthd[name] = lambda x,*pars, name=name : cstack(the_model.__getattribute__(name),x,nruns,1,*pars)
+#        bndmthd[name].__doc__ = '"""'+name+'"""'
+#                            # no alpha in global multirun!
+#        # its pars are generated as a list of lists of the key_as_lambda functions
+#        for funcs in functions_out[j]: # funcs is a run, in the suite of runs
+#            key = []
+#            for func in funcs: # this is a parameter for this run, in the component parameters 
+#                #print('debug tools int2_multirun_user_method_key func = {}'.format(func))
+#                key_as_lambda = set_key(func) # NEW! calculates simple functions and speedup
+#                # function key will be evaluated as key(p) inside mucomponents
+#                key.append(key_as_lambda) # collect parameter key(s) of the component  
+#            keys.append(key) # create outer list adding component parameters for this run
+#        method_key.append([bndmthd[name],keys]) # vectorialized method, with its keys list of lists
+#        # appended to a list of [method,
+#        # print('debug tools int2_multirun_user_method_key: locals =\n{}'.format(globals()))
+#    return method_key
+
+
 def get_number_minuit_internal(nruns,n_globals,n_locals,model):
+    """
+    Deprecated
+
+    uses old n_locals
+    """
     k_mint = 0
     for j,component in enumerate(model):  # scan the model components (as for the first run)
         flags = [pardict["flag"] for pardict in component["pardicts"]] # these are the flags in the present component
@@ -907,7 +1827,9 @@ def get_number_minuit_internal(nruns,n_globals,n_locals,model):
     return n_globals + nruns*(n_locals + k_mint)
     
 def get_functions_in(model,kk):
-    '''
+    """
+    Deprecated
+
     input 
         model = single-run model dashboard dict
         kk = kloc -1, is incremented at each free parameter of the model, so that it scans the internal minuit indices
@@ -915,7 +1837,7 @@ def get_functions_in(model,kk):
     output 
         functions_in = list of lists, one per component, of user functs, one per parameter, for the single-run model, 
                        all component parameters,  including "~" and "!", are translated to appropriate user funct
-    '''
+    """
     functions_in = []
     for j,component in enumerate(model):  # scan the model components (as for the first run)
         flags = [pardict["flag"] for pardict in component["pardicts"]] # these are the flags in the present component
@@ -933,114 +1855,52 @@ def get_functions_in(model,kk):
                 function_in[k] = 'p['+str(kk)+']' # write a fake "function" to eval this parameter as 'p[kk]'
         functions_in.append(function_in)
     return functions_in
-    
-def set_key(string):   
+
+
+def checkvalidmodel(name,component_names):
     """
-    input: the function string from the json or the mudash dashboard
-         e.g. that written in the json file as 'function':'p[0]*(0.5+1/pi*arctan(p[2])'
-              or typed into mudash text widget as 'p[0]*(0.5+1/pi*arctan(p[2])'
-    output: key, a python method, such that in mumodel mucomponents _add_ the command 
-            key(p) evaluates the formula 
-            the evaluation knows simple numpy functions, see the import in string code, below
-    COMMENTS: maybe not the simplest, but it works
-    try the following in ipython3
-        from mujpy.tools.tools import set_key
-        p = [1,2,3,4]
-        key = set_key('p[2]')
-        key(p)
-    Out[] 3
+    Deprecated
+
+    checkvalidmodel(name) checks that name   
+    ::      A1, B1: 2*component string of valid component names, e.g.
+                        'mgmgbl'                
+                        following not valid anymore
+    ::      or A2, B2: same, ending with 1 digit, number of groups (max 9 groups), 
+                        'mgmgml' (2 groups)
+    ::      or C1: same, beginning with 1 digit, number of external minuit parameters (max 9)
+                        '3mgml' (3 external parameters e.g. A, f, phi)
+    ::      or C2: same, both previous options
+                        '3mgml2' (3 external parameters, 2 groups)  
     """
-    code = """
-from numpy import cos, sin, tan, sinh, cosh, tanh, log, pi, exp, sqrt, real, abs, arctan
-def foo():
-"""
-    string = "    key = eval('"+'lambda p: '+string +"')"
-    # print('string ={}'.format(string))
-    code = code + string + """
-    return key
-"""
-    # print('code = {}'.format(code))
-    exec(code,globals(),globals())   # foo is defined by executing code
-    return eval('foo()') # key = set_key('p[2') when p = [10,11,12,13], key(p) returns 12  
-        
-def cstack(npfunc,x,*pars):
-    '''
-    vectorialize npfunc
-    input: 
-        npfunc numpy function with input (x,*argv)
-        x time
-        *pars is a list of lists of parameters, 
-              list len n is the output_function_array.shape[0]
-    output:
-        output_function_array
-            stacks vertically n replica of npfunc distributing parameters as in
-            (x, *argv[i]) for each i-th replica 
-    '''
-    # cstack reproduces the parameter input of a component according to         
-    # self._components_ = [[method,[key,...,key]],...,[method,[key,...,key]]], and eval(key) produces the parmeter value
-    # where the outer list a replica of the same component method 
-    # either over several groups (multigroup) or over several runs (multirun)
-    # as of now this method does not work for the multirun multigroup userpar case (C2)
 
-    from numpy import concatenate 
-    # print('debug tools.cstack: npfunc = {} pars = {}'.format(npfunc,pars))
-    # reshape makes as many rows as necessary, each with x.shape[0] columns   
-    return concatenate([npfunc(x,*par) for par in pars]).reshape(-1,x.shape[0])
-    
-def int2_calib_method_key(dashboard,the_model):
-    '''
-    NOT USED, remove
-    input: the dashboard dict structure and the fit model 'alxx..' instance
-           the actual model contains 'al' plus 'xx', ..
-           the present method considers only the latter FOR PLOTTING ONLY 
-           (USE int2_method for the actual calib fit)
-    output: a list of methods for calib fits, in the order of the 'xx..' model components 
-            (skipping al) for the use of mumodel._add_single_.
-    Invoked by the iMinuit initializing call
-             self._the_model_._load_data_, 
-    just before submitting migrad, 
-    self._the_model_ is an instance of mumodel 
-     
-    This function applies tools.translate to the parameter numbers in formulas
-    since on the dash each parameter of each component gets an internal number,
-    but alpha is popped and shared or formula-determined ('=') ones are not minuit parameters  
-    '''
-    from mujpy.tools.tools import translate
+    from mujpy.tools.tools import modelstrip
 
-    model_guess = dashboard['model_guess']  # guess surely exists
-
-    ntot = sum([len(model_guess[k]['pardicts']) for k in range(len(model_guess))])-1 # minus alpha
-    lmin = [] # initialize the minuit parameter index of dashboard function indices 
-    nint = -1 # initialize the number of internal parameters
-    nmin = -1 # initialize the number of minuit parameters
-    method_key = []
-    function = [pardict['function'] for component in model_guess for pardict in component['pardicts']]
-    for k in range(1,len(model_guess)):  # scan the model popping 'al' and its parameter 'alpha'
-        name = model_guess[k]['name']
-        # print('name = {}, model = {}'.format(name,self._the_model_))
-        bndmthd = the_model.__getattribute__(name) 
-        keys = []
-        # isminuit = [] not used
-        flag = [item['flag'] for item in model_guess[k]['pardicts']]
-        for j,pardict in enumerate(model_guess[k]['pardicts']): 
-            nint += 1  # internal parameter incremente always   
-            if flag[j] == '=': #  function is written in terms of nint
-                # nint must be translated into nmin 
-                string = translate(nint,lmin,pardict['function']) # here is where lmin is used
-                # translate substitutes lmin[n] where n is the index read in the function (e.g. p[3])
-                keys.append(string) # the function will be eval-uated, eval(key) inside mucomponents
-                # isminuit.append(False)
-                lmin.append(0)
-            else:# flag[j] == '~' or flag[j] == '!'
-                nmin += 1
-                keys.append('p['+str(nmin)+']')  # this also needs direct translation                      
-                lmin.append(nmin) # 
-                # isminuit.append(True)
-        method_key.append([bndmthd,keys]) 
-    return method_key
+    try:
+        name, nexternals = modelstrip(name)
+    except:
+        # self.console('name error: '+name+' contains too many externals or groups (max 9 each)')
+        error_msg = 'name error: '+name+' contains too many externals or groups (max 9 each)'
+        return False, error_msg # err code mess
+    # decode model
+    numberofda = 0
+    components = [name[i:i+2] for i in range(0, len(name), 2)]
+    for component in components: 
+        if component == 'da':
+            numberofda += 1           
+        if component == 'al':
+            numberofda += 1           
+        if numberofda > 1:
+            # self.console('name error: '+name+' contains too many da. Not added.')
+            error_msg = 'name error: '+name+' contains too many da/al. Not added.'
+            return False, error_msg # error code, message
+        if component not in component_names:
+            # self.console()
+            error_msg = 'name error: '+component+' is not a known component. Not added.'
+            return False, error_msg # error code, message
+    return True, None
 
 def int2_calib_multigroup_method_key(dashboard,the_model):
-    '''
+    """
     NOT USED, remove
     input: the dashboard dict structure and the fit model 'alxx..' instance
            the actual model contains 'al' plus 'xx', ..
@@ -1056,7 +1916,7 @@ def int2_calib_multigroup_method_key(dashboard,the_model):
     This function applies tools.translate to the parameter numbers in formulas
     since on the dash each parameter of each component gets an internal number,
     but alpha is popped and shared or formula-determined ('=') ones are not minuit parameters  
-    '''
+    """
     from mujpy.tools.tools import translate
     model_guess = dashboard['model_guess']  # guess surely exists
 
@@ -1077,7 +1937,7 @@ def int2_calib_multigroup_method_key(dashboard,the_model):
             nint += 1  # internal parameter incremente always   
             if flag[j] == '=': #  function is written in terms of nint
                 # nint must be translated into nmin 
-                string = translate(nint,lmin,pardict['function']) # here is where lmin is used
+                string = translate(lmin,pardict['function']) # here is where lmin is used
                 # translate substitutes lmin[n] where n is the index read in the function (e.g. p[3])
                 keys.append(string) # the function will be eval-uated, eval(key) inside mucomponents
                 # isminuit.append(False)
@@ -1090,70 +1950,16 @@ def int2_calib_multigroup_method_key(dashboard,the_model):
         method_key.append([bndmthd,keys]) 
     return method_key
 
-def min2int(model_guess,values_in,errors_in):
-    '''
-    input:
-        model_component from dashboard
-        values_in Minuit.values
-        errors_in Minuit.errors
-    output: for all dashbord parameters
-        names list of lists of parameter names
-        values_out list of lists of their values
-        errors_out list of lists of their errors
-    reconstruct dashboard with Minuit best fit values and errors
-    for print_components, compact fit summary 
-    '''
-    # 
-    # initialize
-    #
-    from mujpy.tools.tools import translate
-
-    names, values_out, p, errors_out, e = [], [], [], [], []
-    nint = -1 # initialize
-    nmin = -1
-    lmin = []
-    flag = [pardict['flag'] for component in model_guess for pardict in component['pardicts']]
-    for k,component in enumerate(model_guess):  # scan the model
-        component_name = component['name']
-        name, value, error = [], [], []
-        label = model_guess[k]['label']
-        
-        for j,pardict in enumerate(model_guess[k]['pardicts']): # list of dictionaries, par is a dictionary
-            nint += 1  # internal parameter incremented always
-            if j==0:
-                name.append('{}{}_{}'.format(component_name,pardict['name'],label))
-            else:
-                name.append('{}_{}'.format(pardict['name'],label))
-            if flag[nint] != '=': #  skip functions, they are not new minuit parameter
-                nmin += 1
-                lmin.append(nmin)
-                p.append(values_in[nmin]) # needed also by functions
-                value.append(values_in[nmin])
-                # print('diretto p_in[{}] = {} -> {}'.format(nmin,p[-1],value[-1]))
-                e.append(errors_in[nmin])
-                error.append(errors_in[nmin]) # parvalue item is a string
-            else: # functions, calculate as such
-                # nint must be translated into nmin 
-                string = translate(nint,lmin,pardict['function'])  
-                p.append(eval(string))
-                value.append(eval(string))
-                # print('{} shared p_in = {} -> {}'.format(string,p[-1],value[-1]))
-                e.append(eval(string.replace('p','e')))
-                error.append(eval(string.replace('p','e'))) # this is where e is used
-                lmin.append(0) # not needed
-        names.append(name)
-        values_out.append(value)
-        errors_out.append(error)
-    return names, values_out, errors_out # list of parameter values 
-
 def min2int_multirun(dashboard,p,e,_the_runs_):
-    '''
+    """
+    Deprecated
+
     input:
         dashboard;  userpardicts_guess and model_guess from 
             used only to retrieve "function" or "function_multi" 
             and "error_propagation_multi"
         p,e Minuit best fit parameter values and std
-        _th_runs_ = list of run numbers in suite
+        _the_runs_ = list of run numbers in suite
     output: for all parameters
         names list of lists of parameter names
         pars list of lists ofparameter values
@@ -1161,12 +1967,12 @@ def min2int_multirun(dashboard,p,e,_the_runs_):
     used only in summary_multirun_global that prints name value(error) 
         one or more lines of global user parameters (the first list in the inner lists)
         one line per run local user parameters and local component parameters (the others)
-    '''
+    """
+
     # 
     # initialize
     #
 #    from mujpy.tools.tools import function_multi_in_components
-
     names, pars, epars = [], [], []
     nameloc, npars, n_locals = [], -1, 0# inner list, components
     name, par, epar = [], [], []
@@ -1186,7 +1992,7 @@ def min2int_multirun(dashboard,p,e,_the_runs_):
     pars.append(par)
     epars.append(epar)
     model = dashboard['model_guess']
-    for run in range(len(_the_runs_)):
+    for run in range(nruns):
         name, par, epar = [], [], []# inner list
         for k in range(n_locals):
             npars += 1
@@ -1209,19 +2015,22 @@ def min2int_multirun(dashboard,p,e,_the_runs_):
     return names, pars, epars  # list of lists of parameter names, values, errors
 
 def min2int_multigroup(dashboard,p,e):
-    '''
+    """
+    Deprecated
+
     input:
-        userpardicts_guess from dashboard 
-            (each dict corresponds to a Minuit parameter)
-            used only to retrieve "function" 
-            and "error_propagation_multi"
-            p,e Minuit best fit parameter values and std
-    output: for all parameters
-        namesg list of lists of dashboard parameter names
-        parsg list of lists of dashboard parameter values
-        eparsg list of lists of dashboard parameter errors
+        dashboard:  full dashboard 
+                    to retrieve "function" and "error_propagation_multi"
+        p,e:        Minuit best fit parameter values and std
+    output: for all groups, all components, all parameters  
+        namesg:     list of lists of list of dashboard parameter names
+        parsg:      list of lists of list of dashboard parameter values
+        eparsg:     list of lists of list of dashboard parameter errors
     used only in summary_global
-    '''
+    e.g. bgbl for 2 groups yields namesg = [[['bgA0','σ0'],['bgA1','λ1']],[['bgA0','σ0'],['bgA1','λ1']]]
+                                                   first group                   second group     
+    """
+
     # 
     # initialize
     #
@@ -1231,12 +2040,12 @@ def min2int_multigroup(dashboard,p,e):
     for k in range(len(p)):
         mask_function_multi = function_multi_in_components(dashboard)
     userpardicts = dashboard['userpardicts_guess']  
-    e = [e[k] if pardict['flag']=='~' else 0 for k,pardict in enumerate(userpardicts)]
+    e = [e[k] if pardict['flag']=='~' else 0 for k,pardict in enumerate(userpardicts)] # redundant? e=0 for flag "!"
     # names = [pardict['name'] for pardict in userpardicts]
 
     model = dashboard['model_guess']
     pardicts = [pardict for component in model for pardict in component['pardicts']]
-    ngroups = len(pardicts[mask_function_multi.index(1)]["function_multi"])
+    ngroups = len(pardicts[mask_function_multi.index(1)]["function_multi"]) # liist.index(1) is the index of the first occurrence
     nint = -1 # initialize
     namesg, parsg, eparsg = [], [], []
     for l in range(ngroups):
@@ -1272,136 +2081,12 @@ def min2int_multigroup(dashboard,p,e):
         namesg.append(names)
         parsg.append(pars)
         eparsg.append(epars) 
-    return namesg, parsg, eparsg  # list of parameter values
-    
-def minglobal2sequential(p_out,p_in,method_keys,dashboard):
-    '''
-    translate global best fit results (values) into nruns equivalent sequential fits
-    for plotting purposes: mufitplot(plot_range,the_fit) will access
-    self.fit.lastfits and self.fit.dashboard_single if self.fit.C1 is True
-    input:
-       p_out is global best fit minuit parameters self.lastfit
-       p_in is global fit minuit guess parameters values_in
-       method_key is produced by int2_multirun_user_method_key
-       dashboard is the fit global dashboard
-       results toggles between plotting result of guess
-    output:
-       lastfits,  list of lists of best fits, in the style of multirun sequential single group (B1)
-       dashboard_single (a dashboard that produces a single run best fit function for animated plots) 
-    '''
-    from copy import deepcopy    
-    # values are: 
-    #     first the user globals, 
-    #     then the run replica: first the user locals, then the free model parameters 
-    # for each run must reconstruct a simple model_guess, model_result dashboard (no userpardicts)
-    # with its '=' flag parameters translated in '!' flag with value calculated by key (from function)
-    lastfits = []
-    userpars_g, userpars_r = dashboard["userpardicts_guess"],dashboard["userpardicts_result"]
-    n_locals =  [pardict["local"] for pardict in userpars_g].count(True)
-    n_globals = len(userpars_g)-n_locals
-    # could also simply transfer p = self.fit.lastfit.values
-#    for krun in range(len(values[1:])): # i.e. in range(n_runs)
-    par = [] # list of single-run equivalent best fit parameters
-    # scan method_keys = [[mthd,[[key,...,key],...,[key,,...,key]]],..,[mthd,[[key,...,key]...]]]
-    #                   outer components, middle runs, inner component parameters
-    dash = deepcopy(dashboard)
-    dash.pop("userpardicts_guess")
-    if "userpardicts_result" in dash.keys(): dash.pop("userpardicts_result")
-    model_in, model_out = [],[]
-    if "model_result" not in dash.keys():
-        dash["model_result"] = dash["model_guess"] # make sure model_result exists in dash
-    for jcomp,method_key in enumerate(method_keys): # components
-        method, keys = method_key # component method and run-by-run list of keys
-        model_guess_component = dash["model_guess"][jcomp]
-        model_result_component = dash["model_result"][jcomp] 
-        pars_in, pars_out = [], []
-        for krun, runkeys in enumerate(keys): # single run                    
-            par_in, par_out = [],[] # each run has its set of parameters
-            for kpar,key in enumerate(runkeys):
-                par_in.append(key(p_in))
-                par_out.append(key(p_out))
-                # transform all keys in "~" or "!"
-                if model_guess_component["pardicts"][kpar]["flag"]=='=': # turn them in "!"
-                    model_guess_component["pardicts"][kpar]["flag"] = '!'
-                    model_result_component["pardicts"][kpar]["flag"] = '!' 
-                if type(model_guess_component["pardicts"][kpar]["value"]) is list: 
-                    model_guess_component["pardicts"][kpar]["value"] = model_guess_component["pardicts"][kpar]["value"][0]
-                    model_result_component["pardicts"][kpar]["value"] = model_result_component["pardicts"][kpar]["value"][0]
-                if type(model_guess_component["pardicts"][kpar]["error"]) is list: 
-                    model_guess_component["pardicts"][kpar]["error"] = model_guess_component["pardicts"][kpar]["error"][0]
-                    model_result_component["pardicts"][kpar]["error"] = model_result_component["pardicts"][kpar]["error"][0]
-            pars_in.append(par_in) # list of run lists has its set of parameters
-            pars_out.append(par_out) 
-        dash["model_guess"][jcomp] = model_guess_component
-        dash["model_result"][jcomp] = model_result_component
-        model_in.append(pars_in)
-        model_out.append(pars_out)
-# model is in [model [run [component]]] nesting order
-    pars_in, pars_out, p_in, p_out = [], [], [], []
-    n_runs = len(model_in[0]) #
-    n_components = len(model_in)      
-    for component_in,component_out in zip(model_in,model_out): # component contains all runs
-        for krun in range(n_runs):       
-            pars_in.append(component_in[krun]) # 
-            pars_out.append(component_out[krun])
-    for krun in range(n_runs):
-        par_in, par_out  = [], []
-        for component in range(n_components):
-            par_in += pars_in[krun+component] 
-            par_out += pars_out[krun+component] 
-        p_in.append(par_in)
-        p_out.append(par_out)
-    #print('debug tools minglobal2sequential: p_in = {}'.format(p_in))
-       
-# now the list is in the [run [model [component]]] nesting order
-    return p_in,p_out, dash
-            
-def len_print_components(names,values,errors):
-	'''
-	input: for a component
-		parameter names 
-		parameter values 
-		parameter errors 
-	output:
-	    max length of string to print, e.g.
-	    "bl.A_fast 0.123(4) bl.λ_fast 12.3(4) bl.σ_fast 0(0)"
-	'''
-	from mujpy.tools.tools import value_error
-	out = [' '.join([names[k],'=',value_error(values[k],errors[k])]) for k in range(len(names))]
-	maxlen = len(max(out,key=len))
-	return maxlen
-    
-def print_components(names,values,errors,maxlen):
-	'''
-	input: for a component
-		parameter names 
-		parameter values 
-		parameter errors 
-	output:
-	    string to print, e.g.
-	    "bl.A_fast 0.123(4) bl.λ_fast 12.3(4) bl.σ_fast 0(0)"
-	'''
-	from mujpy.tools.tools import value_error
-	out = [' '.join([names[k],'=',value_error(values[k],errors[k])]) for k in range(len(names))]
-	out = [out[k]+(maxlen-len(out[k]))*' ' for k in range(len(out))]
-	return " ".join(out)
-
-def print_csv_components(values,errors):
-    '''
-    input: for a component
-        parameter values
-        parameter errors
-    output:
-        string to print, see print_components for this e.g.
-        "0.123,0.004,12.3,0.4,0,0,"
-        notice! ends with ","
-        '''
-    from mujpy.tools.tools import value_error_csv
-    return ''.join(value_error_csv(values[k],errors[k]) for k in range(len(values)))
-
+    return namesg, parsg, eparsg  # list of list of list of parameter names, values, stds
 
 def len_print_components_multirun(names,values,errors):
-	'''
+	"""
+    Deprecated
+
 	input: for a component
 		parameter names 
 		parameter values 
@@ -1409,7 +2094,8 @@ def len_print_components_multirun(names,values,errors):
 	output:
 	    max length of string to print, e.g.
 	    "bl.A_fast 0.123(4) bl.λ_fast 12.3(4) bl.σ_fast 0(0)"
-	'''
+	"""
+
 	from mujpy.tools.tools import value_error
 	outname = [' '+names[k] for k in range(len(names))]
 	outval = [' '+value_error(values[k],errors[k]) for k in range(len(names))]
@@ -1417,7 +2103,9 @@ def len_print_components_multirun(names,values,errors):
 	return maxlen
     
 def print_components_multirun(names,values,errors,maxlen):
-	'''
+	"""
+    Deprecated
+
 	input: for a component
 		parameter names 
 		parameter values 
@@ -1426,7 +2114,8 @@ def print_components_multirun(names,values,errors,maxlen):
 	    strings to print, e.g.
 	    "A.fast    λ.fast    σ.fast"
 	    "0.123(4)  12.3(4)   0(0)"
-	'''
+	"""
+
 	from mujpy.tools.tools import value_error
 	outnam = [' '+names[k] for k in range(len(names))]
 	outnam = [outnam[k]+(maxlen-len(outnam[k]))*' ' for k in range(len(outnam))]
@@ -1434,138 +2123,13 @@ def print_components_multirun(names,values,errors,maxlen):
 	outval = [outval[k]+(maxlen-len(outval[k]))*' ' for k in range(len(outval))]
 	return "".join(outnam), "".join(outval)
 	
-def mixer(t,y,f0):
-    '''
-    mixer of a time-signal with a reference 
-    input
-        t time
-        y the time-signal
-        f0 frequency of the cosine reference
-    output
-        y_rrf = 2*y*cos(2*pi*f0*t)  
-    t is 1d and y is 1-d, 2-d or 3-d but t.shape[0] == y.shape[-1]
-    t is vstack-ed to be the same shape as y
-    '''
-    from mujpy.tools.tools import fft_filter
-    from numpy import pi, cos, vstack, fft, delete
-    ydim, tdim = len(y.shape), len(t.shape)
-    # print('tools mixer debug 1: y t shape {}, {}'.format(y.shape,t.shape))
-    if tdim == 1: # must replicate t to the same dimensions as y 
-        if ydim ==2:
-            for k in range(ydim):
-                if k:
-                    time = vstack((time,t))
-                else:
-                    time = t
-            t = time
-        elif ydim==3: # max is ydim = 3
-            for j in range(len.shape[-1]):
-                for k in len.shape[-2]:
-                    if k:
-                        time = vstack((time,t))
-                    else:
-                        time = t
-                if j:
-                    for l in len.shape[-1]:
-                        tim = vstack((tim,time))
-                    else:
-                        tim = time
-            t = tim 
-    n = t.shape[-1] # apodize by zero padding to an even number
-    yf = fft.irfft(fft_filter(t,fft.rfft(2*y*cos(2*pi*f0*t),n=n+1),f0),n=2*n)
-    # now delete padded zeros 
-    mindex = range(n,2*n)
-    yf =delete(yf,mindex,-1)
-    # print('tools mixer debug 3: yf shape {}'.format(yf.shape))
-    return yf
-    
-def fft_filter(t,fy,f0):
-    '''
-    filter above 0.2*fy peak freq 
-    works for 1-2 d
-    '''
-    from numpy import arange, mgrid, where
-    # determine max frequency fmax
-    leny = len(fy.shape)
-    if leny == 1:
-        dt = t[1]-t[0]
-        # array f of fourier component indices (real fft, 0 to fmax)
-        m = fy.shape
-        f = arange(m) 
-    elif leny == 2:
-        dt = t[0,1]-t[0,0]
-        # find peak in rfft below the rrf frequency f0
-        # array f of fourier component indices (real fft, 0 to fmax)
-        n,m = fy.shape
-        _,f = mgrid[0:n,0:m] 
-    else:
-        dt = t[0,0,1]-t[0,0,0]
-        l,n,m = fy.shape
-        _,_,f = mgrid[0:l,0:n,0:m] 
-                
-    fmax = 1/2/dt
-    mask = (f<=f0/fmax*m).astype(int)
-    # find where fy has a peak, below the rrf frequency f0
-    if leny == 1:
-        npeak = where(abs(fy)==abs(mask*fy).max()).max()
-    elif leny == 2:
-        npeak = where(abs(fy)==abs(mask*fy).max())[1].max()
-    else:
-        npeak = where(fy==(mask*fy).max())[2].max()    
-    mask = (f<=2*npeak).astype(int)
-    # print('tools fft_filter debug 2: fy {},mask {} shape'.format(fy.shape,mask.shape))    
-    return fy*mask
-    
-def model_name(dashboard):
-    '''
-    input the dashboard dictionary structure
-    output the model name (e.g. 'mgbgbl') 
-    '''    
-    return ''.join([item for component in dashboard["model_guess"] for item in component["name"]])
-    
-def userpars(dashboard):
-    '''
-    checks if there are userpardicts in the fit dashboard
-    alias of global type fit, of any kind (gg, gr, G)
-    used by fit and plt switchyard
-    '''
-    return "userpardicts_guess" in dashboard
-
-def userlocals(dashboard):
-    '''
-    input:
-        full dashboard
-    output:
-        True is "userpardicts_local" in dashboard.keys 
-    '''
-    return "userpardicts_local" in dashboard    
-
-def function_multi_in_components(dashboard):
-    '''
-    input full dashboard
-    output mask list, 
-        len is sum of number of parameters in components of "model_guess"
-        True where parameter pardict contains "function_multi" key
-        False otherwise
-    '''
-
-    return ['function_multi' in pardict.keys() for component in dashboard["model_guess"]  for pardict in component["pardicts"]]                                
-                            
-def stringify_groups(groups):
-    '''
-    returns a unique string for many groups
-    to use in json file name
-    '''
-    strgrp = []
-    for group in groups: 
-        fgroup, bgroup = group['forward'],group['backward']
-        strgrp.append(fgroup.replace(',','_')+'-'+bgroup.replace(',','_'))
-    return '_'.join(strgrp)
-
 def modelstrip(name):
-    '''
+    """
+    Deprecated
+
     strips numbers of external parameters at beginning of model name
-    '''
+    """
+
     import re
     nexternals, ngroups = 0, 0
     # strip the name and extract number of external parameters
@@ -1592,17 +2156,19 @@ def modelstrip(name):
 ##############
 
 def name_of_model(model_components,model):
-    '''
-    check if model_components list of dictionaries correstponds to model
-    '''
+    """
+    mudash check if model_components list of dictionaries correstponds to model
+    """
+
     content = []
     for component in model_components:
         content.append(component["name"])
     return True if ''.join(content) == model else False
 
 def create_model(model):
-    '''
-    create_model('daml') # adds e.g. the two component 'da' 'ml' model
+    """
+    mudash create_model('alml') # adds e.g. the two component 'al' 'ml' model
+    
     this method 
     does not check syntax (prechecked by checkvalidmodel)
        ? separates nexternals number from model name (e.g. '3mgml' -> 'mgml', 3)
@@ -1610,7 +2176,8 @@ def create_model(model):
     adds a model of components selected from the available_component tuple of  
     directories
     with zeroed values, stepbounds from available_components, flags set to '~' and zeros functions
-    '''
+    """
+
     import string
     from mujpy.tools.tools import addcomponent, _available_components_
     # print('create_model: {}'.format(model))
@@ -1627,13 +2194,13 @@ def create_model(model):
     return model_guess, '' # list of component dictionaries
 
 def addcomponent(name):
-    '''
+    """
     addcomponent('ml') # adds e.g. a mu precessing, lorentzian decay, component
     this method adds a component selected from _available_components_(), tuple of directories
     with zeroed values, error and limits from available_components, 
     flags set to '~' and zeros functions
     [plan also addgroupcomponents and addruncomponents (for A2, B2, C1, C2)]
-    '''
+    """
     from copy import deepcopy
     from mujpy.tools.tools import _available_components_
     available_components =_available_components_() # creates list automagically from mucomponents
@@ -1670,9 +2237,9 @@ def addcomponent(name):
 
 
 def chi2std(nu):
-    '''
+    """
     computes 1 std for least square chi2
-    '''
+    """
     import numpy as np
     from scipy.special import gammainc
     from scipy.stats import norm
@@ -1685,14 +2252,14 @@ def chi2std(nu):
     return lc, hc
 
 def component(model,kin):
-    '''
+    """
     returns the index of the component to which parameter k belongs in
     model = self.model_guess, in mugui, a list of complex dictionaries::
             [{'name':'da', 'pardicts':{'name':'lpha',...},
             {'name':'mg', 'pardicts':{       ...       }]
             
     kin is the index of a dashboard parameter (kint)
-    '''
+    """
     from numpy import array, cumsum, argmax
     
     ncomp = len(model) # number of components in model
@@ -1705,13 +2272,13 @@ def component(model,kin):
 #############
 
 def calib(dashboard):
-    '''
+    """
     True if the first component is 'al'
-    '''
+    """
     return dashboard['model_guess'][0]['name']=='al'
             
 def derange(string,vmax,pack=1):
-    '''
+    """
     derange(string,vmax,pack=1) 
     reads string 
     assumes it contains 2, 3, 4 or 5 csv or space separated values
@@ -1725,7 +2292,7 @@ def derange(string,vmax,pack=1):
     returns 2, 3, 4 or 5 floats or int, or 
     default values, 0,vmax,pack, if fails validity check (stop>start, bin <stop-start, last < vmax) 
     errmsg = '' in ok, a string indicates errors       
-    '''
+    """
     
     # print('In derange, string = {}'.format(string))
     errmsg = ''
@@ -1755,7 +2322,7 @@ def derange(string,vmax,pack=1):
     return x_range, errmsg # a list of values (int or float as appropriate)
     
 def derun(string):
-    '''
+    """
     parses string, producing a list of runs; 
     expects comma separated items
 
@@ -1766,7 +2333,7 @@ def derun(string):
     rejects all other characters
 
     returns a list of lists of integer
-    '''
+    """
     import re
     s = []
     try:
@@ -1781,7 +2348,7 @@ def derun(string):
             kplus = b.find('+')
             #print(kminus,kcolon,kplus)
 
-            if kminus<0 and kcolon<0 and kplus<0: # single run
+            if kminus<0 and kcolon<0 and kplus<0: # single run, no run addition
                 int(b) # produces an Error if b is not an integer
                 s.append([b]) # append single run string   
             else:
@@ -1818,16 +2385,16 @@ def derun(string):
                             s.append(sss)
         return s, None
     except:
-        return [], 'error to be debugged'
+        return [], 'error to be debugged, check musuite runlist'
         
 def run_shorthand(runstrings):
-    '''
+    """
     write the runlist contained in runstrings (suite self.runs produced by derun)
         i.e. a list of lists, with separate run numbers in string format, the inner ones  to be added 
     in a compact string, with space separated notation
     e.g.
     '650:655,675,656:674' 
-    '''
+    """
     # [[623],[624],[625],[626],[627,628,629], [631],[632],[633],[630]] -> 623:626 627+628+629 631:633 630
     runlists = [[int(run) for run in runstringlist] for runstringlist in runstrings]
     string = [[] for i in range(len(runlists))]
@@ -1867,24 +2434,27 @@ def run_shorthand(runstrings):
     return s
 
 def findall(p, s):
-    '''Yields all the positions of
-    the pattern p in the string s.
+    """Yields (provides an iterator for) 
+    all the positions of the pattern p in the string s.
     
+    usage:
+        for i in findall('x','xaxxa, che xifo!'):
+            print(i) 
     Used by translate.
-    '''
+    """
     i = s.find(p)
     while i != -1:
         yield i
         i = s.find(p, i+1)
 
 def find_nth(haystack, needle, n):
-    '''
+    """
     Finds nth needle in haystack 
 
     Returns its first occurrence (0 if not present)
 
     Used by ?
-    '''
+    """
     start = haystack.rfind(needle)
     while start >= 0 and n > 1:
         start = haystack.rfind(needle, 1, start-1)
@@ -1892,11 +2462,11 @@ def find_nth(haystack, needle, n):
     return start
     
 def get_datafilename(datafile,run):
-    '''
+    """
     datafilename = template, e.g. '/fullpath/deltat_gps_tdc_0935.bin'
     run = string of run digits, e.g. '1001'
     returns '/fullpath/deltat_gps_tdc_1001.bin'
-    '''
+    """
     
     import re
     datafile_suffix = datafile[-5:].split('.')[1]
@@ -1922,11 +2492,11 @@ def get_datafilename(datafile,run):
     return datafilename
 
 def get_datafile_path_ext(datafile,run):
-    '''
+    """
     datafilename = template, e.g. '/fullpath/deltat_gps_tdc_0935.bin'
     run = string of run digits, e.g. '1001'
     returns '/fullpath/deltat_gps_tdc_1001.bin'
-    '''
+    """
     import os
     path = datafile[:datafile.rfind(os.path.sep)+1] # e.g. /afs/psi.ch/projec/bulkmusr/data/gps/d2022/tdc/', works in  WIN with '\' as separator
     fileprefix = datafile[datafile.rfind(os.path.sep)+1:datafile.rfind('.')]
@@ -1983,14 +2553,14 @@ def get_grouping(groupcsv):
     return grouping
     
 def get_group(grouping):
-    '''
+    """
     reverse of get_grouping, 
     input 
         grouping is an np.array of indices of detectors , 0 based 
     output is 
         groupcsv shorthand as in self.group[k]["forward"} or self.group[k]["backward"}
           e.g '1:3,5' or '1,3,5' etc.
-    '''
+    """
     import numpy as np
     # find sequences
     groups = []
@@ -2005,19 +2575,27 @@ def get_group(grouping):
     return ','.join(groups)
     
 def getname(fullname):
-    '''
+    """
     estracts parameter name from full parameter name (i.e. name + label)
     for the time being just the first letter
-    '''
+    """
+
     return fullname[0]
 
-def init_csv_row(Bstr, filespec, the_run, group = False):
-    '''
-    writes beginning of csv row 
-    with nrun T [T eT T eT] B 
-    for ISIS [PSI]
-    '''
-    nrun = the_run.get_runNumber_int()
+def init_csv_row(filespec, the_run, group = False):
+    """
+    writes beginning of csv row with nrun T [T eT T eT] B
+
+    filespec    data mime to identify facility
+    the_run     this run instance
+    [group]     stringify(group)
+    updated for ISIS [PSI] 
+            *** must update for root datasets
+    """
+
+    nrun = str(the_run.get_runNumber_int())
+    #print('tools init_csv_row nrun {}'.format(nrun))
+    Bstr = the_run.get_field()
     if filespec=='bin' or filespec=='mdu':
         TsTc, eTsTc = the_run.get_temperatures_vector(), the_run.get_devTemperatures_vector()
         n1,n2 = spec_prec(eTsTc[0]),spec_prec(eTsTc[1]) # calculates format specifier precision
@@ -2039,7 +2617,8 @@ def init_csv_row(Bstr, filespec, the_run, group = False):
             return form.format(nrun, Ts[0], Bstr[:Bstr.find('G')])
 
 def minparam2_csv(dashboard,values_in,errors_in,multirun=0):
-    '''
+    """
+    not needed go the common way: init_csv_row prepare_csv_row write_csv for all
     transforms Minuit values Minuit errors in cvs format
     input:
         dashboard 
@@ -2054,7 +2633,7 @@ def minparam2_csv(dashboard,values_in,errors_in,multirun=0):
     output:
         cvs partial row with parameters and errors for A1, A20 and B1, or A21
             list of partial rows (one per run) for C1
-    '''
+    """
     from mujpy.tools.tools import min2int, min2int_multirun, spec_prec
 
     if multirun:
@@ -2088,12 +2667,12 @@ def minparam2_csv(dashboard,values_in,errors_in,multirun=0):
     return rows
     
 def nextrun(datapath):
-    '''
+    """
     assume datapath is path+fileprefix+runnumber+extension
     datafile is next run, runnumber incremented by one
     if datafile exists return next run, datafile
     else return runnumber and datapath
-    '''
+    """
     import os
     from mujpy.tools.tools import muzeropad
 
@@ -2113,11 +2692,11 @@ def nextrun(datapath):
     return run, datafile
 
 def thisrun(datapath):
-    '''
+    """
     assume datapath is path+fileprefix+runnumber+extension
     datafile is present run
     if datafile exists returns path to datafile
-    '''
+    """
     import os
     from mujpy.tools.tools import muzeropad
 
@@ -2134,12 +2713,12 @@ def thisrun(datapath):
     return datafile
 
 def prevrun(datapath):
-    '''
+    """
     assume datapath is path+fileprefix+runnumber+extension
     datafile is prev run, runnumber decremented by one
     if datafile exists return prev run, datafile
     else return runnumber and datapath
-    '''
+    """
     import os
     from mujpy.tools.tools import muzeropad
 
@@ -2160,25 +2739,29 @@ def prevrun(datapath):
     return run, datafile
     
 def chi2_csv(chi2,lowchi2,hichi2,alpha,offset):
-    '''
+    """
     input:
         chi2, chi2-sdt, chi2+sdt, alpha, offset (bins)
     output:
         cvs partial row with these values and timestring
-    '''
+    """
     from time import localtime, strftime
     
-    echi = min(chi2-lowchi2,hichi2-chi2) # was max
-    n1 = spec_prec(echi) # calculates format specifier precision
-    form = ',{:.'+'{}'.format(n1)+'f},{:.'+'{}'.format(n1)+'f}'
+    #echi = min(chi2-lowchi2,hichi2-chi2) # was max
+    n1=3   #n1 = spec_prec(echi) # calculates format specifier precision
+    form = '{:.'+'{}'.format(n1)+'f},{:.'+'{}'.format(n1)+'f}'
     form += ',{:.'+'{}'.format(n1)+'f}'
     row = form.format(chi2,lowchi2,hichi2)
-    row += ',{:.4f}'.format(alpha)
+    if isinstance(alpha,list):
+        for a in alpha:
+            row += ',{:.4f}'.format(a)
+    else:
+        row += ',{:.4f}'.format(alpha)
     row += ',{},{}'.format(offset,strftime("%d.%b.%H:%M:%S", localtime()))
     return row
 
 def write_csv(header,row,the_run,file_csv,filespec,scan=None):
-    '''
+    """
     input :
         header, the model specific csv header 
                 to compare with that of the csv file
@@ -2191,7 +2774,7 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
         two strings to write on console
     writes onto csv finding the right line
     writes a new file if csv does not exist or is incompatible (writes ~ version)
-    '''
+    """
     from mujpy.tools.tools import get_title
     import os
     import re
@@ -2245,23 +2828,25 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
                 for line in lineout:
                     f_out.write(line)
             file_csv = file_csv[file_csv.rfind('/')+1:]
-            strgrp = re.split(" |,|, ",row)[checkgroup[0]] if checkgroup else '--'
+            strgrp0 = 'minuit parameters' if file_csv[0]=='U' else '--'  
+            strgrp = re.split(" |,|, ",row)[checkgroup[0]] if checkgroup else strgrp0
             return 'Run {}: {} ***'.format(nrun,
-                                           get_title(the_run)), '{} {}:  Log added to {}'.format(nrun,strgrp,file_csv)
+                                           get_title(the_run)), '{} {}:  row added to {}'.format(nrun,strgrp,file_csv)
 
-        except: # incompatible headers, save backup and write a new file
+        except Exception as exc: # incompatible headers, save backup and write a new file
+            #print('write_csv excetption: {}'.format(exc))
             os.rename(file_csv,file_csv+'~')
             with open(file_csv,'w') as f:
                 f.write(header)
                 f.write(row)
             file_csv = file_csv[file_csv.rfind('/')+1:]
             return 'Run {}: {}'.format(nrun,
-                    get_title(the_run)),'.  Log in NEW {} [backup in {}]'.format(
+                    get_title(the_run)),'.  NEW file {} [backup in {}]'.format(
                                                                          file_csv,
                                                                          file_csv+'~')
             
     else: # csv does not exist
-        print('file {} os.path.isfile False'.format(file_csv))
+        print('file {} not found'.format(file_csv))
         with open(file_csv,'w') as f:
             f.write(header)
             f.write(row)
@@ -2270,9 +2855,9 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
                         get_title(the_run)),'.  Log in NEW {}'.format(file_csv)
 
 def get_title(run,notemp=False,nofield=False):
-    '''
+    """
     form standard psi title
-    '''
+    """
     title = [(run.get_sample()).rstrip()]
     title.append((run.get_orient()).rstrip())  
     if not notemp:
@@ -2291,12 +2876,12 @@ def get_title(run,notemp=False,nofield=False):
     return ' '.join(title)    
     
 def get_run_title(the_suite):
-    '''
+    """
     output 
         list of run and title strings
             each run and group in the run replicates its run number + title
     used only in mufitplot (fit and fft  
-    '''
+    """
     from mujpy.tools.tools import get_title
     run_title = []
     for run in the_suite._the_runs_:
@@ -2305,9 +2890,9 @@ def get_run_title(the_suite):
     return run_title
     
 def get_nruns(the_suite):
-    '''
+    """
     get nrun strings
-    '''
+    """
     nruns = []
     for k,run in enumerate(the_suite._the_runs_):
         nruns.append(str(run[0].get_runNumber_int()))
@@ -2315,9 +2900,9 @@ def get_nruns(the_suite):
 
 
 def get_run_number_from(path_filename,filespecs):
-    '''
+    """
     strips number after filespecs[0] and before filespec[1]
-    '''
+    """
     try:
         string =  path_filename.split(filespecs[0],1)[1]
         run = string.split('.'+filespecs[1],1)[0]
@@ -2326,13 +2911,13 @@ def get_run_number_from(path_filename,filespecs):
     return str(int(run)) # to remove leading zeros
 
 def muvalid(string):
-    '''
+    """
     parse function 
 
     CHECK WITH MUCOMPONENT, THAT USES A DIFFERENT SCHEME
 
     accepted functions are RHS of agebraic expressions of parameters p[i], i=0...ntot  
-    '''
+    """
     import re
     error_message = ''
     if string.strip() !='': # empty and blank strings are validated 
@@ -2348,10 +2933,10 @@ def muvalid(string):
     return error_message
     
 def p2x(instring):
-    '''
+    """
     replaces parameters e.g. p[2] with variable x2 in string
     returns substitude string and list of indices (ascii)
-    '''
+    """
     import re
     patterna = re.compile(r"p\[(\d+)\]") # find all patterns p[*] where * is digits
     n = patterna.findall(instring) # all indices of parameters
@@ -2364,13 +2949,13 @@ def p2x(instring):
     return outstring, n
     
 def errorpropagate(string,p,e):
-    '''
+    """
     parse function in string 
     
     substitute p[n] with xn, with errors en
     calculate the partial derivative pdn = partial f/partial xn 
     return the sqrt of the sum of (pdn*en)**2
-    '''
+    """
     from jax import grad
     import numpy as np
     funct,n = p2x(string) # from parameters p[n] to variables xn
@@ -2389,9 +2974,9 @@ def errorpropagate(string,p,e):
     return np.sqrt(variance)
     
 def group_shorthand(grouping):
-    '''
+    """
     group_calib is the list of gorup dictionaries
-    '''
+    """
     shorthand = []
     for group in grouping:
         fwd = '_'.join([str(s+1) for s in group['forward']])
@@ -2400,7 +2985,7 @@ def group_shorthand(grouping):
     return '+'.join(shorthand)
 
 def json_name(model,datafile,grouping,version,g=False):
-    '''
+    """
     model is e.g. 'mlmg'
     datafile is e.g. '/afs/psi.ch/bulkmusr/data/gps/d2022/tdc/deltat_gps_tdc_1233.bin'
        must have a single '.'
@@ -2408,14 +2993,14 @@ def json_name(model,datafile,grouping,version,g=False):
     g = True for global
     version is a label
     returns a unique name for the json dashboard file
-    '''    
+    """    
     from re import findall
     from mujpy.tools.tools import group_shorthand
     run = findall('[0-9]+',datafile)[-1]
     return model+'.'+run+'.'+group_shorthand(grouping)+'.'+version+'.json'
     
 def muvaluid(string):
-    '''
+    """
     Run suite fits: muvaluid returns True/False
     * checks the syntax for string function 
     corresponding to flag='l'. Meant for pars
@@ -2427,7 +3012,7 @@ def muvaluid(string):
     #            for the next 4 runs value = 2.0
     #            from the 8th run on value = 20.0
 
-    '''
+    """
     try:
         value_times_list = string.split(',')
         last = value_times_list.pop()
@@ -2440,7 +3025,7 @@ def muvaluid(string):
         return False
 
 def muvalue(lrun,string):
-    '''
+    """
     Run suite fits: 
 
     muvalue returns the value 
@@ -2449,7 +3034,7 @@ def muvalue(lrun,string):
     Large parameter change across the run suite
     requires different migrad start guesses.
     Probably broken!
-    '''
+    """
     # string syntax: e.g. "0.2*3,2.*4,20."
     # means that for the first 3 runs value = 0.2,
     #            for the next 4 runs value = 2.0
@@ -2468,7 +3053,7 @@ def muvalue(lrun,string):
     return value[lrun]
 
 def muzeropad(runs,nzeros=4):
-    '''
+    """
 
     runs is a string containing the run number
     nzeros the number of digit chars in the filename
@@ -2476,7 +3061,7 @@ def muzeropad(runs,nzeros=4):
     ISIS nxs nzeros=8
     returns the runs string 
     with left zero padding to nzeros digits
-    '''
+    """
     zeros='0'*nzeros
     if len(runs)<len(zeros):
         return zeros[:len(zeros)-len(runs)]+runs
@@ -2506,7 +3091,7 @@ def path_dialog(path,title):
 ################
 
 def plot_parameters(nsub,labels,fig=None): 
-    r'''
+    r"""
     standard plot of fit parameters vs B,T (or X to be implemente)
     input
        nsub<6 is the number of subplots
@@ -2523,7 +3108,7 @@ def plot_parameters(nsub,labels,fig=None):
          ...
          a transverse sigma is plotflag=n and is plotted in ax[n-1]
          
-    '''
+    """
     import matplotlib.pyplot as P
     nsubplots = nsub if nsub!=5 else 6 # nsub = 5 is plotted as 2x3 
     # select layout, 1 , 2 (1,2) , 3 (1,3) , 4 (2,2) or 6 (3,2)
@@ -2607,13 +3192,13 @@ def plot_parameters(nsub,labels,fig=None):
 
 
 def set_bar(n,b):
-    '''
+    """
     service to animate histograms
     e.g. in the fit tab
 
     extracted from matplotlib animate 
     histogram example
-    '''
+    """
     from numpy import array, zeros, ones
     import matplotlib.path as path
 
@@ -2647,13 +3232,13 @@ def set_bar(n,b):
     return verts, codes, bottom, xlim
 
 def set_fig(num,nrow,ncol,title,**kwargs): # unused? perhaps delete? check first 
-    '''
+    """
     num is figure number (static, to keep the same window) 
     nrow, ncol number of subplots rows and columns
     kwargs is a dict of keys to pass to subplots as is
     initializes figures when they are first called 
     or after accidental killing
-    '''
+    """
     import matplotlib.pyplot as P
     fig,ax = P.subplots(nrow, ncol, num = num, **kwargs)
     fig.canvas.manager.set_window_title(title)
@@ -2664,7 +3249,7 @@ def set_fig(num,nrow,ncol,title,**kwargs): # unused? perhaps delete? check first
 ###############
 
 def rebin(x,y,strstp,pack,e=None):
-    '''
+    """
     input:
         x is 1D intensive (time) 
         y [,e] are 1D, 2D or 3D intensive arrays to be rebinned
@@ -2683,8 +3268,10 @@ def rebin(x,y,strstp,pack,e=None):
     or::
 
        xr,yr,eyr = rebin(x,y,strstp,pack,ey) # the 5th is y error
-    '''
-    from numpy import floor, sqrt, zeros
+    """
+
+    from numpy import floor, sqrt, zeros, where
+    # yy is a slice of  y, reshape acts as if yy where a deepcopy, y is not modified
     start,stop = strstp
     m = int(floor((stop-start)/pack)) # length of rebinned xb
     mn = m*pack # length of x slice 
@@ -2701,11 +3288,11 @@ def rebin(x,y,strstp,pack,e=None):
             ey = ey.reshape(m,pack)  # temporaty 2d
             er = sqrt((ey**2).sum(1))/pack  # rebinned row - only good for ISIS 
     elif len(y.shape)==2:
-        nruns = y.shape[0] # number of runs
-        yr = zeros((nruns,m))
+        nruns_or_groups = y.shape[0] # number of runs/groups
+        yr = zeros((nruns_or_groups,m))
         if e is not None:
-            er = zeros((nruns,m))
-        for k in range(nruns): # each row is a run
+            er = zeros((nruns_or_groups,m))
+        for k in range(nruns_or_groups): # each row is a run
             yy = y[k][start:start+mn]  # slice row
             yy = yy.reshape(m,pack)  # temporaty 2d
             yr[k] = yy.sum(1)/pack # rebinned row
@@ -2714,29 +3301,59 @@ def rebin(x,y,strstp,pack,e=None):
                 ey = ey.reshape(m,pack)  # temporaty 2d
                 er[k] = sqrt((ey**2).sum(1))/pack  # rebinned row        
     elif len(y.shape)==3:        
-        ngroups,nruns = y.shape[0:2] # number of groups, runs
-        yr = zeros((ngroups,nruns,m))
-        
+        nruns, ngroups, _ = y.shape # number of groups, runs
+        yr = zeros((nruns,ngroups,m))
+ 
         if e is not None:
-            er = zeros((ngroups,nruns,m))
-        for k in range(ngroups): 
-            for j in range(nruns):  
-                yy = y[k][j][start:start+mn]  # slice row
+            er = zeros((nruns,ngroups,m))
+        for krun in range(nruns): 
+            for jgroup in range(ngroups):  
+                yy = y[krun][jgroup][start:start+mn]  # slice 
                 yy = yy.reshape(m,pack)  # temporaty 2d
-                yr[k][j] = yy.sum(1)/pack # rebinned row
-            if e is not None:
-                ey = e[k][j][start:start+mn]   # slice row
-                ey = ey.reshape(m,pack)  # temporaty 2d
-                er[k][j] = sqrt((ey**2).sum(1))/pack  # rebinned row        
+                yr[krun][jgroup] = yy.sum(1)/pack # ebinned row
+                if e is not None:
+                    ey = e[krun][jgroup][start:start+mn]   # slice row
+                    ey = ey.reshape(m,pack)  # temporaty 2d
+                    er[krun][jgroup] = sqrt((ey**2).sum(1))/pack  # rebinned row
+#                if list(where(er[krun][jgroup]==0)[0]):
+#                    print('rebin: zero er!!!')
+#                else:
+#                    print(where(er[krun][jgroup]==0))
     if e is not None:
         return xr,yr,er
     else:
         return xr,yr
 
+def slice(y,e,krun,kgroup):
+    """
+    """
+    if (krun,kgroup)==(-1,-1): # to be used for A1
+        return y, e
+    elif krun == -1:
+        if len(y.shape) <= 2:
+            return y,e
+        else:
+            return y[:][kgroup][:],e[:][kgroup][:]
+    elif kgroup == -1:
+        if len(y.shape) <= 2:
+            return y,e
+        else:
+            return y[krun][:][:],e[krun][:][:]
+    else:
+        if len(y.shape) == 1:
+            return y,e
+        elif len(y.shape) == 2:
+            if krun == 0:
+                return y[kgroup][:],e[kgroup][:]
+            else: # must be kgroup = 0 otherwise len(y.shape) is 3
+                return y[krun][:],e[krun][:]
+        else:
+            return y[krun][kgroup][:],e[krun][kgroup][:]
+
 def safetry(string):
-    '''
+    """
     Used by muvalid
-    '''
+    """
     from math import acos,asin,atan,atan2,ceil,cos,cosh,degrees,e,exp,floor,log,log10,pi,pow,radians,sin,sinh,sqrt,tan,tanh
     safe_list = ['a','acos', 'asin', 'atan', 'atan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 
                  'exp', 'floor', 'log', 'log10', 'pi', 'pow', 'radians', 'sin', 'sinh', 'sqrt', 'tan', 'tanh']
@@ -2772,32 +3389,32 @@ def scanms(y,n):
 
 
 def spec_prec(a):
-    '''
+    """
     format specifier precision::
 
         0 for a > 1.0
         1 for 1.0 > a > 0.1
         2 for 0.1 > a > 0.01 etc.
 
-    '''
+    """
     import numpy as np
     return int(abs(min(0.,np.floor(np.log10(abs(a)))))) 
 
 def shorten(path,subpath):
-    '''
+    """
     shortens path
     e.g. path, subpath = '/home/myname/myfolder', '/home/myname'
          shart = './myfolder' 
-    '''
+    """
     short = path.split(subpath)
     if len(short)==2:
         short = '.'+short[1]
     return short
 
 def exit_safe():
-    '''
+    """
     opens an are you sure box?
-    '''
+    """
     from tkinter.messagebox import askyesno
             
     answer = askyesno(title='Exit mujpy', message='Really quit?')
@@ -2809,18 +3426,136 @@ def step(x,a,n,dn,b):
     return a+b*norm.cdf(x,n,dn)
        
 def tlog_exists(path,run,ndigits):
-    '''
+    """
     check if tlog exists under various known filenames types
-    '''
+    """
     import os
 
     filename_psibulk = 'run_'+muzeropad(run,ndigits)+'.mon' # add definitions for e.g. filename_isis
     ok = os.path.exists(os.path.join(path,filename_psibulk)) # or os.path.exists(os.path.join(paths,filename_isis))
     return ok
 
+def get_indices(func):
+    """
+    input 
+      func is a user string function, e.g. 'p[0]*p[2]'
+    output
+      list of (string) indices found in the string, 
+      in between 'p[' and ']', e.g. '0','2'
+    used by int2_method_key, int2_global_method_key, grad method diffunc
+    """
+    from mujpy.tools.tools import findall
+    return [func[i:j] for (i,j) in zip([k+1 for k in findall('[',func)],[l for l in findall(']',func)])]
+
+def diffunc(func):
+    """
+    input user function of the form 'p[0]*(1-p[1])'
+          up to functions of three parameters (this could be easily extended)
+    output a list of its derivatives [with respect to 'p[0]' and 'p[1]']
+    and the list of their indices, [0,1]
+    """
+    from mujpy.tools.tools import get_indices
+    from sympy import symbols,diff,sympify,simplify
+    from sympy import sin,cos,exp, sqrt,atan,pi
+    # identify variables
+    # first identify indices
+    func = func.replace('abs','Abs').replace('arctan','atan')
+#    indices =[func[i:j] for (i,j) in zip([k+1 for k in findall('[',func)],[l for l in findall(']',func)])]
+    indices  = get_indices(func)
+    ind = [int(k) for k in indices]
+    if len(indices)==0: # no indices, func is the empty string
+        return ['0'],ind
+    elif len(indices)==1: # one index
+        x = symbols('x')
+        p0 = 'p['+indices[0]+']'
+        fun = func.replace(p0,'x') # function of x
+        f0 = str(diff(sympify(fun),x)).replace('x',p0).replace('Abs','abs').replace('atan','arctan')
+        return [f0],ind
+    elif len(indices)==2:  # two index
+        x,y = symbols('x,y')
+        p0,p1 = 'p['+indices[0]+']','p['+indices[1]+']'
+        fun = func.replace(p0,'x').replace(p1,'y') # function of x,y
+        f0 = str(sympify(diff(fun,x))).replace('x',p0).replace('y',p1).replace('Abs','abs').replace('atan','arctan')
+        f1 = str(sympify(diff(fun,y))).replace('x',p0).replace('y',p1).replace('Abs','abs').replace('atan','arctan')
+        return [f0,f1],ind
+    elif len(indices)==3:   # three index
+        x,y,z = symbols('x,y,z')
+        p0,p1,p2 = 'p['+indices[0]+']','p['+indices[1]+']','p['+indices[2]+']'
+        f0 = str(sympify(diff(fun,x))).replace('x',p0).replace('y',p1).replace('z',p2).replace('Abs','abs').replace('atan','arctan')
+        f1 = str(sympify(diff(fun,y))).replace('x',p0).replace('y',p1).replace('z',p2).replace('Abs','abs').replace('atan','arctan')
+        f2 = str(sympify(diff(fun,z))).replace('x',p0).replace('y',p1).replace('z',p2).replace('Abs','abs').replace('atan','arctan')
+    # could be extended to four, five ...
+        return [f0,f1,f2],ind
+                
+def translate(lmin,function_in):
+    """
+    input: 
+        lmin: list of minuit indices replacement, one for each dashboard index, -1 is blank
+        function_in: single function string, of dashboard index nint, to be translated
+    output: 
+        function_out: single translated function
+    Used in int2_method_key and min2int to replace parameter indices contained in function[nint] e.g.
+
+    ::
+ 
+       translate([0,0,1,2],'p[0]*2+p[3]') yields 'p[0]+2*p[2]'
+
+    e.g. if parameter 1 is shared with parameter 0, the minuit parameter index 3
+    will be translated to 2  
+    """
+    from copy import deepcopy
+    from mujpy.tools.tools import findall
+    # print(' nint = {}, lmin = {}\n{}'.format(nint,lmin,function_in))
+    function_out = deepcopy(function_in)
+    # search for integers between '[' and ']'
+    start = [i+1 for i in findall('[',function_out)]  
+    # finds index of number after all occurencies of '['
+    stop = [i for i in findall(']',function_out)]
+    # same for ']'
+    nints = [function_out[i:j] for (i,j) in zip(start,stop)] 
+    # this is a list of strings with the numbers to be replaced
+    try: 
+        nmins = [lmin[int(function_out[i:j])] for (i,j) in zip(start,stop)]
+    # replacements integers
+        for lstr,m in zip(nints,nmins):
+            function_out = function_out.replace(lstr,str(m))    
+        return function_out
+    except Exception as err: # supposes that err is list index out of range
+        print('Exception: {}'.format(err))
+        print("If Exception is 'list index out of range' then probably")
+        print("**** One or more model parameters with flag  '='")
+        print("     point to other model parameters with an '=' flag")
+        print("**** Check function syntax and model layout")
+        return False
+
+def translate_nint(nint,lmin,function): # NOT USED any more?!!
+    """
+    Used in int2_int and min2int to parse parameters contained in function[nint].value e.g.
+    ::
+ 
+       p[4]*2+p[7]
+
+    and translate the internal parameter indices 4 and 7 (written according to the gui parameter list order)
+    into the corresponding minuit parameter list indices, that skips shared and fixed parameters.
+
+    e.g. if parameter 6 is shared with parameter 4 and parameter 2 is fixed, the minuit parameter indices
+    will be 3 instead of 4 (skipping internal index 2) and 5 instead of 7 (skipping both 2 and 6)
+    Returns lmin[nint]
+    """
+    from mujpy.tools.tools import findall
+    string = function[nint].value
+    # search for integers between '[' and ']'
+    start = [i+1 for i in  findall('[',string)]  
+    # finds index of number after all occurencies of '['
+    stop = [i for i in  findall(']',string)]
+    # same for ']'
+    nints = [string[i:j] for (i,j) in zip(start,stop)] 
+    # this is a list of strings with the numbers
+    nmins = [lmin[int(string[i:j])] for (i,j) in zip(start,stop)]
+    return nmins
 
 def translate_multirun(functions_in,n_locals,kloc,nruns):
-    '''
+    """
     functions_in  = [list of function strings], 
                     for the model components of a single-run model (obtained from get_functions_in)
                     where a "~","!" parameter dummy function has been redefined as 'p[k]'
@@ -2836,7 +3571,7 @@ def translate_multirun(functions_in,n_locals,kloc,nruns):
                     middle list is runs,
                     inner list is component parameter functions 
     used in int2_multigroup_method_keyrun_user_method_key and int2_multirun_grad_method_key
-    '''
+    """
     # print('debug tools translate_multirun functions_in = {}'.format(functions_in))
     korig = kloc # minuit index index of first component first parameter in the single run model
     npar_run = n_locals # these will be the local parameters in each run, initialized to number of user_locals
@@ -2897,126 +3632,25 @@ def translate_multirun(functions_in,n_locals,kloc,nruns):
         # now frun is a list or runs for component jcomp    
         functions_out.append(frun) # now functions_out is a list of components, each a list or runs, each a list of parameter func
     return functions_out    
-    
-def get_indices(func):
-    '''
-    input 
-      func is a user string function, e.g. 'p[0]*p[2]'
-    output
-      list of (string) indices found in the string, 
-      in between 'p[' and ']', e.g. '0','2'
-    '''
-    from mujpy.tools.tools import findall
-    return [func[i:j] for (i,j) in zip([k+1 for k in findall('[',func)],[l for l in findall(']',func)])]
-
-def diffunc(func):
-    '''
-    input user function of the form 'p[0]*(1-p[1])'
-          up to functions of three parameters (this could be easily extended)
-    output a list of its derivatives [with respect to 'p[0]' and 'p[1]']
-    and the list of their indices, [0,1]
-    '''
-    from mujpy.tools.tools import get_indices
-    from sympy import symbols,diff,sympify,simplify
-    from sympy import sin,cos,exp, sqrt,atan,pi
-    # identify variables
-    # first identify indices
-    func = func.replace('abs','Abs').replace('arctan','atan')
-#    indices =[func[i:j] for (i,j) in zip([k+1 for k in findall('[',func)],[l for l in findall(']',func)])]
-    indices  = get_indices(func)
-    ind = [int(k) for k in indices]
-    if len(indices)==0: # no indices, func is the empty string
-        return ['0'],ind
-    elif len(indices)==1: # one index
-        x = symbols('x')
-        p0 = 'p['+indices[0]+']'
-        fun = func.replace(p0,'x') # function of x
-        f0 = str(diff(sympify(fun),x)).replace('x',p0).replace('Abs','abs').replace('atan','arctan')
-        return [f0],ind
-    elif len(indices)==2:  # two index
-        x,y = symbols('x,y')
-        p0,p1 = 'p['+indices[0]+']','p['+indices[1]+']'
-        fun = func.replace(p0,'x').replace(p1,'y') # function of x,y
-        f0 = str(sympify(diff(fun,x))).replace('x',p0).replace('y',p1).replace('Abs','abs').replace('atan','arctan')
-        f1 = str(sympify(diff(fun,y))).replace('x',p0).replace('y',p1).replace('Abs','abs').replace('atan','arctan')
-        return [f0,f1],ind
-    elif len(indices)==3:   # three index
-        x,y,z = symbols('x,y,z')
-        p0,p1,p2 = 'p['+indices[0]+']','p['+indices[1]+']','p['+indices[2]+']'
-        f0 = str(sympify(diff(fun,x))).replace('x',p0).replace('y',p1).replace('z',p2).replace('Abs','abs').replace('atan','arctan')
-        f1 = str(sympify(diff(fun,y))).replace('x',p0).replace('y',p1).replace('z',p2).replace('Abs','abs').replace('atan','arctan')
-        f2 = str(sympify(diff(fun,z))).replace('x',p0).replace('y',p1).replace('z',p2).replace('Abs','abs').replace('atan','arctan')
-    # could be extended to four, five ...
-        return [f0,f1,f2],ind
-                
-def translate(nint,lmin,function_in):
-    '''
-    input: 
-        nint: dashbord index, 
-        lmin: list of minuit indices replacement, one for each dashboard index, -1 is blank
-        function: single function string, of dashboard index nint, to be translated
-    output: 
-        function_out: single translated function
-    Used in int2_method_key and min2int to replace parameter indices contained in function[nint] e.g.
-
-    ::
- 
-       p[0]*2+p[3]
-
-    by translate the internal parameter indices 0 and 3 (written according to the dashboard dict order)
-    into the corresponding minuit parameter list indices, skipping shared parameters.
-
-    e.g. if parameter 1 is shared with parameter 0, the minuit parameter index 3
-    will be translated to 2  (skipping internal index 1)
-    '''
-    from copy import deepcopy
-    from mujpy.tools.tools import findall
-    # print(' nint = {}, lmin = {}\n{}'.format(nint,lmin,function_in))
-    function_out = deepcopy(function_in)
-    # search for integers between '[' and ']'
-    start = [i+1 for i in  findall('[',function_out)]  
-    # finds index of number after all occurencies of '['
-    stop = [i for i in  findall(']',function_out)]
-    # same for ']'
-    nints = [function_out[i:j] for (i,j) in zip(start,stop)] 
-    # this is a list of strings with the numbers to be replaced
-    nmins = [lmin[int(function_out[i:j])] for (i,j) in zip(start,stop)]
-    # replacements integers
-    for lstr,m in zip(nints,nmins):
-        function_out = function_out.replace(lstr,str(m))
-    return function_out
-
-def translate_nint(nint,lmin,function): # NOT USED any more?!!
-    '''
-    Used in int2_int and min2int to parse parameters contained in function[nint].value e.g.
-    ::
- 
-       p[4]*2+p[7]
-
-    and translate the internal parameter indices 4 and 7 (written according to the gui parameter list order)
-    into the corresponding minuit parameter list indices, that skips shared and fixed parameters.
-
-    e.g. if parameter 6 is shared with parameter 4 and parameter 2 is fixed, the minuit parameter indices
-    will be 3 instead of 4 (skipping internal index 2) and 5 instead of 7 (skipping both 2 and 6)
-    Returns lmin[nint]
-    '''
-    from mujpy.tools.tools import findall
-    string = function[nint].value
-    # search for integers between '[' and ']'
-    start = [i+1 for i in  findall('[',string)]  
-    # finds index of number after all occurencies of '['
-    stop = [i for i in  findall(']',string)]
-    # same for ']'
-    nints = [string[i:j] for (i,j) in zip(start,stop)] 
-    # this is a list of strings with the numbers
-    nmins = [lmin[int(string[i:j])] for (i,j) in zip(start,stop)]
-    return nmins
+   
+def hash_translate(kin,hash_id,krun):
+    """
+    is this used?
+    translates indices in functions according to 2026 fits
+    """
+    kout = []
+    for k in kin:
+        if int(k) in hash_id:
+            kout.append(str(int(k)+len(hash_id)*krun))
+        else:
+            kout.append(k)
+    return kout
 
 def value_error(value,error):
-    '''
+    """
     value_error(v,e)
     returns a string of the format v(e) 
-    '''
+    """
     from numpy import floor, log10, seterr
     eps = 1e-10 # minimum error
     if error>eps: # normal error
@@ -3037,10 +3671,10 @@ def value_error(value,error):
     return eval(form)
     
 def value_error_csv(value,error):
-    '''
+    """
     value_error_csv(v,e)
-    returns a string of the format v, e with the correct precision
-    '''
+    returns a string of the format v, e, with the correct precision
+    """
     from numpy import floor, log10, seterr
     eps = 1e-10 # minimum error
     if error>eps: # normal error
@@ -3063,9 +3697,10 @@ def value_error_csv(value,error):
     return eval(form)
     
 def results():
-    '''
+    """
     generate a notebook with some results
-    '''
+    used ?
+    """
     import subprocess
     # write a python script
     script = '# Single Run Single Group Fit'
@@ -3123,9 +3758,9 @@ def results():
     # issue os command 'p2j cache/notebook.py '+filename
     
 def signif(x, p):
-    '''
+    """
     write x with p significant digits
-    '''
+    """
     from numpy import asarray,where,isfinite,abs,floor,log10,round
     x = asarray(x)
     x_positive = where(isfinite(x) & (x != 0), abs(x), 10**(p-1))
@@ -3133,23 +3768,81 @@ def signif(x, p):
     return round(x * mags) / mags
 
 def version_flag(mufit_method):
-    '''
+    """
     generate a label with the fit type A1-C2
     to be included in the log and csv filename version 
-    '''
+    """
     if mufit_method.A1() or mufit_method.A1_calib():
         return "A1"
     elif mufit_method.A20() or mufit_method.A20_calib():
         return "A20"
     elif mufit_method.A21() or mufit_method.A21_calib():
         return "A21"
-    elif mufit_method.B1():
+    elif mufit_method.B1() or mufit_method.B1_calib():
         return "B1"
-    elif mufit_method.B2():
-        return "B2"
-    elif mufit_method.C1():
+    elif mufit_method.B20() or mufit_method.B20_calib():
+        return "B20"
+    elif mufit_method.B21() or mufit_method.B21_calib():
+        return "B21"
+    elif mufit_method.C1() or mufit_method.C1_calib():
         return "C1"
-    elif mufit_method.C2():
+    elif mufit_method.C2() or mufit_method.C2_calib():
         return "C2"
     else:
         return "_"
+
+def transliterate(string_in):
+    """
+    input: function or function_multi string_in, e.g. '(1-p[2])*p[3]' 
+        searches 'p[d]' and substitutes progressively with 'x', 'y', 'z', 'u', 'v', 'w'
+    output: string_out '(1-x)*y' and list indices = ['2','3'] of unique indices (strings)
+        used by tools error_propagation with sympy
+    """
+    import re
+    symbols = ['x','y','z','u','v','w']
+    indices = re.findall(r'p\[(\d+)\]',string_in)
+    indices = list(dict(zip(indices,indices)))
+    nind = len(indices)
+    for k,x in enumerate(symbols[:nind]):
+        string_in = re.sub(r'p\['+indices[k]+r'\]',x,string_in)
+    return string_in, indices
+
+def litertransate(string_in,indices):
+    """
+    input:  string error_propagation formula in terms of x, y, z, ...
+            indices, list ['i',...] of 'p[i]' to be substituted to the above
+    output: substituted string
+        used by tools error_propagation with sympy
+    """
+    import re
+    symbols = ['x','y','z','u','v','w']
+    nind = len(indices) 
+    for k,x in enumerate(symbols[:nind]):
+        string_in = re.sub(x,'p['+indices[k]+']',string_in)
+    return string_in
+
+def error_propagation(string_in):
+    """
+    input: string from 'function' of 'function_multi' dictionary, e.g. '(1-p[2])*p[3]'
+    output: string for error propagation, e.g. "sqrt((p[3]*e[2])**2+((1-p[2])*e[2])**2)"
+            calculated with transliterate, sympy, litertransate
+        used by mufit
+    """
+    from mujpy.tools.tools import transliterate, litertransate
+    from sympy import sympify, diff, symbols
+    x,y,z,u,v,w = symbols('x y z u v w')
+    string, indices = transliterate(string_in)
+    expression = sympify(string)
+    nind = len(indices)
+    variables = [x,y,z,u,v,w]
+    string_out = 'sqrt('
+    for k,x in enumerate(variables[:nind]):
+        dx = str(diff(expression,x))
+        # string_out += '('+re.sub(r'p\['+indices[k]+r'\]',x,string_in)+'*e['+str(indices[k])+'])**2'
+        string_out += '(('+litertransate(dx,indices)+')*e['+str(indices[k])+'])**2'
+        string_out += '+'
+    string_out = string_out[:-1]+')'
+    return string_out
+#    return string_in, indices
+
+
