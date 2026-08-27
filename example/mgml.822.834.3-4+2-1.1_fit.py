@@ -9,7 +9,6 @@ startuppath = getcwd() # before changing to git mujpy (if mujpy installed this i
 # chdir('/home/roberto.derenzi/git/mujpy/')
 # print(getcwd())
 from mujpy.musuite import suite
-from mujpy.mudash import dash
 from mujpy.mufit import mufit
 from mujpy.mufitplot import mufitplot
 datafile = '../data/deltat_tdc_gps_0822.bin'

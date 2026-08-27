@@ -8,8 +8,8 @@ def plot_parameters(nsub,labels,fig=None):
     input
        nsub<6 is the number of subplots
        labels is a dict of labels, 
-       e.g. {title:self.title, xlabel:'T [K]', ylabels: ['asym',r'$\lambda$',r'$\sigma$,...]}
-       fig is the standard fig e.g self.fig_pars
+       e.g. {title:title, xlabel:'T [K]', ylabels: ['asym',r'$\lambda$',r'$\sigma$,...]}
+       fig is the standard fig e.g fig_pars
        
     output 
        the ax array on which to plot 
@@ -50,6 +50,7 @@ def plot_parameters(nsub,labels,fig=None):
                 }
     if fig: # has been set to a handle once
        fig.clf()
+       P.ioff()
        if nrc[str(nsub)][1]: # not a single subplot
            fig,ax = P.subplots(nrc[str(nsub)][0],nrc[str(nsub)][1],
                                figsize=figsize[str(nsub)],sharex = 'col', 
@@ -68,6 +69,7 @@ def plot_parameters(nsub,labels,fig=None):
            fig,ax = P.subplots(nrc[str(nsub)][0],
                                 figsize=figsize['1']) # first creation
 
+    P.ion()
     fig.canvas.manager.set_window_title('Fit parameters') # the title on the window bar
     fig.suptitle(labels['title']) # the sample title
     axout=[]
@@ -153,7 +155,7 @@ def set_fig(num,nrow,ncol,title,**kwargs):  # NOT CLEAR WHERE IT IS USED
     fig.canvas.manager.set_window_title(title)
     return fig, ax  
 
-def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):#,canvas=None):
+def set_single_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):#,canvas=None):
     """
     call single mufitplot with no animation
 
@@ -180,15 +182,15 @@ def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,c
     """
 
     import matplotlib.pyplot as P
-    from matplotlib.pyplot import rcParams, suptitle
     from numpy import hstack   
+    from matplotlib.font_manager import get_font_names as font_names
     from mujpy.tools.plot import errorb, plot_fit, decorate_data, decorate_data_late
     from mujpy.tools.plot import plot_res, decorate_res, decorate_res_late, plot_txt, plot_chi2
-    from mujpy.tools.plot import draw
         
-    font = {'family':'Ubuntu','size':10}
+    family = 'Ubuntu' if 'Ubuntu' in font_names() else 'Arial'
+    font = {'family':family,'size':10}
     P.rc('font', **font)
-    prop_cycle = rcParams['axes.prop_cycle']
+    prop_cycle = P.rcParams['axes.prop_cycle']
     color = prop_cycle.by_key()['color']
     # data and residues, data_early and residue early: color[0] 
     # fit, both early and late: color[1]
@@ -205,12 +207,12 @@ def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,c
 
     if fig:
         fig.clf()
-        fig,ax = P.subplots(2,ncols,sharex = 'col', 
+        fig, ax  = P.subplots(2,ncols,sharex = 'col', 
                      gridspec_kw = {'height_ratios':[3,1],'width_ratios':width_ratios},
                                     num=fig.number)
         fig.subplots_adjust(hspace=0.05,top=0.90,bottom=0.12,right=0.97,wspace=0.03)
     else: # handle does not exist, make one
-        fig,ax = P.subplots(2,ncols,figsize=(6,4),sharex = 'col',
+        fig, ax  = P.subplots(2,ncols,figsize=(6,4),sharex = 'col',
                      gridspec_kw = {'height_ratios':[3, 1],'width_ratios':width_ratios})
         fig.canvas.manager.set_window_title('Fit')
         fig.subplots_adjust(hspace=0.05,top=0.90,bottom=0.12,right=0.97,wspace=0.03)
@@ -263,13 +265,13 @@ def set_single_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,c
                                       w_late)   
     if rrf:
         string = r'$\nu_R=$'+'{:.1f}MHz   '.format(rrf)
-        suptitle(string+run_title,x=-0.125,ha='right')    
+        P.suptitle(string+run_title,x=-0.125,ha='right')    
     else:
-        suptitle(run_title)                           
-    draw(fig)
+        P.suptitle(run_title)                           
+    P.draw()
     return fig
 
-def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):
+def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):
     """
     call sequence mufitplot, with animation
 
@@ -291,18 +293,23 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
             w_l = nu_fit*ones(t_fit_late.shape[0])/nu_fit_late
     output: 
         fig, to reuse fig window
-    recovers or creates figure subplots  
+    recovers or creates figure subplots 
+
+    until FuncAnimation does not work in a ipywidgets Outpu()
+        if type(out) != 'NoneType': produce a list of images  
     """
 
     import matplotlib.pyplot as P
     from matplotlib.pyplot import rcParams
 
-    import matplotlib.animation as animation
     from numpy import hstack, vstack   
+    from matplotlib.font_manager import get_font_names as font_names
+    family = 'Ubuntu' if 'Ubuntu' in font_names() else 'Arial'
     from mujpy.tools.plot import errorb, plot_fit, decorate_data, decorate_data_late
     from mujpy.tools.plot import plot_res, decorate_res, decorate_res_late, plot_txt, plot_chi2
-    from mujpy.tools.plot import draw
-#    from datetime import datetime
+    from mujpy.tools.plot import display_anim
+    #from functools import partial
+    from datetime import datetime
 
     def animate_fit(i): 
         """
@@ -315,9 +322,7 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         # early_late == False if data_late == None
         #early_late = False if data_late == None else False
 
-        global ax_0
-        
-        #print('animate_fit: plot debug: Hey, I am here!, i = {}'.format(i))
+        #global ax_0
         if rrf:
             supti.set_text(stringrrf+run_title[i]) 
         else:
@@ -401,9 +406,8 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         """
 
         from  numpy import histogram, array
-        global ax_0
+         #global ax_0
 
-        # print('init_animate_fit: plot debug: Hey, I am here!')
         if rrf:
             supti.set_text(stringrrf+run_title[0]) 
         else:
@@ -473,27 +477,15 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         return line, ye, fline, res, linesp, linesm, line2sp, line2sm, vertf, text1
 
 
-    global paused
-    global anim_fit,ax_0
-
-    paused = False
-    def toggle_pause(*args, **kwargs):
-        global paused
-        global anim_fit
-        if paused:
-            anim_fit.event_source.start() # matplotlib.__version__ >= 3.4 
-            # animation.event_source.start()
-        else:
-            anim_fit.event_source.stop() # if matplotlib.__version__ >= 3.4 
-            # animation.event_source.stop()
-        paused = not paused    
+    #global paused
+     #global anim_fit,ax_0
 
 ## set_sequence_fit begins here
     #now = datetime.now()
     #dt_string = now.strftime("%d/%m/%Y %H:%M:%S")             
-    font = {'family':'Ubuntu','size':10}
+    font = {'family':family,'size':10}
     P.rc('font', **font)
-    prop_cycle = rcParams['axes.prop_cycle']
+    prop_cycle = P.rcParams['axes.prop_cycle']
     color = prop_cycle.by_key()['color']
     anim_delay = 1000.
 #        # unpack data, chi_dof
@@ -521,12 +513,12 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
 
     try:    
         fig.clf()
-        fig,ax = P.subplots(2,ncols,sharex = 'col', 
+        fig, ax  = P.subplots(2,ncols,sharex = 'col', 
                      gridspec_kw = {'height_ratios':[3,1],'width_ratios':width_ratios},
                                     num=fig.number)
         fig.subplots_adjust(hspace=0.05,top=0.90,bottom=0.12,right=0.97,wspace=0.03)
     except: # handle does not exist, make one
-        fig,ax = P.subplots(2,ncols,figsize=(6,4),sharex = 'col',
+        fig, ax  = P.subplots(2,ncols,figsize=(6,4),sharex = 'col',
                      gridspec_kw = {'height_ratios':[3, 1],'width_ratios':width_ratios})
         fig.canvas.manager.set_window_title('Fit')
         fig.subplots_adjust(hspace=0.05,top=0.90,bottom=0.12,right=0.97,wspace=0.03)
@@ -537,6 +529,8 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
         [[ax_early,ax_late,ax_txt],[ax_early_res,ax_late_res,ax_chi]] = ax
         #print('debug-plot: shape dy_fit_late {}, w_late {}'.format(dy_fit_late.shape, w_late.shape))
 
+        now = datetime.now()
+        dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
         for k in range(n):  # ytot rtot for gettimg absolute max min of data and residue plots
             yt, rt = hstack((y[k],y_late[k])), hstack((y[k]-f_res[k],y_late[k]-f_late_res[k]))
             if k==0:
@@ -544,8 +538,8 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
             else:
                 ytot, rtot = vstack((ytot,yt)), vstack((rtot,rt))            
         ym,yM,rm,rM = ytot.min()-0.05,ytot.max()+0.01,rtot.min()-0.005,rtot.max()+0.005
-        xtgl,ytgl = 1.35*t.min()-0.35*t.max(), 1.65*rm-0.65*rM
-        ax_early_res.text(xtgl,ytgl,'Click to toggle\npause/resume',fontsize='small')
+        xtgl,ytgl = 1.35*t.min()-0.35*t.max(), 1.45*rm-0.65*rM
+        ax_early_res.text(xtgl,ytgl,'Click to pause/resume',fontsize='small')
         ax_early.text(xtgl,yM+0.01,dt_string,fontsize='small')
  
  
@@ -619,24 +613,17 @@ def set_sequence_fit(fig,model,early_late,data,group,run_title,chi_dof,data_late
 
     ax_0 = ax_early if early_late else ax_fit
     title = run_title
+    supti = P.suptitle(run_title[0]) # 'large','small'
     # print('set_sequence plot debug: next launcing animations')
-    anim_fit = animation.FuncAnimation(fig,animate_fit, 
-                                            frames=range(len(run_title)),
-                                            init_func=init_animate_fit,
-                                            interval=anim_delay,
-                                            repeat=True,
-                                            blit=False)
+    anim = display_anim(animate_fit,run_title,init_animate_fit, anim_delay, out, fig)
 
-    fig.canvas.mpl_connect('button_press_event', toggle_pause)
     if rrf:
         stringrrf = r'$\nu_R=$'+'{:.1f}MHz   '.format(rrf)
         supti = P.suptitle(stringrrf+run_title[0])#,x=-0.125,ha='right')    
-    else:
-        supti = P.suptitle(run_title[0]) # 'large','small'
-    draw(fig)
+    #P.show()
     return fig
 
-def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
+def set_figure_fft(out,fig,model_name,ylabel,f,ap,apf,ep,group,run_title):
     """
     draw the mufitplot FFT figure, anim for 2,3d a, af
 
@@ -656,7 +643,8 @@ def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
     from matplotlib.path import Path
     import matplotlib.patches as patches
     import matplotlib.animation as animation
-
+    from matplotlib.font_manager import get_font_names as font_names
+    family = 'Ubuntu' if 'Ubuntu' in font_names() else 'Arial'
     ###################
     # PYPLOT ANIMATIONS
     ###################
@@ -690,14 +678,10 @@ def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
         fline.set_ydata(apf[0,:])
         return marks, ye, fline 
 
-    global paused_fft
-    global anim_fft
-
     paused_fft = False
+
     def toggle_pause_fft(*args, **kwargs):
-        global paused_fft
-        global anim_fft
-        if paused_fft:
+        if aused_fft:
             anim_fft.event_source.start() # matplotlib.__version__ >= 3.4 
             # animation.event_source.start()
         else:
@@ -708,13 +692,13 @@ def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
     ########################
     # build or recall Figure
     ########################
-    font = {'family':'Ubuntu','size':10}
+    font = {'family':family,'size':10}
     P.rc('font', **font)
     anim_delay = 1000.
 
     if fig_fft: # has been set to a handle once
         fig_fft.clf()
-        fig_fft,ax_fft = P.subplots(num=self.fig_fft.number)
+        fig_fft,ax_fft = P.subplots(num=fig_fft.number)
     else: # handle does not exist, make one
         fig_fft,ax_fft = P.subplots(figsize=(6,4))
         fig_fft.canvas.manager.set_window_title('FFT')
@@ -747,13 +731,14 @@ def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
 #    ydat = 1.01*yM
 #    ax_early.text(,ydat,dt_string,fontsize='small')
     if len(ap.shape)>1:
-        anim_fft = animation.FuncAnimation(fig_fft, animate_fft, 
+        with out:
+            anim_fft = animation.FuncAnimation(self.fig_fft, animate_fft, 
                                                 frames=range(len(run_title)),
                                                 init_func=init_animate_fft,
                                                 interval=anim_delay,
                                                 repeat=True,
                                                 blit=False)
-    fig_fft.canvas.mpl_connect('button_press_event', toggle_pause_fft)
+            fig_fft.canvas.mpl_connect('button_press_event', toggle_pause_fft)
 
 #        # print('f.shape = {}, ap.shape = {}'.format(f.shape,ap.shape))  
 #        ax_fft.plot(f[k],ap[k],'o',ms=2,alpha=0.5,color=color[k]) # f, ap, apf are     plotiled!
@@ -762,12 +747,11 @@ def set_figure_fft(fig_fft,model_name,ylabel,f,ap,apf,ep,group,run_title):
         ###################
         # errors, alpha_version for single
         ################### 
-#                    if self._single_: 
+#                    if _single_: 
 
     ax_fft.set_ylabel(ylabel)
 
     fig_fft.canvas.manager.window.tkraise()
-    P.draw()
 
 ##########################
 # Actual pyplot commands
@@ -961,7 +945,8 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
     ax.set_ylim(ylim)
     now = datetime.now()
     dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
-    text5 = ax.text(xtxt-dx,ylim[0]+dyl,dt_string,fontsize='small')
+    if chi_late is None:
+        text5 = ax.text(xtxt-dx,ylim[0]+dyl,dt_string,fontsize='small')
     # print('plot_txt in tools.plot debug: chi_late = {}'.format(chi_late))
     if chi_late is not None: 
         mm = round(nu_early/4)
@@ -969,18 +954,18 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
         cc = gammainc((hb+nu_early)/2,nu_early/2) # muchi2cdf(x,nu) = gammainc(x/2, nu/2);
         lce = 1+hb[min(list(where((cc<norm.cdf(1))&(cc>norm.cdf(-1))))[0])]/nu_early
         hce = 1+hb[max(list(where((cc<norm.cdf(1))&(cc>norm.cdf(-1))))[0])]/nu_early
-        string2 = r'$\chi^2_e$ = {:.3f}\n({:.2f}-{:.2f})'.format(chi_early,lce,hce) 
+        string2 = r'$\chi^2_e$ = {:.3f}'.format(chi_early)+'\n({:.2f}-{:.2f})'.format(lce,hce) 
         mml = round(nu_late/4)
         hbl = linspace(-mml,mml,2*mml+1)
         ccl = gammainc((hbl+nu_late)/2,nu_late/2) # muchi2cdf(x,nu) = gammainc(x/2, nu/2);
         lcl = 1+hbl[min(list(where((ccl<norm.cdf(1))&(ccl>norm.cdf(-1))))[0])]/nu_late
         hcl = 1+hbl[max(list(where((ccl<norm.cdf(1))&(ccl>norm.cdf(-1))))[0])]/nu_late
-        string3 = r'$\chi^2_l$ = {:.3f}\n({:.2f}-{:.2f})'.format(chi_late,lcl,hcl) 
+        string3 = r'$\chi^2_l$ = {:.3f}'.format(chi_late)+'\n({:.2f}-{:.2f})'.format(lcl,hcl) 
         text2 = ax.text(xtxt,ylim[0]+0.28*dylim,string2,
                         bbox={'facecolor': color[0], 'alpha': transalpha, 'pad': pad})
         dyl = dylim/50
         text3 = ax.text(xtxt,ylim[0]+dyl,string3,bbox={'facecolor': color[2], 'alpha': transalpha, 'pad': pad})
-        text4 = ax.text(xtxt,ylim[0]+dylim,model+' fit')
+        text4 = ax.text(xtxt+dx/2,ylim[0]+dylim-2*dyl,model+' fit')
 
         return text1, lc, hc, text2, lce, hce, text3, lcl, hcl
 
@@ -988,7 +973,7 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
 
 def plot_chi2(ax,dy_fit,nu_fit,dy_early,w_early,dy_late,w_late):
     """
-    draws histogram of chi2 distrib, returns 1 histo, bar, bottom handles, [None padded or + 2 histo, bar handles]
+     histogram of chi2 distrib, returns 1 histo, bar, bottom handles, [None padded or + 2 histo, bar handles]
 
     input:
         ax, axis handle
@@ -1013,7 +998,7 @@ def plot_chi2(ax,dy_fit,nu_fit,dy_early,w_early,dy_late,w_late):
     # chi2 distribution: fit
     ########################
     xbin = linspace(-5.5,5.5,12)
-    # self.ax_fit[(1,-1)].set_ylim(0, 1.15*nhist.max())
+    # ax_fit[(1,-1)].set_ylim(0, 1.15*nhist.max())
     #nhist = ax.hist(dy_fit[0],xbin,rwidth=0.9,fc='w',ec='k',lw=0.7)
     nhistf,_ = histogram(dy_fit,xbin) # fc, lw, alpha set in patches
     vertf, codef, bottom, xlim = set_bar(nhistf,xbin) # fc, lw, alpha set in patches
@@ -1092,24 +1077,47 @@ def set_bar(n,b):
     xlim = [left[0], right[-1]]
     return verts, codes, bottom, xlim
 
-def draw(fig):
+def display_anim(anima,run_title,init_anima, delay, out, fig):
     """
-    brings window to focus and does P.draw()
+    display inside Output widget out and P.draw()
     """
-
-    import matplotlib.pyplot as P
-    cfm = P.get_current_fig_manager()
-    if hasattr(cfm,'window'):
-        if hasattr(cfm.window,'attributes'):
-            cfm.window.attributes('-topmost', True) # Tkinter backend
-            cfm.window.attributes('-topmost', False)
-    #cfm.window.activateWindow()
-    #cfm.window.raise_()
-    #fig.canvas.manager.window.tkraise()# fig.canvas.manager.window.raise_()
-#    if canvas:
-#        with canvas:
-#            P.draw()
-#    else:
-#        P.draw()
-    P.draw()
     
+    import matplotlib.pyplot as P
+    import matplotlib.animation as animation
+    #global paused
+    #global anim
+    paused = False
+    if out:
+        with out: # animated, stoppable, inside of the box
+            anim = animation.FuncAnimation(fig,anima, 
+                                                frames=range(len(run_title)),
+                                                init_func=init_anima,
+                                                interval=delay,
+                                                repeat=True,
+                                                blit=False)
+            P.show()# must be inside with out:
+    else: # animated figure window, unstoppable
+        anim = animation.FuncAnimation(fig,anima, 
+                                            frames=range(len(run_title)),
+                                            init_func=init_anima,
+                                            interval=delay,
+                                            repeat=True,
+                                            blit=False)
+        P.draw() # must be inside
+    fig.canvas.toolbar_visible = False
+    fig.canvas.header_visible = False
+    fig.canvas.footer_visible = False
+    def toggle_pause(event):
+        #global paused
+        #global anim
+        nonlocal paused,anim
+        if paused:
+            anim.event_source.start() # matplotlib.__version__ >= 3.4 
+            # animation.event_source.start()
+        else:
+            anim.event_source.stop() # if matplotlib.__version__ >= 3.4 
+            # animation.event_source.stop()
+        paused = not paused    
+
+    fig.canvas.mpl_connect('button_press_event',toggle_pause)
+    return anim

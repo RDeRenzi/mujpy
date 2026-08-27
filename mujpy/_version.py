@@ -1,5 +1,10 @@
 '''
 Version history
+version  3.0    new skimmed version of class musuite, mufit, mufitplot, mucomponents, 
+                libraries tools.tools tools.plot 
+                new Jupyter class mudashed.py, ipywidgets interface 
+                with Output boxes for log and matplotlib animations
+__________________________________________________________________________
 version  2.9   rewritten mufit and mufitplot to support all eight fit types
                single run           A1, A20, A21 (single group, multi group sequential, multigroup global)
                multirun sequential  B1, B20, B21 (>>          , >>                    , >>)

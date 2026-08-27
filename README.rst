@@ -2,23 +2,34 @@
 MuJPy
 *****
 
-A Python MuSR data analysis based on classes, with a graphical interface designed for jupyter, released under the MIT licence.
+A Python MuSR data analysis based on classes, with a graphical interface designed for jupyter, released under the MIT licence. 
+It aims at the useri-friendly appearance of mulab and the power of musrfit.
 
-v. 2.9.beta refactoring. See _version.py for the most recent version details. 
-For the time being works only via python3 scripts (test.py ties them all)
-(mudash, next step, is still broken). i
+v. 3.0 refactoring. See _version.py for the most recent version details. 
 
-Once cloned, run test.pyr,
-or run the individual tests, 
-e.g. for a single run single group fit
-:: 
- 
-  python mgml.822.3-4.1_fit.py
+Main features: 
+- a model built on two-letter bricks: mg, for Gaussian-damped cosine, ml for Lorentzian-damped cosine etc.
+- sequential fits by the same model driven by a run list and a list of grouping dicts for asymmetry definition
+- global fits by user-defined parameters assigned to model parameters in a json file
+- a mulab-like interface in Jupyter-lab that allow fit model and parameter editing, hopefully with a gentler learning curve than musrfit   
 
-Modify these scripts to your purposes. The clumsy part is to modify by hand the models fit/... .json files.
-mudash will soon come to make this user-friendly
-Linux installation instructionsi. In principle valid under windows with possible os related problems. 
-Docs not updated yet
+To try mujpy:
+1. Install python (python3 is assumed)
+2. Install git and clone https://github.com/RDeRenzi/mujpy.git
+
+The scripts collected in test.py show how to drive mujpy in command line mode.
+To see some fit capabilities try
+
+```
+cd example
+python test.py 
+```
+
+Modify these scripts to your purposes. The clumsy part is to modify by hand the models fit/... .json files. To avoid that
+
+3. Install jupiter-lab for the gui editor mudashed
+
+Docs and installation instructions still at v. 1.1, to be updated soon
 
 ----
 Old installation instructions (v 1.1)

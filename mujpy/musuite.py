@@ -52,7 +52,7 @@ class suite(object):
         sys.__stderr__ is <_io.TextIOWrapper name='<stderr>' mode='w' encoding='utf-8'>
     """ 
 
-    def __init__(self, datafile , runlist , grp_calib , offset , startuppath, console = 'print',dash=None, mplot=False):
+    def __init__(self, datafile , runlist , grp_calib , offset , startuppath, console = 'print',mplot=False):
                  
         """
         __init__ for musuite class
@@ -74,9 +74,9 @@ class suite(object):
                                'forward' and 'backward' lists of detector indices
                 promptfit(): determines t0
                 timebase(): stores self.time (1d)  
-        if dash = None and console = 'print' self.console will exec print(string)
-        if dash = self in mudash calls to suite, and console = 'self.dash.log'   
-              self.console will exec self.dash.log(string), i.e. write on board output                           
+        if console = 'print' self.console will exec print(string)
+        if mudashed calls suite with console = 'self.log', a method of mudashed  
+              self.console will exec self.log(string), i.e. write on board output                           
         """
 
         from mujpy.tools.tools import derun
@@ -92,16 +92,17 @@ class suite(object):
 #        with open(suite_input_file,"r") as f:
 #            suite_input_json = f.read()
 #            suite_input = json.loads(suite_input_json)
-        self.dash = dash
-        self.console_method = console # either 'print' for scripts or 'self.dash.log' for mudash.py calls, eg. from jupyter-lab or ipython
+        self.console_method = console # either 'print' for scripts or 'self.log' for mudashed calls, eg. from jupyter-lab or ipython
         try:
-            if not dash: # not a call from a mudash instance
+            if self.console_method == 'print': # not a call from a mudash instance
                 self.console('******************* SUITE *********************')
                 # self.console('debug')
+            elif isinstance(console,object):
+                self.console('**** SUITE: using caller log ****')
             else:
                 self.console('')
-        except:
-            print('no suite.console!')
+        except ValueError as e:
+            print('Except: {}\nno suite.console!'.format(e))
             return  # with no console error message, it means no console
         # determine number of runs, filenames etc.
             #######################
@@ -109,7 +110,7 @@ class suite(object):
             #######################           
         self.runs, errormessage = derun(runlist) # self.runs is a list of lists of run numbers (string)
         if errormessage is not None: # derun error
-            self.console('Run syntax error: {}. You typed: {}'.format(errormessage,runlist))
+            self.console('Run syntax error? {}. You typed: {}'.format(errormessage,runlist))
             return  # with console error message
 
         self.nruns = len(self.runs) # vanished on 23 July 2026 at 17:00 ?!??!  reinserted here
@@ -129,22 +130,22 @@ class suite(object):
 #            self.console('* CHECK YOUR ACCESS (e.g. klog)')
             self.console('**************************************')
             return None  # with console error message
-        try: # working directory, in which, in case, to find mujpy_setup.pkl 
-            self.__startuppath__ = startuppath 
-        except:
-            self.__startuppath__ = os.getcwd()
+        self.__startuppath__ = os.getcwd()
         # implement new folder policy, see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy.Dashboard
         self.__path__ = os.path.dirname(MuJPyName) # mujpy path
-        self.__templatepath__ = os.path.abspath(os.path.join(os.path.dirname(MuJPyName), '../', 'templates/'))
-        if not os.path.exists(self.__startuppath__+'/fit/'):
-            os.mkdir(self.__startuppath__+'/fit/')
-        self.__fitpath__ = self.__startuppath__+'/fit/'
-        if not os.path.exists(self.__startuppath__+'/csv/'):
-            os.mkdir(self.__startuppath__+'/csv/')
-        self.__csvpath__ = self.__startuppath__+'/csv/'
-        if not os.path.exists(self.__startuppath__+'/cache/'):
-            os.mkdir(self.__startuppath__+'/cache/')
-        self.__cachepath__ = self.__startuppath__+'/cache/'
+        # REMEMBER! ../ does not work if it points outside the directory where jupyterlab is launched from
+        pre_mujpy_path = os.path.dirname(MuJPyName)[:os.path.dirname(MuJPyName).rfind(os.sep)]
+        self.__grppath__ = pre_mujpy_path+os.sep+'groups'+os.sep
+        self.__templatepath__ = pre_mujpy_path+os.sep+'templates'+os.sep
+        if not os.path.exists(self.__startuppath__+os.sep+'fit'+os.sep):
+            os.mkdir(self.__startuppath__+os.sep+'fit'+os.sep)
+        self.__fitpath__ = self.__startuppath__+os.sep+'fit'+os.sep
+        if not os.path.exists(self.__startuppath__+os.sep+'csv'+os.sep):
+            os.mkdir(self.__startuppath__+os.sep+'csv'+os.sep)
+        self.__csvpath__ = self.__startuppath__+os.sep+'csv'+os.sep
+        if not os.path.exists(self.__startuppath__+os.sep+'cache'+os.sep):
+            os.mkdir(self.__startuppath__+os.sep+'cache'+os.sep)
+        self.__cachepath__ = self.__startuppath__+os.sep+'cache'+os.sep
         # reverse of tools get_grouping is tools get_group
         self.offset = int(offset) # offset belongs to suite, that needs it for asymmetries
         if self.load_runs(): #           load data instances in self._the_runs_
@@ -158,7 +159,22 @@ class suite(object):
         # self.console('... end of initialize suite')
         else:
             self.console('*********************** suite exits without loading data ****************************')
+    
+    def console(self,string):
+        """
+        writes string to initiated self.console_method
 
+           when suite invoked without console, self.console_method defaults top 'print'
+           when invoked from mudashes, self.console_method = mudashed.log
+        """
+
+        #print('debug string = '+string)
+        #print('debug console_method = {}'.format(self.console_method))
+        if self.console_method == 'print': 
+            print(string)
+        else:
+            exec('self.console_method'+'("'+string+'")')
+ 
     def add_runs(self,k):
         """
         Tries to load one or more runs to be added together
@@ -285,6 +301,7 @@ class suite(object):
             #a,b = self.check_group(fgroup), self.check_group(bgroup)
             # print('fwd = {} bwd = {}'.format(a,b))
             #if alpha>0 and a and b:
+                if k==0: self.grouping=[]
                 self.grouping.append({'forward':fgroup, 'backward':bgroup, 'alpha':alpha})
                 # fgroup bgroup are two np.arrays of integers
             else:
@@ -294,17 +311,7 @@ class suite(object):
                 return False
         return True
 
-    def console(self,string):
-        """
-        writes string to initiated self.console_method
-
-           when suite invoked without console, self.console_method defaults top 'print'
-           when invoked from dash, self.console_method = 'self'
-        """
-
-        #print('string = '+string+r'\nconsole_method = '+self.console_method)
-        exec(self.console_method+'("'+string+'")')
-               
+              
     def t_value_error(self,k):
         """
         calculates T and eT values also for runs to be added
@@ -326,7 +333,6 @@ class suite(object):
             t_value, t_error = 0, 0
         return t_value, t_error
 
-
     def promptfit(self,mplot, mprint = False):
         """
         indentifies t0 and stores self.nt0 array (all intruments) [ISIS not yet]
@@ -346,7 +352,8 @@ class suite(object):
         import matplotlib.pyplot as P
         from mujpy.mucomponents.muprompt import muprompt
         from mujpy.mucomponents.muedge import muedge
-        from mujpy.tools.tools import TauMu_mus, scanms, step, set_fig 
+        from mujpy.tools.tools import TauMu_mus, scanms, step
+        from mujpy.tools.plot import set_fig 
     
         if mplot:  # setup figure window if a plot of the prompt peak or edge fits is required
             font = {'family' : 'Ubuntu','size'   : 8}
@@ -973,196 +980,4 @@ class suite(object):
         elif [run[0].get_field() for run in self._the_runs_]!=[self._the_runs_[0][0].get_field()]*len(self._the_runs_): return 'B[mT]'
         elif [run[0].get_orient() for run in self._the_runs_]!=[self._the_runs_[0][0].get_orient()]*len(self._the_runs_): return '[deg]'
         else: return '#    '
-
-###############
-# Deprecated
-###############
-
-    def single_multigroup_for_back_counts(self,runs,groupings):
-        """
-        Deprecated
-
-        * input: 
-        *         runs, runs-to-add
-        *         grouping, {'forward':[3],'backward':[4]] for 3-4
-        *         uses self.single_for_back_counts
-        * output:
-        *         yf, yb, eyf, eyf = vstacks over groups
-        *         2D numpy arrays, used in calib multigroups
-        """
-
-        from numpy import vstack,array
-        for k,grouping in enumerate(groupings):
-            yforw, ybackw, ey_forw, ey_backw = self.single_for_back_counts(runs,grouping)
-            #        all are 1D numpy arrays
-            if k:
-                yf = vstack((yf,yforw))
-                yb = vstack((yb,ybackw))
-                eyf = vstack((eyf,ey_forw))
-                eyb = vstack((eyb,ey_backw))
-            else:
-                yf = yforw
-                yb = ybackw
-                eyf = ey_forw
-                eyb = ey_backw
-        return yf,yb,eyf,eyb
-
-    def multirun_multigroup_for_back_counts(self,runs,groupings):
-        """
-        Deprecated
-
-        * input: 
-        *         runs, list of list, 
-                        [[run0 runs to add],[run1 runs to add], ...] 
-        *         grouping, {'forward':[3],'backward':[4]] for 3-4
-        *         uses self.single_multigroup_for_back_counts
-        * output:
-        *         yf, yb, eyf, eyf = vstacks over runs, groups
-        *         3D numpy arrays, used in calib multirun multigroups
-        """
-
-        from numpy import vstack,array
-        for k,run in enumerate(runs):
-            yforw, ybackw, ey_forw, ey_backw = self.single_multigroup_for_back_counts(run,groupings)
-            #        all are 1D numpy arrays
-            if k:
-                yf = vstack((yf,array([yforw])))
-                yb = vstack((yb,array([ybackw])))
-                eyf = vstack((eyf,array([ey_forw])))
-                eyb = vstack((eyb,array([ey_backw])))
-            else:
-                yf = array([yforw])
-                yb = array([ybackw])
-                eyf = array([ey_forw])
-                eyb = array([ey_backw])
-        return yf,yb,eyf,eyb
-                        
-    def asymmetry_multirun(self,kgroup):
-        """
-        Deprecated
-
-        input:
-                kgroup, index forward - backward pair 
-                    self.grouping[kgroup]['forward'] and ['backward']
-                    containing the respective lists of detectors
-        * uses the suite of run instances from musr2py/muisis2py  (psi/isis load routine) 
-        *
-        # can be B1, C1 fits 
-        outputs: 
-            asymmetry and asymmetry error (2d)
-                 also generates self.time (1d)
-        """
-
-        from numpy import vstack
-
-        if self.loadfirst:
-            for k,run in enumerate(self._the_runs_):
-                a,e = self.asymmetry_single(run,kgroup)
-                if a is None: 
-                    return None, None
-                if k==0:
-                    asymm, asyme  = a, e
-                else:
-                    asymm, asyme = vstack((asymm,a)), vstack((asyme,e))
-            return asymm, asyme
-        else:
-            return None, None
-
-    def asymmetry_multigroup(self):
-        """
-        Deprecated
-
-        input: none
-            calls self.asymmetry_single which calls self.single_for_back_counts
-        outputs: 
-            # can be A20, A21 fits 
-            asymmetry and asymmetry error (2d)
-        """
-
-        from numpy import vstack
-
-        if self.loadfirst:
-            if not self.multi_groups():
-                self.console('** ONLY ONE GROUP! Use asymmetry_single instead') 
-            run = self._the_runs_[0]   # must be only one run, switch brings here only if self.suite.single     
-            if not self.single():
-                self.console('** You are programmatically invoking asymmetry_multigroup with a multi-run suite')
-                self.console('*  Only the first run in the suite will be analysed') 
-            for kgroup in range(len(self.grouping)):
-                a,e = self.asymmetry_single(run,kgroup)
-                # self.console('Loaded run {}, group {} ({}), alpha = {}'.format(run[0].get_runNumber_int(), kgroup, 
-#                                                  self.groups[kgroup]['forward']+'-'+self.groups[kgroup]['backward'],
-#                                                  self.groups[kgroup]["alpha"]))  
-                if a is None: 
-                    return None, None
-                if kgroup==0:
-                    asymm, asyme  = a, e
-                else:
-                    asymm, asyme = vstack((asymm,a)), vstack((asyme,e))
-            return asymm, asyme
-        else:
-            self.console('** CHECK ACCESS to database (or load runs first)') 
-            return None, None
- 
-    def asymmetry_multirun_multigroup(self,multirun,multigroup): # 
-        """
-        Deprecated
-
-        input: 
-            multirun True/False 
-            multigroup True/False
-            calls self.asymmetry_single which calls self.single_for_back_counts
-        outputs: 
-            asymmetry and asymmetry error (3d,2d/1d)
-            for run in runs:
-                for group in groups:
-                    np.vstack # axis=1
-                np.vstack # axis=0
-        A1 -> False False self.asymmetry_single
-        A20 -> False True vstack of ngroups, iterate kgroup 
-        A21 -> False True vstack of ngroups
-        B1 -> True False vstack of nruns, iterate krun
-        B20 ->  True True vstack of vstacks, iterate krun. kgroup
-        B21 -> True True vstack of vstacks, iterate krun
-        C1 -> True False vstack of nruns
-        C2 -> True True vstack of vstacks
-        """
-
-        from numpy import array, vstack
-
-        if self.loadfirst:
-            if multirun and multigroup: # 3d
-            
-                for krun,run in enumerate(self._the_runs_):
-                    for kgroup in range(len(self.groups)):
-
-                        a,e = self.asymmetry_single(run,kgroup)
-                        if kgroup:
-                            asy,ase = vstack((asy,a)), vstack((ase,e)) # groups are vstacked in 2nd dimension
-                        else: # kgroup = 0
-                            asy,ase = a,e # 1d dimension bins
-                    if krun:
-                        asymm, asyme  = vstack((asymm,array([asy]))), vstack((asyme,array([ase])))
-                    else: # krun=0
-                        asymm, asyme = array([asy]),array([ase]) # 3rd dimension runs
-            elif multirun: # 2d
-                for krun,run in enumerate(self._the_runs_):
-                    a,e = self.asymmetry_single(run,0)
-                    if krun:
-                        asymm, asyme  = vstack((asymm,a)), vstack((asyme,e)) # runs are vstacked in 2nd dimension
-                    else: # krun=0
-                        asymm, asyme = a,e # 1nd dimension bins
-            elif multigroup:
-                for kgroup in range(len(self.groups)):
-                    a,e = self.asymmetry_single(self._the_runs_[0],kgroup)
-                    if kgroup:
-                        asymm,asyme = vstack((asymm,a)), vstack((asyme,e)) # groups are vstacked in 2nd dimension
-                    else: # kgroup = 0
-                        asymm,asyme = a,e# 1d dimension bins
-            else: # 1d, only bins
-                asymm,asyme = self.asymmetry_single(self._the_runs_[0],0)
-            return asymm, asyme
-        else:
-            self.console('** CHECK ACCESS to database (or load runs first)') 
-            return None, None
 

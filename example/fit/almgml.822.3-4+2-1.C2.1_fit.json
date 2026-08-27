@@ -2,7 +2,7 @@
     "version": "1",
     "fit_range": "0,20000,40",
     "offset": 20,
-        "userpardicts_guess": [
+        "globpardicts_guess": [
     {
       "name": "α34",
       "value": 1.13,

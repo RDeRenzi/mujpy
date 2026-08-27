@@ -12,89 +12,100 @@ def isok(ok,fit_type):
 string_ok = '\nSuccessfully tested fit types (check all output!): '
 string_ko = 'Broken fit types: '
 print('* Running mgml.822.3_4.1_fit.py: A1 single run single group fit')
-command = 'python3 '+path+"/mgml.822.3-4.1_fit.py"
+command = 'python '+path+"/mgml.822.3-4.1_fit.py"
 ok, string1 = isok(system(command),'A1')
 string_ok += ' '+string1+',' if not ok else ''
 string_ko += ' '+string1+',' if ok else ''
 
 print('* Running almlgml.822.3_4.1_fit.py: A1_calib single run single group fit')
-command = 'python3 '+path+"/almgml.822.3-4.1_fit.py"
+command = 'python '+path+"/almgml.822.3-4.1_fit.py"
 ok, string1 = isok(system(command),'A1_calib')
 string_ok += ' '+string1+',' if not ok else ''
 string_ko += ' '+string1+',' if ok else ''
 
 print('* Running mgml.822.3_4.2-1.1_fit.py: A20 single run multi group sequential fit')
-command = 'python3 '+path+"/mgml.822.3-4.2-1.1_fit.py"
+command = 'python '+path+"/mgml.822.3-4.2-1.1_fit.py"
 ok, string1 = isok(system(command),'A20')
 string_ok += ' '+string1+',' if not ok else ''
 string_ko += ' '+string1+',' if ok else ''
 
 print('* Running almgml.822.3_4.2-1.1_fit.py: A20_calib single run multi group sequential fit')
-command = 'python3 '+path+"/almgml.822.3-4.2-1.1_fit.py"
+command = 'python '+path+"/almgml.822.3-4.2-1.1_fit.py"
 ok, string1 = isok(system(command),'A20_calib')
 string_ok += ' '+string1+',' if not ok else ''
 string_ko += ' '+string1+',' if ok else ''
 
 print('* Running mgml.822.3_4+2-1.1_fit.py: A21 single run multi group global fit')
-command = 'python3 '+path+"/mgml.822.3-4+2-1.1_fit.py"
+command = 'python '+path+"/mgml.822.3-4+2-1.1_fit.py"
 ok, string1 = isok(system(command),'A21')
 string_ok += ' '+string1+',' if not ok else ''
 string_ko += ' '+string1+',' if ok else ''
 
 print('* Running almgml.822.3_4+2-1.1_fit.py: A21 calib single run multi group global fit')
-command = 'python3 '+path+"/almgml.822.3-4+2-1.1_fit.py"
+command = 'python '+path+"/almgml.822.3-4+2-1.1_fit.py"
 ok, string1 = isok(system(command),'A21_calib')
 string_ok += ' '+string1+',' if not ok else ''
 string_ko += ' '+string1+',' if ok else ''
 
 print('* Running  mgml.822.834.3-4.1_fit.py: B1 multirun sequential single group fit')
-command = 'python3 ' + path+'/mgml.822.834.3-4.1_fit.py'
+command = 'python ' + path+'/mgml.822.834.3-4.1_fit.py'
 ok, string1 = isok(system(command),'B1')
 string_ok += ' '+string1 if not ok else ''
 string_ko += ' '+string1 if ok else ''
 
 print('* Running  almgml.822.834.3-4.1_fit.py: B1 calib multirun sequential single group fit')
-command = 'python3 ' + path+'/almgml.822.834.3-4.1_fit.py'
+command = 'python ' + path+'/almgml.822.834.3-4.1_fit.py'
 ok, string1 = isok(system(command),'B1_calib')
 string_ok += ' '+string1 if not ok else ''
 string_ko += ' '+string1 if ok else ''
 
 print('* Running  mgml.822.834.3-4.2-1.1_fit.py: B20 sequential multirun multigroup fit')
-command = 'python3 ' + path+'/mgml.822.834.3-4.2-1.1_fit.py'
+command = 'python ' + path+'/mgml.822.834.3-4.2-1.1_fit.py'
 ok, string1 = isok(system(command),'B20')
 string_ok += ' '+string1 if not ok else ''
 string_ko += ' '+string1 if ok else ''
 
 print('* Running  almgml.822.834.3-4.2-1.1_fit.py: B20 calib sequential multirun multigroup fit')
-command = 'python3 ' + path+'/almgml.822.834.3-4.2-1.1_fit.py'
+command = 'python ' + path+'/almgml.822.834.3-4.2-1.1_fit.py'
 ok, string1 = isok(system(command),'B20_calib')
 string_ok += ' '+string1 if not ok else ''
 string_ko += ' '+string1 if ok else ''
 
 print('* Running  mgml.822.834.3-4+2-1.1_fit.py: B21 multirun sequential, multigroup global fit')
-command = 'python3 ' + path+'/mgml.822.834.3-4+2-1.1_fit.py'
+command = 'python ' + path+'/mgml.822.834.3-4+2-1.1_fit.py'
 ok, string1 = isok(system(command),'B21')
 string_ok += ' '+string1 if not ok else ''
 string_ko += ' '+string1 if ok else ''
 
 print('* Running  almgml.822.834.3-4+2-1.1_fit.py: B21 multirun sequential, multigroup global fit')
-command = 'python3 ' + path+'/almgml.822.834.3-4+2-1.1_fit.py'
+command = 'python ' + path+'/almgml.822.834.3-4+2-1.1_fit.py'
 ok, string1 = isok(system(command),'B21_calib')
 string_ok += ' '+string1 if not ok else ''
 string_ko += ' '+string1 if ok else ''
 
 print('* Running  mgml.822.3-4.C1.1_fit.py: C1 global multirun single group global fit')
-command = 'python3 ' + path+'/mgml.822.3-4.C1.1_fit.py'
+command = 'python ' + path+'/mgml.822.3-4.C1.1_fit.py'
 ok, string1 = isok(system(command),'C1')
 string_ok += ' '+string1 if not ok else ''
 string_ko += ' '+string1 if ok else ''
 
 print('* Running  almgml.822.3-4.C1.1_fit.py: C1 calib global multirun single group global fit')
-command = 'python3 ' + path+'/almgml.822.3-4.C1.1_fit.py'
+command = 'python ' + path+'/almgml.822.3-4.C1.1_fit.py'
 ok, string1 = isok(system(command),'C1_calib')
 string_ok += ' '+string1 if not ok else ''
 string_ko += ' '+string1 if ok else ''
 
+print('* Running  mgml.822.3-4+2-1.C2.1_fit.py: C2 global multirun single group global fit')
+command = 'python ' + path+'/mgml.822.3-4+2-1.C2.1_fit.py'
+ok, string1 = isok(system(command),'C2')
+string_ok += ' '+string1 if not ok else ''
+string_ko += ' '+string1 if ok else ''
+
+print('* Running  almgml.822.3-4+2-1.C2.1_fit.py: C2 calib global multirun single group global fit')
+command = 'python ' + path+'/almgml.822.3-4+2-1.C2.1_fit.py'
+ok, string1 = isok(system(command),'C2_calib')
+string_ok += ' '+string1 if not ok else ''
+string_ko += ' '+string1 if ok else ''
 
 if string_ko == 'Broken fit types: ':
     string_ko += 'None'

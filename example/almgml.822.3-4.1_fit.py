@@ -7,7 +7,6 @@ from os import getcwd #, chdir
 import matplotlib.pyplot as P
 startuppath = getcwd() # before changing to git mujpy (if mujpy installed this is not needed)
 from mujpy.musuite import suite
-from mujpy.mudash import dash
 from mujpy.mufit import mufit
 from mujpy.mufitplot import mufitplot
 datafile = '../data/deltat_tdc_gps_0822.bin'

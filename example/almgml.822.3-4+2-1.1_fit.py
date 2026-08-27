@@ -18,8 +18,8 @@ grp_calib = [{'forward':'3', 'backward':'4', 'alpha':1.13},{'forward':'2', 'back
 #
 the_suite = suite(datafile, runlist , grp_calib , offset, startuppath)
 dashboard_file = startuppath+'/fit/almgml.822.3-4+2-1.1_fit.json' # must exist
-the_fit = mufit(the_suite,dashboard_file)#,initialize_only=True)
+the_fit = mufit(the_suite,dashboard_file)#,no_fit=True)
 print('>>>>>>>>>>>>>> close (x) the figure to finish')
-plot_range = '0,20000,40'
+plot_range = '0,7000,40,25000,200'
 the_fitplot = mufitplot(plot_range,the_fit)
 P.show()

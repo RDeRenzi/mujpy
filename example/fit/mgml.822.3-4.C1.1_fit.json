@@ -2,7 +2,7 @@
     "version": "1new",
     "fit_range": "0,20000,40",
     "offset": 20,
-        "userpardicts_guess": [
+        "globpardicts_guess": [
     {
         "name": "f",
         "value": 0.2,
