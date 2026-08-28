@@ -1,6 +1,5 @@
-*****
 MuJPy
-*****
+=====
 
 A Python MuSR data analysis based on classes, with a graphical interface designed for jupyter, released under the MIT licence. 
 It aims at the useri-friendly appearance of mulab and the power of musrfit.
@@ -25,14 +24,15 @@ cd example
 python test.py 
 ```
 
-Modify these scripts to your purposes. The clumsy part is to modify by hand the models fit/... .json files. To avoid that
+Modify these scripts for your purposes. The clumsy part is to modify by hand the models fit/... .json files. To avoid that
 
-3. Install jupiter-lab for the gui editor mudashed
+3. Install jupiterlab for the gui editor class mudashed
 
-Docs and installation instructions still at v. 1.1, to be updated soon
+Docs and installation instructions still are work-in-progress
 
-----
+
 Old installation instructions (v 1.1)
+-------------------------------------
 * Make sure you have python, standard on linux, and jupyter lab. Otherwise install them (see https://docs.python.org/3/using/windows.html, https://docs.python.org/3/using/mac.html, jupyter.readthedoc.io).
 * Install mujpy. Clone or download from https://github.com/RDeRenzi/mujpy, unzip into the directory of your choice::
 

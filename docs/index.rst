@@ -10,14 +10,13 @@ Welcome to mujpy's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   Introduction
+   Introduction   
    Installation
    Tutorial
    Reference
    Examples
    FAQ
-   Developer
-   Philostory 
+   Developer 
    Source
 
 
