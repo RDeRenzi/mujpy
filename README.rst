@@ -4,7 +4,7 @@ MuJPy
 A Python MuSR data analysis based on classes, with a graphical interface designed for jupyter, released under the MIT licence. 
 It aims at the useri-friendly appearance of mulab and the power of musrfit.
 
-v. 3.0 refactoring. See _version.py for the most recent version details. 
+Version 3.0 refactoring. See _version.py for the most recent version details. 
 
 Main features: 
 - a model built on two-letter bricks: mg, for Gaussian-damped cosine, ml for Lorentzian-damped cosine etc.
@@ -19,10 +19,9 @@ To try mujpy:
 The scripts collected in test.py show how to drive mujpy in command line mode.
 To see some fit capabilities try
 
-```
-cd example
-python test.py 
-```
+.. code.block::
+        cd example
+        python test.py 
 
 Modify these scripts for your purposes. The clumsy part is to modify by hand the models fit/... .json files. To avoid that
 
