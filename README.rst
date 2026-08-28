@@ -17,9 +17,8 @@ To try mujpy:
 2. Install git and clone https://github.com/RDeRenzi/mujpy.git
 
 The scripts collected in test.py show how to drive mujpy in command line mode.
-To see some fit capabilities try
+To see some fit capabilities try::
 
-.. code.block::
         cd example
         python test.py 
 
