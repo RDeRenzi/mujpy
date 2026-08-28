@@ -1,3 +1,6 @@
+version_info = (3, 0, 0)
+
+__version__ = '%s.%s.%s'%(version_info[0], version_info[1], version_info[2])
 '''
 Version history
 version  3.0    new skimmed version of class musuite, mufit, mufitplot, mucomponents, 
@@ -49,4 +52,4 @@ Versions 1.x, not documented, based on mujpy.mugui, enclusing both gui and funct
                        class muedge and muprompt for t=0 determination at isis and psi bulkmusr  
 
 '''
-__version__ = "2.8"
+

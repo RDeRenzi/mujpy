@@ -1,6 +1,13 @@
 include LICENSE README.rst
-recursive-include mujpy MuSR2py.cpp MuSR_td_PSI_bin.cpp MuSR_td_PSI_bin.h Makefile
-recursive-include docs *
-recursive-include mujpy logo.png
-recursive-include example *
-
+recursive-include mujpy
+recursive-include docs
+prune docs/_build
+recursive-include example
+prune example/cache
+prune example/csv
+# Patterns to exclude from any directory
+global-exclude *~
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude .git
+global-exclude .ipynb_checkpoints

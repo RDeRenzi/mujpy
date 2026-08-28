@@ -13,7 +13,7 @@ We will walk through a few basic steps, assuming you have installed the followin
 
 Starting from scratch
 ---------------------
-Navigate to the working directory of your choice
+Navigate to the working directory of your choice.
 copy or link there the mugpy notebook mujpy_test_damg_lab.ipynb file
 
 Make a data dir, a tlog dir and a log dir.
