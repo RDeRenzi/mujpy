@@ -1,4 +1,4 @@
-MuJPy
+mujpy
 =====
 
 A Python MuSR data analysis based on classes, with a graphical interface designed for jupyter, released under the MIT licence. 
