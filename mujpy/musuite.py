@@ -149,12 +149,17 @@ class suite(object):
         # reverse of tools get_grouping is tools get_group
         self.offset = int(offset) # offset belongs to suite, that needs it for asymmetries
         if self.load_runs(): #           load data instances in self._the_runs_
+            # grp_calib is a list of dictionaries, one per group, with keys 'forward,'backward','alpha'
+            # where groups may be in shorthand notation
             self.groups = grp_calib
-        # grp_calib is a list of dictionaries, one per group, with keys 'forward,'backward','alpha'
-        # where groups may be in shorthand notation
+            self.LEM_back_subt = False
+            if self._the_instrument_ == 'LEM' and self._the_runs_[0][0].get_histo_fromt0_vector(15)[0]:
+                # in single_for_back_count use next eight background subtracted histo
+                self.console('                            using corrected LEM histograms 8,9,10,11,12,13,14,15') 
+                self.LEM_back_subt = True
             self.grouping = [] # reproduce the same with arrays of histogram numbers, done by tools get_grouping
-            self.store_groups() #        in self.grouping        self.promptfit(mplot)   #    to be done: make switch for ISIS
-            self.promptfit(mplot)   #    to be done: switch for ISIS broken and root LEM wip
+            self.store_groups() #        in self.grouping        self.promptfit(mplot)   #    to be done: make switch for isis
+            self.promptfit(mplot)   #    to be done: switch for isis broken and root lem wip
             self.timebase()
         # self.console('... end of initialize suite')
         else:
@@ -179,9 +184,9 @@ class suite(object):
         """
         Tries to load one or more runs to be added together
 
-        by means of murs2py. 
-        self.runs is a list of strings containing integer run numbers 
-        Returns -1 and quits if musr2py or muisis2py complain, 0 otherwise
+        by means of murs2py, muisis2py or muroot2py. 
+        self.runs[k] is a list of strings containing integer run numbers 
+        Returns -1 and quits if musr2py, muroot2py or muisis2py complain, 0 otherwise
         """
 
         from mujpy.muroot2py.muroot2py import muroot2py as rootload 
@@ -190,18 +195,19 @@ class suite(object):
         # muisis2py has the same methods as musr2py
         from mujpy.tools.tools import get_datafilename, get_title, short_path
         
-        def instrument(run):
-            instrument_set = set(['gps','gpd','dolly','flame','ltf','hifi'])
+        def instrument(run): # used by 'PSI' bin and mdu files
+            # datafilename, e.g. deltat_tdc_gps_0001.bin, contains '_instrument name_'
+            instrument_set = set(['gps','gpd','dolly','flame','ltf','hifi','vms'])
             return list(set(run.Filename().split('_')).intersection(instrument_set))[0].upper()
 
         read_ok = True
         runadd = []
         for j,run in enumerate(self.runs[k]): # run is a single run number
             path_and_filename =  get_datafilename(self.datafile,run) 
-            # print('path_and_filename in suite: {}'.format(path_and_filename))
-            if self.datafile[-4:]=='root':
+            # PSI cases
+            if self.datafile[-4:]=='root': # 
                 try:
-                    runadd.append(rootload(path_and_filename))
+                    runadd.append(rootload(path_and_filename)) # opens one run in the list
                     self._the_instrument_ = runadd[-1].get_instrument()
                     self._the_facility_ = 'PSI'
                 except:
@@ -213,7 +219,7 @@ class suite(object):
                 else:
                     self._the_instrument_ = instrument(runadd[j])
                     self._the_facility_ = 'PSI'
-
+            # ISIS case
             elif self.datafile[-3:]=='nxs': 
                 try: 
                     #self.console('{} ns'.format(isisload(path_and_filename,'r').get_binWidth_ns()))
@@ -263,9 +269,8 @@ class suite(object):
         """
 
         read_ok = True
-        for k,runs_add in enumerate(self.runs):#  runs_add can be a list of run numbers (string) to add
-            read_ok = read_ok and self.add_runs(k)                
-            # print('on_loads_change, inside loop, runs {}'.format(self._the_runs_))
+        for k in range(len(self.runs)):#  self.runs is a list of lists of run number stringsto add
+            read_ok = read_ok and self.add_runs(k) # this code reads and returns a read_ok code
         
         return read_ok # False with console error message in add_runs
 
@@ -297,6 +302,7 @@ class suite(object):
         from mujpy.tools.tools import get_grouping
         for k,group in enumerate(self.groups):
             fgroup, bgroup, alpha = get_grouping(group['forward']), get_grouping(group['backward']), group['alpha']
+
             if alpha>0 and self.check_group(fgroup) and self.check_group(bgroup): # checks legal grpcalib_file
             #a,b = self.check_group(fgroup), self.check_group(bgroup)
             # print('fwd = {} bwd = {}'.format(a,b))
@@ -316,7 +322,8 @@ class suite(object):
         """
         calculates T and eT values also for runs to be added
         
-        sillily, but it works also for single run 
+        sillily, but it works also for single run
+            ignores self.LEM_back_subt, a negligible factor for weight
         """
 
         from numpy import sqrt
@@ -385,6 +392,7 @@ class suite(object):
         
         if self._the_instrument_  == 'LEM':
             # t0 calibration encoded in file, override only by setting self.nt0 by hand
+            # self.nt0 and self.dt0 are independent of self.LEM_back_subt
             self.nt0 = array([int(self._the_runs_[0][0].get_t0_int(k)) for k in range(self._the_runs_[0][0].get_numberHisto_int())])
             self.dt0 = zeros_like(self.nt0) # fraction of bin, ignored with tdc resolution of 195 pds  
             self.lastbin = self.nt0.min() # unused for lem
@@ -731,27 +739,25 @@ class suite(object):
         from mujpy.tools.tools import TauMu_mus
 
         filespec = self.datafile[-3:] # 'bin', 'mdu', "oot" or 'nsx'
+        filespecs = ['bin','mdu']
+        filespecsr = ['bin','mdu','oot']
         if self.loadfirst:
             
-#            n1 = self.nt0[0] + self.offset # ISIS and lem PSI root
-#            n2 = n1 + self.histoLength # ISIS and lem PSI root
-#            print('musuite single_for_back_counts debug: n1 {}, n2 {}, self.histoLength {}'.format(n1,n2,self.histoLength))
             yfc, eyfc = zeros(self.histoLength), zeros(self.histoLength) # counts 
             ybc, eybc = zeros(self.histoLength), zeros(self.histoLength) # counts 
             back_f, back_b = 0., 0.             # background initialized
             n = self.lastbin-self.firstbin+1    # n of bins in back estimation 
-                           
+            n1 = self.nt0[0] + self.offset      # first good bin     
+            n2 = n1 + self.histoLength          # last good bin     
             for j, run in enumerate(runs): # Add runs
                 #print(run)
                 for counter in grouping['forward']: 
-                
-                    histo = array(run.get_histo_vector(counter,1)) # counter data array in forw group
-#                    if array(where(histo==0)).size:
-#                        print('musuite single_for_back_counts debug: run {} counter fwd {} contains {}  zeros'.format(run.get_runNumber_int(),counter,array(where(histo==0)).size))
-                    if filespec =='bin' or filespec=='mdu' or filespec=='oot': # PSI, counter specific range                  
+                    nc = counter + 8 if self.LEM_back_subt else counter
+                    histo = array(run.get_histo_vector(nc,1)) # counter data array in forw group
+                    if filespec in filespecsr: # oot is correct! PSI, counter specific range
                         n1 = self.nt0[counter] + self.offset # first good bin
                         n2 = n1 + self.histoLength           # last good bin
-                        back_f += mean(histo[self.firstbin:self.lastbin]) # before muon arrival
+                        back_f += mean(histo[self.firstbin:self.lastbin]) if filespec in filespecs else 0. # before muon arrival
                     yfc += histo[n1:n2] # counts 
                 p_0b =  exp(-back_f) if back_f > 0 else 0. # true Poisson probability for zero counts
                 eyfc = sqrt(yfc+(back_f+p_0b)/n) # error accounting also for zero counts
@@ -759,14 +765,12 @@ class suite(object):
                 yfc[where(yfc<0)] = 0
                         
                 for counter in grouping['backward']: # first good bin, last good bin from data attay start
-                
-                    histo = array(run.get_histo_vector(counter,1)) # counter data array in back group
-#                    if array(where(histo==0)).size:
-#                        print('musuite single_for_back_counts debug: run {} counter bkw {} contains {}  zeros'.format(run.get_runNumber_int(),counter,array(where(histo==0)).size))
-                    if filespec=='bin' or filespec=='mdu' or filespec=='oot': #  PSI, counter specific range  
+                    nc = counter + 8 if self.LEM_back_subt else counter
+                    histo = array(run.get_histo_vector(nc,1)) # counter data array in back group
+                    if filespec in filespecsr: #  PSI, counter specific range  
                         n1 = self.nt0[counter] + self.offset
                         n2 = n1 + self.histoLength 
-                        back_b += mean(histo[self.firstbin:self.lastbin])  # before muon arrival
+                        back_b += mean(histo[self.firstbin:self.lastbin]) if filespec in filespecs else 0.  # before muon arrival
                     ybc += histo[n1:n2]
                 p_0b =  exp(-back_b) if back_b > 0 else 0. # true Poisson probability for zero counts
                 eybc = sqrt(ybc+(back_b+p_0b)/n)

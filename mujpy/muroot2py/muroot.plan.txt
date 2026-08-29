@@ -1,0 +1,140 @@
+# uproot methods fopr ReadtheDocs objects
+histos ---|
+          |- DecayAnaModule (TObjArray):---|
+          |                                |- hDecay001 (TIntVector) # left/forward, Red or off
+          |                                |- hDecay002 (TIntVector) # top/forward, Red or off
+          |                                |- hDecay003 (TIntVector) # right/forward, Red or off
+          |                                |- hDecay004 (TIntVector) # bottom/forward, Red or off
+          |                                |- hDecay005 (TIntVector) # left/backward, Red or off
+          |                                |- hDecay006 (TIntVector) # top/backward, Red or off
+          |                                |- hDecay007 (TIntVector) # right/backward, Red or off
+          |                                |- hDecay008 (TIntVector) # bottom/backward, Red or off
+          |                                ...
+          |
+          |- SCAnaModule ---|
+          ...               |- hSampleTemperature
+                            |- hSampleMagneticField
+                            ...
+RunHeader ---|
+             |- RunInfo (TObjArray):  	Version (TString)
+                                       Generic Validator URL (TString)
+                                       Specific Validator URL (TString)
+                                       Generator (TString)
+                                       Proposal number
+                                       Main Proposer
+                                       File Name (TString)
+                                       Run Title (TString)
+                                       Run Number (Int_t)
+                                       Run Start Time (TString)
+                                       Run Stop Time (TString)
+                                       Run Duration (TMusrRunPhysicalQuantity) [s]
+                                       Laboratory (TString)
+                                       Instrument (TString)
+                                       Muon Beam Momentum (TString)
+                                       Muon Species (TString)
+                                       Muon Source (TString) 
+                                       Setup (TString)
+                                       Comment (TString)
+                                       Sample Name (TString)
+                                       Sample Temperature (TMusrRunPhysicalQuantity) [contains unit]
+                                       Sample Magnetic Field (TMusrRunPhysicalQuantity) [contains unit, G]
+                                       No of Histos (Int_t)
+                                       Time Resolution  (TMusrRunPhysicalQuantity) [contains unit, ns]
+                                       RedGreen Offset (TIntVector) 
+             |- DetectorInfo (TObjArray)---|
+             |                             |- Detector001 (TObjArray):
+                                                                      Name (TString)
+                                                                      Histo Number (Int_t)
+                                                                      Histo Length (Int_t)
+                                                                      Time Zero Bin (Double_t) 
+                                                                      Fisrt Good Bin (Int_t)
+                                                                      Last Good Bin (Int_t)  
+             |                             |- Detector002
+             |                             ...
+             |- SampleEnvironmentInfo (TObjArray):
+                                                  Cryo (TString)
+             |- MagneticFieldEnvironmentInfo (TObjArray):
+                                                  Magnet Name (TString)
+             |- BeamlineInfo (TObjArray):
+                                         Name (TString)
+             |- ScalerInfo (TOnjArray):
+             									scalername (Int_i)
+             |- RunSummary (TObjArray):
+                                       a number of (TString)
+             					
+List of get methods in nMuSR_td_PSI_bin, index-input is 0-based 
+read
+[readbin, readmdu]
+readingOK()
+ReadStatus()
+Filename()
+get_histo_int(int,int) histo index, bin returns int
+get_histo(int,int) histo, bin returns float
+get_histo_vector(int,int) histo index, binning, returns float array 
+get_histo_vector_no0(int,int) histo index, binning, returns float array 0.1->0.0
+get_histo_fromt0_vector(int,int,int) histo index, binning, offset index returns list of floats from t0_int+offset
+get_histo_goodBins_vector(int,int) histo index, binning returns list of floats from firstGood to lastGood
+get_histo_fromt0_minus_bckgrd_vector(int,int,int,int,int) histo index, bkg first index, bkg last index, binning, offset index returns list of floats
+get_histo_goodBins_minus_bckgrd_vectorint,int,int,int) histo index, bkg first index, bkg last index, binning returns list of floats
+get_asymmetry_vector(histo+,histo-,alpha,binning,bkg+ first, bkg+ last,bkg- first, bkg- last, offset index, y offset)
+get_error_asymmetry_vector(histo+,histo-,alpha,binning,bkg+ first, bkg+ last,bkg- first, bkg- last, offset index)
+get_asymmetry_goodBins_vector -- strange, not reproducible [try bi = MuSR_td_PSI_bin('data/deltat_tdc_gps_2277.bin')  bin.get_asymmetry_goodBins_vector(1,0,1.0,10,10,300,10,300)]
+get_error_asymmetry_goodBins_vector -- same
+get_numberScaler_int() returns int how many scalers
+get_scalers_vector() returns list of int counts
+get_max_t0_int() returns max index of all t0 bins
+get_max_2_t0_int(int, int) histo indices returns the max t0 bin of the two
+get_min_2_t0_intint, int) histo indices returns the min t0 bin of the two
+get_min_t0_int(int,int) histo indices returns min index of all t0 bins
+get_binWidth_ps() ditto
+get_binWidth_ns() ditto
+get_binWidth_us() ditto
+get_histoLength_bin() ditto
+get_numberHisto_int() ditto
+get_totalEvents_long() returns total counts
+get_eventsHisto_long(int) histo inmdex returns its total counts
+get_eventsHisto_vector() returns lists of total counts
+get_t0_double(int) histo index returns a fractional bin deviation for t0 (often 0.0)
+get_default_binning() returns 1
+get_t0_int(int) histo index returns index of t0 bin
+get_t0_vector() returns list of indeces of t0 bin
+get_firstGood_int(int) histo index returns ditto
+get_firstGood_vector() returns list of indeces of ditto
+put_firstGood_int modifies ditto
+get_lastGood_int(int) histo index returns ditto
+get_lastGood_vector() returns list of indeces of ditto
+get_max_lastGood_int() returns the maximum of all lastGood bins
+get_max_2_lastGood_int(int,int) two histos indices returns ditto
+get_min_lastGood_int() returns the minimum of all lastGood bins
+get_min_2_lastGood_int(int,int) two histos indices returns ditto
+put_lastGood_int modifies ditto
+get_runNumber_int() returns ditto
+put_runNumber_int modifies ditto
+get_sample() returns title sample string
+get_temp() returns title temperature string
+get_orient() returns title orientation string
+get_field() returns title field string
+get_comment() returns ditto
+get_nameHisto(int) histo index returns string
+get_histoNames_vector() returns list of strings
+get_scalersNames_vector() returns list of strings
+get_numberTemperature_int() returns number of sensor slots in the file
+get_temperatures_vector() returns list of their values
+get_devTemperatures_vector returns list opf their values
+get_timeStart_vector returns string list ['DD-MTH-YY','hh:mm:ss']
+get_timeStop_vector returns string list ['DD-MTH-YY','hh:mm:ss']
+Clear
+Show
+__repr__
+
+what is useful of all this? first, last Good relies on user setting them right at data tking, never done. t0 is probably also unreliably set by users for bulk musr, t0 is trustworthy (?) for lem
+
+useless: histo_int, histo_double, asymmetry_goodBins, error_asymmetry_goodBins, all goodBins, default_binning, put_firstGood, put_lastGood, put_runNumber
+
+useful: read, readingOK, Filename, binWidth_ns,_us, h	istoLength_bin, number_Histo, runNumber, histo_vector, _vector_no0, fromt0_vector, fromt0_minus_bckgrd_vector, nameHisto, histoNames_vector, timeSt.., number_Temperature, temperatures, devTemperatures, 
+Show
+
+maybe: ReadStatus, asymmetry, error_asymmetry, t0, scalers, totalEvents, eventsHisto, Clear
+
+differences: muroot2py histo and asymmetry yields numpy arrays, musr2py yields lists
+

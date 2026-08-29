@@ -5,7 +5,7 @@ from mujpy.musuite import suite
 from mujpy.mufit import mufit
 from mujpy.mufitplot import mufitplot
 from matplotlib.pyplot import show
-datafile = '../data/deltat_tdc_gps_0822.bin'
+datafile = 'data/deltat_tdc_gps_0822.bin'
 runlist = '822' # first run first
 offset = '20'
 grp_calib = [{'forward':'3', 'backward':'4', 'alpha':1.13}]

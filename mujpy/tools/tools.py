@@ -1833,7 +1833,7 @@ def get_grouping(groupcsv):
       contained in self.suite.group[k]["forward] of self.suite.group[k]["backward"]
           (the k-th detector group of a multi group fit)
     output
-     grouping is an np.array of indces, 0 based
+     grouping is an np.array of indices, 0 based
         used in musuite
     """
     import numpy as np
@@ -1891,8 +1891,14 @@ def init_csv_row(filespec, the_run, group = False):
 
     nrun = str(the_run.get_runNumber_int())
     #print('tools init_csv_row nrun {}'.format(nrun))
-    Bstr = the_run.get_field()
-    if filespec=='bin' or filespec=='mdu':
+    Bstr  = the_run.get_field()
+    try:
+        Bstr = '{:.1f}'.format(float(Bstr[:Bstr.index('G')])/10)
+    except:
+        Bstr = '{:.1f}'.format(float(Bstr)/10)
+
+    filespecs = ['bin','mdu'] 
+    if filespec in filespecs:
         TsTc, eTsTc = the_run.get_temperatures_vector(), the_run.get_devTemperatures_vector()
         n1,n2 = spec_prec(eTsTc[0]),spec_prec(eTsTc[1]) # calculates format specifier precision
         form = '{},{:.'+'{}'.format(n1)+'f},{:.'+'{}'.format(n1)
@@ -1902,6 +1908,18 @@ def init_csv_row(filespec, the_run, group = False):
             return form.format(nrun, TsTc[0],eTsTc[0],TsTc[1],eTsTc[1], float(Bstr[:Bstr.find('G')]),group)
         else:
             return form.format(nrun, TsTc[0],eTsTc[0],TsTc[1],eTsTc[1], float(Bstr[:Bstr.find('G')]))
+
+    elif filespec=='oot': # oot is the last 3 chars of 'root'!
+        TsTc, eTsTc = the_run.get_temperatures_vector(), the_run.get_devTemperatures_vector()
+        n1 = spec_prec(eTsTc[0])
+        form = '{},{:.'+'{}'.format(n1)+'f},{:.'+'{}'.format(n1)+'f}'
+        if group:
+            form += '{},'
+            return form.format(nrun, TsTc[0],eTsTc[0],float(Bstr[:Bstr.find('G')]),group)
+        else:
+            return form.format(nrun, TsTc[0],eTsTc[0],float(Bstr[:Bstr.find('G')]))
+
+
     elif filespec=='nxs':
         Ts = the_run.get_temperatures_vector()
         n1 = '1'       

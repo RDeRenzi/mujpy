@@ -1,6 +1,5 @@
----
-title: mujpy
----
+
+# mujpy
 
 A Python MuSR data analysis based on classes, with a graphical interface
 designed for jupyter, released under the MIT licence. It aims at the
@@ -33,7 +32,9 @@ hand the models fit/... .json files. To avoid that
 
 Docs and installation instructions still are work-in-progress
 
-# Old installation instructions (v 1.1)
+----
+
+## Old installation instructions (v 1.1)
 
 - Make sure you have python, standard on linux, and jupyter lab.
   Otherwise install them (see
