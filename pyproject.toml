@@ -29,7 +29,8 @@ dependencies = [
 		'fonttools',
 		'voila',
 		'sidecar',
-		'pyqt5'
+		'pyqt5',
+		'sphinx-rtd-theme'
 		]
 
 
