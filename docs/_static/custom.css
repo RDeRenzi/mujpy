@@ -1,0 +1,9 @@
+/* Center or left-align the math block */
+.math {
+    text-align: center;
+}
+
+/* Force the equation number to float to the right side of the same line */
+.eqno {
+    float: right;
+}

@@ -11,7 +11,7 @@ startuppath = getcwd() # before changing to git mujpy (if mujpy installed this i
 from mujpy.musuite import suite
 from mujpy.mufit import mufit
 from mujpy.mufitplot import mufitplot
-datafile = '../data/deltat_tdc_gps_0822.bin'
+datafile = 'data/deltat_tdc_gps_0822.bin'
 runlist = '822,827:834:-1' # first run first
 offset = '20'
 grp_calib = [{'forward':'3', 'backward':'4', 'alpha':1.13},{'forward':'2', 'backward':'1', 'alpha':1.135}]

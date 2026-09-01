@@ -3,36 +3,37 @@
 
 Introduction
 ============
-Welcome to **mujpy**  |mSR| data analysis, v.3.0, a set of a few python classes that can be called by command line. Here we assume that you are familiar with the basic technique, with asymmetry and its |a| ratio. This docs provides also an ultrashort, *nuts and bolts* introduction to the physics.
-The full aims of this suite of programs are 
-        * easy and efficient Minuit fit of muon asymmetries from any facility (limited to PSI and ISIS at present)
-        * an intuitive and flexible GUI model editor, both for the simple single dataset fit and for more complex global fits across many datasets and different detector groupings
-        * a powerful fit display, based on animations, with optional distinct packing of early and late times, to inspect fast precessions and slow decays at the same time.    
-        * simple logs and a csv output for easy plotting of fit parameters
-        * saved json fit input for reproducible results
+Welcome to **mujpy**  |mSR| data analysis, v.3.0, a small set of command-line python classes. Basic code-oriented |mSR| concepts are recalled in :doc:`NutsNdBoltsMuSR`.
+These classes provide 
+        * simultaneous access to sets of asymmetries on the same sample: list of runs and/or list of detector groups.
+        * Minuit fit of muon asymmetries from PSI and ISIS (add your own)
+        * intuitive GUI model editor, for simple single dataset fit and more complex global fits of many datasets and detector groups
+        * a fit display based on animations, optional distinct packing of early and late times, to show fast and slow evolution.    
+        * logs and csv output for plotting of fit parameters
+        * reproducible by saved json fit input
 
-In a sentence, mujpy joins the power of `musrfit <http://lmu.web.psi.ch/musrfit/technical/main.html>`_ by Andreas Suter, a golden standard of |mSR| data analyisis, albeit with a notorious *steep learning curve*, with the ease of the old Matlab `mulab <http://www.fis.unipr.it/~derenzi/dispense/pmwiki.php?n=MuSR.Mulab>`_ interface by R. De Renzi. The main virtue of the latter were
+mujpy merges the best of `musrfit <http://lmu.web.psi.ch/musrfit/technical/main.html>`_ by Andreas Suter, the *steep learning curve* standard, with the old intuitive `mulab <http://www.fis.unipr.it/~derenzi/dispense/pmwiki.php?n=MuSR.Mulab>`_\ (Matlab) approach by R. De Renzi. The main virtue of the latter were
 
-    * an easy way to combine elementary fit components, labelled by two letters: damped cosines (``mg``, ``ml``), Bessel functions (``jg``, ``js``), simple relaxations (``bg``, ``bl``), Kubo-Toyabe functions (``kg``, ``kl``), FMuF functions (``fm``), etc. The model is defined by an acronym that is a combination of two-letter components, e.g. ``mgml`` is the sum of one Gaussian-damped and one Lorentzian-damped cosines.
-    * an easy GUI input for sharing or combining parameters among these components 
-    * an efficient plot with residues to immediately grasp goodness of fit 
+    * elementary fit components, labelled by two letters: damped cosines (``mg``, ``ml``), Bessel functions (``jg``, ``js``), simple relaxations (``bg``, ``bl``), Kubo-Toyabe functions (``kg``, ``kl``), FMuF functions (``fm``), etc. 
+    * model selected  by acronym, combining the two-letter components: ``mgml`` is the sum of a Gaussian- and a Lorentzian-damped cosine.
+    * GUI model editor for combining parameters among components, based on jupyter notebooks interface and `ipywidgets <https://ipywidgets.readthedocs.io/en/latest/>`_  
+    * plot with residues to visualize goodness of fit 
 
-
-The Mujpy GUI is based on the `jupyterlab <https://jupyterlab.readthedocs.io/en/stable/getting_started/installation.html>`_  notebook interface and `ipywidgets <https://ipywidgets.readthedocs.io/en/latest/>`_  
 
 .. sidebar:: Global fit
 
    A global fit is the minimization of a single cost function, the sum of a cost function for each asymmetry. 
 
-Fits come in eight types, increasing in complexity, conventionally labelled *A1, A20, A21, B1, B20, B21, C1, C2*. *A* fits are single run, *B* are sequential fits on a set of runs, *C1* is a **global** fit of a set of runs. *X20* (with *X* = *A,B*\ ) are sequential fits on two or more detector groupings (e.g. 2-1 and 3-4 on PSI GPS). *X21* are **global** fits of the same set of groupings.
+Eight types of fit are conventionally labelled *A1, A20, A21, B1, B20, B21, C1, C2*. *A* fits are single run, *B* are sequential fits on a set of asymmetries, *C1* is a **global** fit of a set of runs. *X20* (with *X* = *A,B*\ ) are sequential fits on two or more detector groups (e.g. 2-1 and 3-4 on PSI GPS). *X21* are simultaneous **global** fits of the same groups.
+Finally *C2* is a global fit across runs and groups.  
 
-Finally *C2* is a global fit of a set of runs and groupings. 
-In the simplest *A21* case the global parameters are first defined by the user, and then assigned to the standard model parameters.
-Notice that *C1, C2* can define local virtual parameters, called *hash* parameters, that give rise to a separate replica for each run. This nomenclature is irrelevant in the GUI editor, but it is good to know it anyway.
+This nomenclature is only relevant inside the code, the GUI just selects sequential or global fits.
+Global parameters are defined in advance. The simplest *A21* global fit assigns them to model parameters. 
+In *C1, C2* fits virtual *hash* parameters are also defined in advance, assigned to model parameters, and give rise to a separate local replica for each asymmetry. 
 
-.. note:: Each of these eight fit types comes in two versions: one, say ``mgml``, with fixed values of the |a| ratios that define a detector grouping asymmetry, and one with the |a| values as  Minuit fit parameters for an automatic calibration, when the data allow it. The acronym of the second version must be ``almgml``, the |a| parameter being formally treated as the first fit component (al), although it is not an additive one. 
+.. note:: Each of these eight fit types comes in two versions: one, say ``mgml``, with fixed values of the |a| ratio that defines a detector grouping asymmetry, and one with the |a| values as Minuit fit parameters, for automatic calibration when the data allow it. The acronym of the second version must be ``almgml``, the |a| parameter being formally treated as the first fit component ``al``, although it is not an additive one. 
 
-Mujpy comes with a test script showing all these 16 subtypes on a standard TF |mSR| data set (a temperature scan approaching a magnetic transition from the paramagnetic side). Try it! Just run ```python test.py``` from subfolder ```example```. Each script in the sequence can be run independently and used as templates for the corresponding fit.
+The package includes a ```test.py``` script demonstrating all these 16 subtypes on a standard TF |mSR| data set (a temperature scan approaching a magnetic transition from the paramagnetic side). Try it! Just run ```python test.py``` from subfolder ```example```. Each script in the sequence can be run independently and used as templates for the corresponding fit type.
 
 Basic GUI editor usage
 ----------------------
@@ -41,14 +42,14 @@ Using the ```.py``` templates is efficient but has one big drawback: the fit is 
 
 .. code-block::
 
-    %matplotlib ipympl
+    %matplotlib qt
 
 in the first cell to activate the correct graphic backend. Then type
 
 .. code-block::
 
         from mujpy.mudashed import dashed as mudash
-        mudash()
+        the_dash = mudash()
   
 In the second cell (this is actually the content of Mudashed.ipynb, just start that one if you are lazy). Three rows of widgets appear 
 

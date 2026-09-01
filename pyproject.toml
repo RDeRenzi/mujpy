@@ -1,0 +1,47 @@
+[project]
+name = "mujpy"
+dynamic = ["version"]
+description = "muSR data analysis classes with jupyterlab ipywidgets GUI"
+authors = [ { name = "Roberto De Renzi", email = "roberto.derenzi@unipr.it" }, ]
+keywords =["muSR", "data analysis"]
+readme = "README.rst"
+license = "GPL-3.0-or-later" 
+classifiers = [
+  "Intended Audience :: Science/Research",
+  "# SPDX-License-Identifier: GPL-3.0-or-later",
+  "Programming Language :: Python :: 3",
+  "Framework :: Jupyter :: Jupyterlab",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: Physics"]
+requires-python = ">=3.8"
+dependencies = [
+		'setuptools',
+		'numpy',
+		'nexusformat',
+		'uproot',
+		'musr2py',
+		'scipy',
+		'sympy',
+		'iminuit',
+		'jupyterlab',
+		'ipympl',
+		'ipywidgets',
+		'fonttools',
+		'voila',
+		'sidecar',
+		'pyqt5'
+		]
+
+
+[project.urls]
+Repository = "https://github.com/RDeRenzi/mujpy"
+Documentation = "https://readthedocs.org"
+
+[build-system]
+requires = [
+    "setuptools>=80", "setuptools-scm[simple]>=9.2", "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+version_file = "mujpy/_version.py"

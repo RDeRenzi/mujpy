@@ -23,8 +23,8 @@ class dashed(object):
         from IPython.display import display# ,  HTML
 
         self.facility = facility
-        self.mudashed_width = '880px'   
-        self.output_width = '920px'
+        self.mudashed_width = '900px'   
+        self.output_width = '900px'
         self.textheight = '23px'
         self.labelheight = '23px'
         self.buttonheight = '48px'
@@ -64,9 +64,10 @@ class dashed(object):
         """
         written output
         """
-        #print('debug in mudashed log')
-        with self.board_box:
+
+        with self.board_box: # just an Output
             print(string) # THIS MUST BE print, NOT self.log!
+
 
     def command2dash(self):
         """
@@ -136,7 +137,7 @@ class dashed(object):
                 self.the_fit = mufit(self.suite,dashboard_file,no_fit = guess, dash_log = self.log) # writes text to board_box
                 #self.figure_box.clear_output()
                 plot_range = self.command_1.children[8].value
-                rotfreq = self.command_1.children[10].value
+                rotfreq = self.command_1.children[9].value
                 mufitplot(plot_range, self.the_fit, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box) # plots in self.figure_box
 
 
@@ -407,6 +408,8 @@ class dashed(object):
         from ipywidgets.widgets import Output, ToggleButtons, Button, Label, Layout, Text, IntText
         from ipywidgets.widgets import Dropdown, FloatText, HBox, VBox, HTML
         from mujpy.musuite import suite
+        from datetime import datetime
+        from sidecar import Sidecar
 
         ##################################################################################################
         # Use from scratch
@@ -754,8 +757,8 @@ class dashed(object):
         # 2. Inietta il CSS nel notebook tramite un widget HTML
         css_widget = HTML(value=custom_css)
         command_width = ['38%','21%','11%','14%','8%','8%']
-        self.figure_box = Output(layout=Layout(width='900px',height='410px'))# define a space for the plots
-        self.board_box = Output(layout=Layout(command_width='900px',height='650px'))
+        self.figure_box = Output(layout=Layout(width='100%',height='410px'))# width='900px'
+        self.board_box = Output(layout=Layout(width='100%',height='650px'))
         fit_type = ToggleButtons(options = ['sequential fit','global fit'],
                                  value = 'sequential fit',
                                  tooltips = ['A1 A20 B1 B20\nsingle asymmetry fit','A21 B21 C1 C2\nmulti asymmetries fit'],
@@ -803,7 +806,14 @@ class dashed(object):
                      self.command_box,
                      self.global_box,
                      self.model_box],
-                     layout={'width':board_width,'border':self.model_button_color})
-        panels = HBox([dash,VBox([self.figure_box,self.board_box])],layout={'width':'100%'})
-        display(css_widget,panels)
+                    layout={'width':'100%','border':self.model_button_color}) # 'width':board_width
+        #panels = HBox([dash,VBox([self.figure_box,self.board_box])],layout={'width':'100%'})
+        display(css_widget,dash)
+        #now = datetime.now()
+        #dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+        SC = Sidecar(title='Mudashed log: {}'.format(datetime.now().strftime("%d/%m/%Y %H:%M")))
+        with SC:
+            display(self.board_box)
 
+        # Button( icon = 'fa-trash' #, <i class="fa-thin fa-trash"></i>
+        #https://stackoverflow.com/questions/60116974/what-is-the-icon-argument-for-ipywidgets-button

@@ -862,7 +862,6 @@ class mufit(object):
         else:
             alpha = [group['alpha'] for group in self.suite.groups]
         chi = self.lastfit.fval/self.number_dof # true fit reduced chi square, fval is cost (chi2) at the minimum
-        print('debug prepare_globcsv_row\nrow = {}\npar_err_str = {}'.format(row,par_err_str))
         row += par_err_str 
         row += chi2_csv(chi,lowchi,hichi,alpha,self.suite.offset) # now accepts also lists of alphas
         row += '\n'

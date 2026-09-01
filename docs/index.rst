@@ -15,6 +15,7 @@ Welcome to mujpy's documentation!
    Tutorial
    Reference
    Examples
+   NutsNdBoltsMuSR
    FAQ
    Developer 
    Source
