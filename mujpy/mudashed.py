@@ -571,11 +571,28 @@ class dashed(object):
                 if os.path.isfile(datafile):
                     if runlist:
                         self.suite = suite(datafile , runlist , grp_calib , offset , 'CettoLaqualunque',console=self.log) #startuppath is set in suite
-                        # self.log info 
-                        self.suite_box.children[0].children[0].value = ' '.join(self.suite._the_runs_[0][0].get_timeStart_vector())
-                        self.suite_box.children[0].children[1].value = ' '.join(self.suite._the_runs_[0][0].get_timeStop_vector())
-                        self.suite_box.children[0].children[2].value = get_title(self.suite._the_runs_[0][0])
-                        self.suite_box.children[0].children[3].value = self.suite._the_runs_[0][0].get_comment()
+                        # self.log info
+                        starttime_options = [' '.join(self.suite._the_runs_[k][0].get_timeStart_vector()) for k in range(self.suite.nruns)]
+                        starttime_options.insert(0,'Run start times')
+                        self.suite_box.children[0].children[0].options = starttime_options
+                        self.suite_box.children[0].children[0].value = starttime_options[1]
+
+                        stoptime_options = [' '.join(self.suite._the_runs_[k][0].get_timeStop_vector()) for k in range(self.suite.nruns)]
+                        stoptime_options.insert(0,'Run stop times')
+                        #self.log('nruns {}, SD_options = {}'.format(self.suite.nruns,starttime_options))
+                        self.suite_box.children[0].children[1].options = stoptime_options
+                        self.suite_box.children[0].children[1].value = stoptime_options[1]
+
+                        title_options = [get_title(self.suite._the_runs_[k][0]) for k in range(self.suite.nruns)]
+                        title_options.insert(0,'Titles')
+                        self.suite_box.children[0].children[2].options = title_options
+                        self.suite_box.children[0].children[2].value = title_options[1] 
+
+                        comment_options = [self.suite._the_runs_[k][0].get_comment() for k in range(self.suite.nruns)]
+                        comment_options.insert(0,'Comments')
+                        self.suite_box.children[0].children[3].options = comment_options 
+                        self.suite_box.children[0].children[3].value = comment_options[1]
+
                         totalcounts, groupcounts, nsbin, maxbin = get_gtotals(self.suite)
                         self.suite_box.children[0].children[4].value = nsbin
                         self.suite_box.children[0].children[5].value = maxbin 
@@ -634,23 +651,25 @@ class dashed(object):
 
         self.suite_box [^ disabled, Buttons all on_click, * observe]
         """
+
         info_width = ['16%','16%','27%','27%','6%','8%']
-        SD_text = Text(value='',
+        SD_drop = Dropdown(options = ['Run start times'], value='Run start times',
                         layout = Layout(width=info_width[0]),
-                        tooltip = 'start time',
-                        disabled = True)
-        PD_text = Text(value='',
+                        tooltip = 'run start times',
+                           )# this is not disabled = True, but has no observe
+        SD_drop.add_class("custom-grey-dropdown") #  and is color gray
+        PD_drop = Dropdown(options = ['Run stop times'], value='Run stop times',
                         layout = Layout(width=info_width[1]),
-                        tooltip = 'stop time',
-                        disabled = True)
-        TL_text = Text(value='',
+                        tooltip = 'run stop time')
+        PD_drop.add_class("custom-grey-dropdown") #  and is color gray
+        TL_drop = Dropdown(options = ['Titles'], value='Titles',
                         layout = Layout(width=info_width[2]),
-                        tooltip = 'title',
-                        disabled = True)
-        CM_text = Text(value='',
+                        tooltip = 'titles')
+        TL_drop.add_class("custom-grey-dropdown") #  and is color gray
+        CM_drop = Dropdown(options = ['Comments'], value='Comments',
                         layout = Layout(width=info_width[3]),
-                        tooltip = 'comment',
-                        disabled = True)
+                        tooltip = 'comments')
+        CM_drop.add_class("custom-grey-dropdown") #  and is color gray
         NS_text = Text(value='',
                         layout = Layout(width=info_width[4]),
                         tooltip = 'ns/bin',
@@ -660,12 +679,10 @@ class dashed(object):
                           tooltip='max bins',disabled = True)
 
         suite_info = HBox([
-                       SD_text,
-                       PD_text,
-                       TL_text,
-                       CM_text,
-                       #Label(value='NS',
-                       #      layout = Layout(width=width[4])),
+                       SD_drop,
+                       PD_drop,
+                       TL_drop,
+                       CM_drop,
                        NS_text,
                        MB_text
                        ])
@@ -738,17 +755,21 @@ class dashed(object):
         <style>
             .jp-OutputArea-output pre { white-space: pre !important; }
             .container { width:100% !important; }
-            /* Colore di sfondo e testo per i pulsanti non selezionati */
+            /* background and text color for unselected ToggleButtons */
             .widget-toggle-button {
                 background-color: #b5d6d0;
                 color: #888888 ;
             }
 
-            /* Colore di sfondo e testo per il pulsante attualmente SELEZIONATO (attivo) */
+            /* background and text color for SELECTED ToggleButtons (active) */
             .widget-toggle-button.mod-active {
                 background-color: #97b3ae;
                 color: #000000;
                 border-color: #4b5957 ;
+            }
+            /* SD_ PD_ TL_ CM_ dropdown in nsuite_info */
+            .custom-grey-dropdown select option {
+                color: grey !important;
             }
         </style>
 
