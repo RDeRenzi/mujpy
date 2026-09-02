@@ -1352,7 +1352,8 @@ class mumodel(object):
            else: # even
                Np = Ns//2-1
                Nm = -Ns//2
-           n = hstack((inspace(0,Np,Np+1),linspace(Nm,-1.,-Nm)))
+           # WARNING! was is inspace)0,Np,,Np+1= but what is inspace?
+           n = hstack((linspace(0,Np,Np+1),linspace(Nm,-1.,-Nm))) # 
            f = fft.ifft(fft.fft(f)*exp(nshift*1j*2*pi*n/Ns)) # shift back
         # multiply by amplitude
         f = A*real(f[0:N])

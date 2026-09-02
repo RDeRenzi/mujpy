@@ -11,7 +11,7 @@ class dashed(object):
 ##########################
 # INIT
 ##########################
-    def __init__(self,facility='PSI'):
+    def __init__(self,facility='PSI',sidecar=False):
         '''
             Launches the simple gui, that requires only an instance of mujpy.musuite suite 
         '''
@@ -23,6 +23,7 @@ class dashed(object):
         from IPython.display import display# ,  HTML
 
         self.facility = facility
+        self.sidecar = sidecar
         self.mudashed_width = '900px'   
         self.output_width = '900px'
         self.textheight = '23px'
@@ -112,6 +113,7 @@ class dashed(object):
                 rotfreq = self.command_1.children[9].value
                 fft_range = self.command_1.children[12].value # not yet in use 
                 lb = self.command_1.children[13].value # not yet in use 
+                self.tab.selected_index=1
                 mufitplot(plot_range, the_fit, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box) # plots in self.figure_box
 
         def on_Plot(b):
@@ -399,17 +401,24 @@ class dashed(object):
 
     def board(self):
         '''
-        draws a gui editor
+        entry, draws the gui editor in 3 stages, suite, model selection, editor
 
+            for suite input and information
+            for command actions (Fit,Plot,FFT,Ranges ...)
             for 'model_guess' list of components and their pardicts
             for 'globpardicts_guess' list of global parameters
         '''
 
         from ipywidgets.widgets import Output, ToggleButtons, Button, Label, Layout, Text, IntText
-        from ipywidgets.widgets import Dropdown, FloatText, HBox, VBox, HTML
+        from ipywidgets.widgets import Dropdown, FloatText, HBox, VBox, HTML, Box, Image, Textarea
+        from ipywidgets.widgets import Tab
         from mujpy.musuite import suite
+        from mujpy import __file__ as MuJPyName
+        from mujpy._version import __version_tuple__ as version_tup
+        from mujpy.tools.tools import _available_components_
         from datetime import datetime
         from sidecar import Sidecar
+        import os
 
         ##################################################################################################
         # Use from scratch
@@ -642,6 +651,7 @@ class dashed(object):
 # initiate gui first stage
 ##########################   
         """
+        tabs Fit Log Help About
         info [SD] Text^ [PD] Text^ [TT] Text^ [CM] Text^ [NS] Text^ [MB] Text^ 
              [3]  15    [3]  15         20         20         10         10    tot 90
              [GR] Text α FloatText [GR] Text α FloatText
@@ -651,6 +661,7 @@ class dashed(object):
 
         self.suite_box [^ disabled, Buttons all on_click, * observe]
         """
+
 
         info_width = ['16%','16%','27%','27%','6%','8%']
         SD_drop = Dropdown(options = ['Run start times'], value='Run start times',
@@ -779,7 +790,7 @@ class dashed(object):
         css_widget = HTML(value=custom_css)
         command_width = ['38%','21%','11%','14%','8%','8%']
         self.figure_box = Output(layout=Layout(width='100%',height='410px'))# width='900px'
-        self.board_box = Output(layout=Layout(width='100%',height='650px'))
+        self.board_box = Output(layout=Layout(width='100%',height='650px',overflow_y='auto'))
         fit_type = ToggleButtons(options = ['sequential fit','global fit'],
                                  value = 'sequential fit',
                                  tooltips = ['A1 A20 B1 B20\nsingle asymmetry fit','A21 B21 C1 C2\nmulti asymmetries fit'],
@@ -829,12 +840,41 @@ class dashed(object):
                      self.model_box],
                     layout={'width':'100%','border':self.model_button_color}) # 'width':board_width
         #panels = HBox([dash,VBox([self.figure_box,self.board_box])],layout={'width':'100%'})
-        display(css_widget,dash)
         #now = datetime.now()
         #dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
-        SC = Sidecar(title='Mudashed log: {}'.format(datetime.now().strftime("%d/%m/%Y %H:%M")))
-        with SC:
-            display(self.board_box)
-
+        help_box = Textarea(
+                            disabled=True, # Prevents users from editing the text
+                            layout=Layout(width='900px',height='660px'))
+        help_text = 'Available components, uniuquely identified by two letters, and their Minuit parameters'
+        for c in _available_components_():
+            help_text += '\n{}: {}'.format(c['name'],c['tip'].replace('\n    ',' ',2)) 
+        help_box.value = help_text
+        logo_file = open(os.path.join(os.path.join(os.path.dirname(MuJPyName),"logo"),"logo.png"), "rb")
+        logo_image = logo_file.read()
+        logo = Box([Image(value=logo_image)],layout=Layout(width='114px',height='100px'))
+        about_text = "mujpy        "+'v'+'.'.join([str(version_tup[k]) for k in range(2)])
+        about_text += "\npython μSR data analysis"
+        about_text += "\nby R. De Renzi"
+        about_text += "\n______________________________"
+        about_text += "\ncontributors, direct and indirect"
+        about_text += "\nmusr2py: P. Bonfà, A. Amato, A. Raselli"
+        about_text += "\ndynamical KT: G. Allodi"
+        about_text += "\nideas stolen from: A. Suter (musrfit)"
+        about = HBox([logo,Textarea(
+            value = about_text,
+            placeholder='',
+            disabled=True, # Prevents users from editing the text
+            layout=Layout(width='786px',height='160px')           #,height='250px' # Height constraint triggers the scrollbar
+            )],layout=Layout(width='900px'))       
+        if self.sidecar:
+            display(css_widget,dash)
+            SC = Sidecar(title='Mudashed log: {}'.format(datetime.now().strftime("%d/%m/%Y %H:%M")))
+            with SC:
+                display(self.board_box)
+        else: 
+            self.tab = Tab([dash,self.board_box,help_box,about],lyout=Layout(width='920px'))
+            self.tab.titles = ['Fit','Log','Help','About']
+            self.tab.selected_index = 0
+            display(css_widget,self.tab)
         # Button( icon = 'fa-trash' #, <i class="fa-thin fa-trash"></i>
         #https://stackoverflow.com/questions/60116974/what-is-the-icon-argument-for-ipywidgets-button
