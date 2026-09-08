@@ -1,69 +1,78 @@
+.. |mSR| replace:: :math:`\mu`\ SR
+
+=====
 mujpy
 =====
 
-A Python MuSR data analysis based on classes, with a graphical interface
-designed for jupyter, released under the MIT licence. It aims at the
-useri-friendly appearance of mulab and the power of musrfit.
+A Python |mSR| data analysis based on classes, with a graphical interface
+designed for jupyter, released under the GPL-3 licence. 
+
+It aims at the power of musrfit
+with the user-friendly appearance of mulab.
 
 Version 3.0 refactoring. See Changelog for the most recent version
-details.
+details. Main technical features: 
 
-Main features: - a model built on two-letter bricks: mg, for
-Gaussian-damped cosine, ml for Lorentzian-damped cosine etc. -
-sequential fits by the same model driven by a run list and a list of
-grouping dicts for asymmetry definition - global fits by user-defined
-parameters assigned to model parameters in a json file - a mulab-like
-interface in Jupyter-lab that allow fit model and parameter editing,
-hopefully with a gentler learning curve than musrfit
+- a model built on two-letter bricks: mg, for
+  Gaussian-damped cosine, ml for Lorentzian-damped cosine etc. 
+- sequential fits by the same model, driven by a run list and a list of
+  grouping dictionaries, for asymmetry definition 
+- global fits by user-defined parameters assigned to model parameters in a json file 
+- a mulab-like interface in jupyterlab that allow fit model and parameter editing,
+  hopefully with a gentler learning curve than musrfit
+- web interface by ```voila```, included
 
-To try mujpy: 
+**Try mujpy!** 
+
+You only need to:  [#1]_
 
   1. Install python (python3 is assumed) 
-  2. Install git and clone `mujpy <https://github.com/RDeRenzi/mujpy.git>`_
+  2. Install pip [perhaps create a venv] 
+  3. invoke ``pip install mujpy``
 
-The scripts collected in test.py show how to drive mujpy in command line
-mode. To see some fit capabilities try:
+This repository includes ```Mudashed.ipynb```, a static notebook. Type its two cells yourself in jupyterlab:
 
-::
+.. code-block::
 
-   cd example
-   python test.py 
+     %matplotlib qt  
 
-Modify these scripts for your purposes. The clumsy part is to modify by
-hand the models fit/… .json files. To avoid that
+and
 
-   3.a Install jupiterlab to run the gui editor notebook Mudashed.ipynb
+.. code-block::
 
-or 
+        from mujpy.mudashed import dashed as mudash
+        the_dash = mudash()
 
-   3.b ```pip nstall voila``` and run ```voila Mudashed.ipynb``` (with `snap-installed firefox bug workaround? <https://github.com/voila-dashboards/voila/issues/1508>`_)
+Otherwise, download ```Mudashed.ipynb``` and ```Mudashed-demos.ipynb``` from the ```tests/``` folder of this repository and 
+test the gui: 
 
-Docs and installation instructions still are work-in-progress
-(`ReadTheDocs <http://mujpy.readthedocs.io/en/latest/>`_ obsolete)
+   a. create project directory and cd to it
+   b. copy ``Mudashed-demos.ipynb`` into it
+   d. type ``voila Mudashed-demos.ipynb`` in a terminal (``voila`` comes with ``mujpy``) [#2]_
+   e. Group0 already reads ``3-4`` (Up-Down in GPS), leave it
+   f. press DL and choose the first datafile (e.g. a transverse field run, ``822``)
+   g. insert the run number in run list and hit ``Enter`` (or press RL)
+   h. press LF and double-click on ```almgml.822.3-4.1_fit.json``` in teh pop-up
+   i. press Fit, check the result
+   j. change run list to ``822,834`` or ``822,827:834:-1`` and press LF again, check the result
 
---------------
+For more complex fits see the Introduction 
+in `ReadTheDocs <http://mujpy.readthedocs.io/en/latest/>`_
+For a first demo try out [#3]_ the script ``test.py``: choose an empty folder, edit a file ``savetests.py`` and copy-paste the following code:
 
-Old installation instructions (v 1.1)
--------------------------------------
+.. code-block::
 
--  Make sure you have python, standard on linux, and jupyter lab.
-   Otherwise install them (see
-   https://docs.python.org/3/using/windows.html,
-   https://docs.python.org/3/using/mac.html, jupyter.readthedoc.io).
+   from mujpy.tools.tools import savetests
+   savetests()
 
--  Install mujpy. Clone or download from
-   https://github.com/RDeRenzi/mujpy, unzip into the directory of your
-   choice:
+Execute ``python savetests.py``. This allows you to run ``python test.py``, to get a look and feel of the 16 different types of fit that mujpy provides. 
 
-   ::
+Modify the script for your purposes. The clumsy part here is to modify by
+hand the models in the ``fit/… .json`` files. Use the gui instead.
 
-      cd mujpy/mujpy/musr2py
-      make
-      sudo make install
 
--  Start jupyter lab:
+.. rubric:: Footnotes
 
-   ::
-
-      jupyter-lab
-
+.. [#1]  in principle ``mujpy`` works on all OS, but for the moment it is tested only on linux
+.. [#2]  snap-installed firefox has a known bug with ``voila``, follow ` <https://github.com/voila-dashboards/voila/issues/1508>`_ for a simple workaround
+.. [#3]  if ``pip install mujpy`` was successful

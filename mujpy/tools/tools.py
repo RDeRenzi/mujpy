@@ -417,36 +417,27 @@ def get_gtotals(suite):
         else:
             g = concatenate((grpdict['forward'],grpdict['backward']))
             grc.append(g)
-            gr = concatenate((gr,g))
 
     ts,gs =  [],[]
     n1 = suite.offset+suite.nt0[0]
     for k,runs in enumerate(suite._the_runs_):
-        for j,run in enumerate(runs): # add values for runs to add
-            tsum = 0
-            ggs = []
-            gts = []
-            for j,group in enumerate(grc):
-                gggs =[]
-                for counter in group:
-                    gsum = 0
-                    if suite.datafile[-3:]=='bin' or suite.datafile[-3:]=='mdu' or suite.datafile[-4.:]=='root':
+        tsum = 0
+        ggs = []
+        gts = []
+        for j,group in enumerate(grc):
+            for counter in group:
+                gsum = 0
+                for j,run in enumerate(runs): # add values for runs to add
+                    if suite.datafile[-3:]=='bin' or suite.datafile[-3:]=='mdu' or suite.datafile[-4:]=='root':
                         n1 = suite.offset+suite.nt0[counter] 
                     histo = array(run.get_histo_vector(counter,1)).sum() 
                     gsum += histo
-                if j==0:
-                    gsum0 = gsum
-                gggs.append('{:.2f}'.format(gsum0/1e6)+'Mev'+', {:.2f}'.format(gsum/1e6)+'Mev')
+                    tsum += histo
+            gggs = '{:.2f}'.format(gsum/1e6)+'Mev'
             ggs.append(gggs)
-            for counter in range(run.get_numberHisto_int()):
-                if suite.datafile[-3:]=='bin' or suite.datafile[-3:]=='mdu' or suite.datafile[-4.:]=='root':
-                    n1 = suite.offset+suite.nt0[counter] 
-                histo = array(run.get_histo_vector(counter,1)).sum() 
-                tsum += histo
             gts.append('{:.2f}'.format(tsum/1e6)+'Mev')
         gs.append(ggs)
         ts.append(gts)
-        # print('In get totals inside loop,k {}, runs {}'.format(k,runs))
     return ts, gs, '{:.3}'.format(suite._the_runs_[0][0].get_binWidth_ns()), str(suite.histoLength)
    
 ###############################################################################
@@ -1593,7 +1584,8 @@ def read_pardict_from_widgets(kids,kmax):
         if invalid:
             return 'index out of bounds'
     #if not glob: # check invalid 
-    pardict = {'name':na,'flag':fl}
+    #pardict = {'name':na,'flag':fl}
+    pardict = {'name':na,'value':va,'flag':fl}
     if len(fu)==1:
         pardict['function']=fu[0]
     else:
@@ -1872,8 +1864,8 @@ def get_grouping(groupcsv):
                 grouping = np.concatenate((grouping,np.array(list(int(w) for w in q[1:])))).astype(int)
 
         grouping -=1 # this is counter index, remove 1 for python 0-based indexing 
-    except:
-        grouping = np.array([-1]) # error flag
+    except Exception as e:
+        grouping = e # np.array([-1]) # error flag
         
     return grouping
 
@@ -2040,7 +2032,7 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
                                                                          file_csv+'~')
             
     else: # csv does not exist
-        print('file {} not found'.format(file_csv))
+        #print('file {} not found'.format(file_csv))
         with open(file_csv,'w') as f:
             f.write(header)
             f.write(row)
@@ -2130,7 +2122,7 @@ def muzeropad(runs,nzeros=4):
     elif len(runs)==len(zeros):
         return runs
 
-def path_file_dialog(path,spec):
+def path_file_dialog(path,spec,root=None):
     """
     launch tkinter filedialog in path, spec is filename after dot
         used in mudashed
@@ -2139,10 +2131,16 @@ def path_file_dialog(path,spec):
     import tkinter
     from tkinter import filedialog
     import os
-    tkinter.Tk().withdraw() # Close the root window
+
+    if not root:
+        root = tkinter.Tk() # Close the root window
+        root.geometry("+400+10")
+    else:
+        root.deiconify()
     spc, spcdef = '.'+spec,'*.'+spec
-    in_path = filedialog.askopenfilename(initialdir = path,filetypes=((spc,spcdef),('all','*.*')))
-    return in_path
+    in_path = filedialog.askopenfilename(initialdir = path, filetypes=((spc,spcdef),('all','*.*')))
+    root.withdraw()
+    return in_path,root
 
 def rebin(x,y,strstp,pack,e=None):
     """
@@ -2514,10 +2512,168 @@ def limits(string):
     nones = string.count('None')
     return  [None, None] if nones == 2 else [None, float(string.split(',')[1])] if nones == 1 and string.index('None')== 0 else [float(string.split(',')[0]),None] if nones ==1 else [float(s) for s in string.split(',')]
 
+def fetch_PSI_data(year,area,run_start,run_stop,datapath):
+    """
+    tools equivalent of musruser.psi.ch fetching data files from cgi-bin/SearchDB same process
+    
+    year yyyy string
+    area lowcase instrument
+    run_start, run_stop integers
+    datapath dafile destination
+    PSI datapath = '/psi.ch/group/lmu/public/data/'
+    ------------------table of data names------------------
+    nnnn is leading zero run number
+    lem 2006- lem06_his_nnnn.root           <- does this become the standard?
+    ins 200x-2009 deltat_pta_ins_nnnn.bin ins:x gps:3 ltf:4 dolly:3 gpd:3 
+    ins 2009-2022 deltat_tdc_ins_nnnn.bin ins gps dolly gpd, ltf 2009-2017 flame 2019-2022
+    hifi 2012-2022 tdc_hifi_yyyy_nnnnn.mdu notice 5 digit run number 
+    ins 2023-202x deltat_tdc_ins_yyyy_nnnn.root ins:x dolly:4 vms:- hifi:-
+    gps 2023- deltatbc_tdc_gps_yyyy_nnnn.root 
+    flame 26- flameyy_his_nnnn.root          <- does this become the standard?
+    """
+   
+    import requests
+    import tarfile
+
+    musruser_url = 'http://musruser.psi.ch/cgi-bin/SearchDB.cgi' 
+    nruns = run_stop - run_start + 1
+    form_data = {
+                'go':'Search',
+                'Rmin':str(run_start),
+                'Rmax':str(run_stop),
+                'YEAR':year,
+                'AREA':area}
+    s = requests.get(musruser_url,params=form_data)
+    t = s.text
+    st = 'Chk'
+    sp = '"'
+    dk = 29
+    form_data = {'go':'TAR',
+                 'FORMAT':'MusrRoot',
+                 "Counter":str(nruns)}
+    for k in range(nruns):
+        if k==9: dk += 1
+        chk = st+str(k+1)
+        k1 = t.find(chk)+dk
+        k2 = t.find(sp,k1)
+        path = t[k1:k2]
+        form_data[chk]= path
+
+    with requests.get(musruser_url,params=form_data, stream=True) as r:
+        with tarfile.open(fileobj=r.raw,mode="r|gz") as tar:
+            tar.extractall(path=datapath)
+        return r.raise_for_status()
+
+def make_links(test):
+    """
+    if getcwd() is writeable, ln -a groups to tests/group and, if test, generate data, fit directories, 
+    """
+
+    from mujpy import __file__ as MuJPyName
+    from os import getcwd, symlink, access, W_OK, remove, mkdir, listdir, rmdir
+    from os.path import join, dirname, isdir, islink, isfile
+
+    startuppath = getcwd()
+    writeable = access(startuppath, W_OK) 
+    if writeable:
+        # duplicate grp locally
+        grp_dir = join(startuppath,"groups")
+        if not isdir(grp_dir): symlink(join(join(dirname(MuJPyName),"tests"),"groups"),grp_dir) 
+
+        if test:
+            test = test.upper()
+            data_dir = join(startuppath,"data")
+            data = "data_gps" if test == 'GPS' else "data_root" if test == 'LEM' else "data_nexus"
+            mujpy_data_dir = join(join(dirname(MuJPyName),"tests"),data)
+            fit = "fit_gps" if test == 'GPS' else "fit_root" if test == 'LEM' else "fit_nexus"
+            fit_dir = join(startuppath,"fit")
+            mujpy_fit_dir = join(join(dirname(MuJPyName),"tests"),fit)
+            if not islink(data_dir) and isdir(data_dir): # a real data directory exists
+                return test,None,None
+            else:
+                if islink(data_dir): 
+                    remove(data_dir) # stale link, remove
+                if isdir(fit_dir): 
+                    for file in listdir(fit_dir):
+                        pathfile = join(fit_dir,file)
+                        if islink(pathfile) or isfile(pathfile): 
+                            remove(pathfile) # stale jsons
+                        elif isdir(pathfile):
+                            for fil in listdir(pathfile):
+                                pathfil = join(pathfile,fil) 
+                                remove(pathfil)
+                            rmdir(pathfile)
+                else: 
+                    mkdir(fit_dir)
+                symlink(mujpy_data_dir,data_dir)# ln -s mujpy_data_dir in data_dir
+                for file in listdir(mujpy_fit_dir):
+                    pathfile = join(mujpy_fit_dir,file) 
+                    if isfile(pathfile): symlink(pathfile,join(fit_dir,file)) # ln -s file in fit_dir
+    else:
+        data_dir = True # test True, False means abort 
+    return test,data_dir,writeable # allow check writeable
+
+def tk_error(text,title,root=None):
+    """
+    popup warning for generic typo
+    """
+
+    import tkinter as tk
+    from tkinter import messagebox as mb
+    if not root:
+        root = tk.Tk() # Close the root window
+        root.geometry("+400+10")
+    else:
+        root.deiconify() 
+    root.title(title)
+    label = tk.Label(root, text = text)
+    label.pack()
+    button = tk.Button(root, text='OK', width=25, command=root.destroy)
+    button.pack()
+    root.geometry('400x100+400+0')
+    root.mainloop()
+
+def group_syntax(text,root=None):
+    """
+    popup warning for group syntax
+    """
+
+    import tkinter as tk
+    from tkinter import messagebox as mb
+    if not root:
+        root = tk.Tk() # Close the root window
+        root.geometry("+400+10")
+    else:
+        root.deiconify() 
+    root.title("Watch the group syntax")
+    label = tk.Label(root, text = text)
+    label.pack()
+    button = tk.Button(root, text='OK', width=25, command=root.destroy)
+    button.pack()
+    root.geometry('400x100+400+0')
+    root.mainloop()
+
+def savetests():
+    """
+    save tests (tests.py, almgml.822.3-4.1_fit.py etc.) to local path
+    """
+
+    from os import getcwd, symlink, listdir
+    from os.path import join, isfile, dirname
+    from mujpy import __file__ as MuJPyName
+    here = getcwd()
+    test = join(dirname(MuJPyName),'tests')
+    for fil in listdir(test):
+        file = join(test,fil)
+        print('file {}'.format(file))
+        if isfile(file) and fil[-3:]=='.py': 
+            symlink(file,join(here,fil))
+            print('ln -s {} ./'.format(file))
+
+
 """
  REMEMBER: TOOLS METHODS DO NOT NEED TO IMPORT OTHER TOOLS METHODS!
-     MAY REMOVE ALL from tools.tools import ...
-     some are already
-     leaving import may be useful to grep if used by other tools methods
+     MAY REMOVE ALL from tools.tools import ... some are already
+     useful though: 'grep "import mthd" tools.py' shows tools using it
 """
 

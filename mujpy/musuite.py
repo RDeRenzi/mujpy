@@ -163,6 +163,7 @@ class suite(object):
             self.timebase()
         # self.console('... end of initialize suite')
         else:
+            self.loadfirst = False
             self.console('*********************** suite exits without loading data ****************************')
     
     def console(self,string):
@@ -303,10 +304,7 @@ class suite(object):
         for k,group in enumerate(self.groups):
             fgroup, bgroup, alpha = get_grouping(group['forward']), get_grouping(group['backward']), group['alpha']
 
-            if alpha>0 and self.check_group(fgroup) and self.check_group(bgroup): # checks legal grpcalib_file
-            #a,b = self.check_group(fgroup), self.check_group(bgroup)
-            # print('fwd = {} bwd = {}'.format(a,b))
-            #if alpha>0 and a and b:
+            if alpha>0 and self.check_group(fgroup) and self.check_group(bgroup) and not isinstance(fgroup,str) and not isinstance(bgroup,str): # checks legal grpcalib_file
                 if k==0: self.grouping=[]
                 self.grouping.append({'forward':fgroup, 'backward':bgroup, 'alpha':alpha})
                 # fgroup bgroup are two np.arrays of integers

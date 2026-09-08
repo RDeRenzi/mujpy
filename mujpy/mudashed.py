@@ -11,17 +11,15 @@ class dashed(object):
 ##########################
 # INIT
 ##########################
-    def __init__(self,facility='PSI',sidecar=False):
+    def __init__(self,facility='PSI',sidecar=False,test=None):
         '''
             Launches the simple gui, that requires only an instance of mujpy.musuite suite 
         '''
  
         from mujpy._version import __version__
+        from mujpy.tools.tools import make_links
 
-        #import os
-        #import numpy as np
-        from IPython.display import display# ,  HTML
-
+        self.__version__ = __version__
         self.facility = facility
         self.sidecar = sidecar
         self.mudashed_width = '900px'   
@@ -35,40 +33,29 @@ class dashed(object):
         self.global_button_color = '#c29c94'
         self.model_button_color = '#c0b1ab'
     
-        #self.width_s = '6%'
-        #self.width_m = '12%'
-        #self.width_x = '30%'
 
-        self.__version__ = __version__
         # initialize dashboard, a dictionary
         # self.log = self.suite.console
+        self.root = None # initialize for tkinter
+        self.fig_fit = None
+        self.fig_fft = None
+        self.loading_dash = False # ensures widgets are built for empty model, unless loaded from file
+        self.test, self.data_dir, writeable_folder  = make_links(test) # links groups, plus data and fit if test
+        if writeable_folder and self.data_dir: # normal and test mode
+            self.board()
+        elif not Self.data_dir: # test attempt on a folder with a permanent data dir
+            print('please start test or demos from an empty folder, e.g. tmp')
+        else: # start outside %HOME
+            print('please start from a writeable folder')
 
-        self.loading_dash = False # builds widgets for this model
-        self.board()
-
-###############################################
-# def board(self):      display self.command_box self.global_box,self.model_box self.figure_box board_box 
-#                       observe: on_MN) on_LD on_LF
-#   on_LD, on_LF        loads json.file from dashed or fit file
-#                       self.json2dash self.command2dash
-#   on_MN               dash_globals dash_model self.command2dash
-#                       tools dash_globals and dash_model either create empty global model + build_dashed to self.dashboard -> self.json2dash
-#                                                         or create + json2_without_dump, leaving self.dashboard empty
-#                                           reverse of self.dump_dash()
-# def comman2dash()     deploys many widgets and observes on_Fit [on_Plot on_FFT]
-# def on_Fit(b)         self.dump_dash() reads widgets to self.dashboard, 
-#                       json.dump(self.dashboard,f)
-#                       mufit
-#                       mufitplot
-#                       
     def log(self,string):
         """
         written output
         """
 
         with self.board_box: # just an Output
-            print(string) # THIS MUST BE print, NOT self.log!
-
+            # THIS MUST BE print, NOT self.log!
+            print(string) 
 
     def command2dash(self):
         """
@@ -113,8 +100,10 @@ class dashed(object):
                 rotfreq = self.command_1.children[9].value
                 fft_range = self.command_1.children[12].value # not yet in use 
                 lb = self.command_1.children[13].value # not yet in use 
-                self.tab.selected_index=1
-                mufitplot(plot_range, the_fit, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box) # plots in self.figure_box
+                self.tab.selected_index = 2
+                the_plot = mufitplot(plot_range, the_fit, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box, fig_fit = self.fig_fit) # plots in self.figure_box
+                self.fig_fit = the_plot.fig
+                
 
         def on_Plot(b):
             """
@@ -140,8 +129,12 @@ class dashed(object):
                 #self.figure_box.clear_output()
                 plot_range = self.command_1.children[8].value
                 rotfreq = self.command_1.children[9].value
-                mufitplot(plot_range, self.the_fit, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box) # plots in self.figure_box
-
+                the_plot = mufitplot(plot_range, 
+                                     self.the_fit, 
+                                     rotating_frame_frequencyMHz = rotfreq, 
+                                     plot_out = self.figure_box, 
+                                     fig_fit = self.fig_fit) # plots in self.figure_box
+                self.fig_fit = the_plot.fig
 
 
         def on_FFT():
@@ -478,7 +471,7 @@ class dashed(object):
             import os
 
             self.loading_dash = True # to allow json2dash to write MN_text
-            file_json = path_file_dialog(self.suite.__fitpath__,'json')
+            file_json, self.root = path_file_dialog(self.suite.__fitpath__,'json',root = self.root)
             # self.log('Trying to load {} ...'.format(file_json))
             if os.path.isfile(file_json):
                 if file_json[-4:]=='json':
@@ -545,83 +538,109 @@ class dashed(object):
 
             import os
             from mujpy.musuite import suite
-            from mujpy.tools.tools import derun, get_title, get_gtotals
+            from mujpy.tools.tools import derun, get_title, get_gtotals, get_grouping, group_syntax
+            from numpy import all
 
 
             runlist  = change['new']
             if not isinstance(runlist,dict):
-                datafile = self.suite_box.children[2].children[1].value  # path Text value
-          
+                datafile = self.suite_box.children[2].children[2].value  # path Text value
                 #self.log('runlist = {}'.format(runlist))
 
                 try:
                     grp = self.suite_box.children[1].children[1].value
                     forward, backward = grp.split('-')
-                    grp_calib = [{'forward':forward, 
+                    if all(get_grouping(forward)>=0) and all(get_grouping(backward)>=0):
+                        grp_calib = [{'forward':forward, 
                                   'backward':backward, 
                                   'alpha':float(self.suite_box.children[1].children[2].value)}]
+                    else:
+                        raise NameError('No Group0')
                 except ValueError as e:
-                    self.log('Exception {}'.format(e))
-                    self.log('group syntax error: {}'.format(grp))
+                    f,b = get_grouping(forward), get_grouping(backward)
+                    if isinstance(f,str):
+                        e = f
+                        if isinstance(b,str): e += ';'+b
+                    elif isinstance(b,str): e = b
+                    #self.log('Exception {}'.format(e))
+                    #self.log('group syntax error: {}'.format(grp))
+                    text = 'Exception {}'.format(e)
+                    text += '\nGroup0 syntax error: {}'.format(grp)
+                    self.root = group_syntax(text,root=self.root)
+                    #self.log('Group0 group_syntax return a self.root = {}'.format(self.root))
                     return
                 grp = self.suite_box.children[1].children[4].value
                 if grp:
                     try:
-                        forward1, backward1 = grp.split('-')
-                        grp_calib.append({'forward':forward1, 
-                                  'backward':backward1, 
-                                  'alpha':float(self.suite_box.children[1].children[5].value)})
+                        alph = self.suite_box.children[1].children[5].value 
+                        groups,alphas = grp.split(';'),alph
+                        for group,alpha in zip(groups,alphas):
+                            forward1, backward1 = group.split('-')
+                            if all(get_grouping(forward1)>=0) and all(get_grouping(backward1)>=0):
+                                grp_calib.append({'forward':forward1, 
+                                      'backward':backward1, 
+                                       'alpha':float(alpha)})
                     except ValueError as e:
-                        self.log('Exception {}'.format(e))
-                        self.log('second group syntax error: {}'.format(grp))
+                        f,b = get_grouping(forward), get_grouping(backward)
+                        if isinstance(f,str):
+                            e = f
+                            if isinstance(b,str): e += ';'+b
+                        elif isinstance(b,str): e = b
+                        #self.log('Exception {}'.format(e))
+                        #self.log('other group syntax error: {}, alpha {}'.format(grp,alph))
+                        #self.tab.selected_index = 2
+                        text = 'Exception {}'.format(e)
+                        text += '\nGroups ... syntax error: {}'.format(grp)
+                        self.root = group_syntax(text, root=self.root)
+                        #self.log('Groups ... group_syntax return a self.root = {}'.format(self.root))
                         return
 
-                offset = self.suite_box.children[2].children[5].value
+                offset = self.suite_box.children[1].children[8].value
                 if os.path.isfile(datafile):
                     if runlist:
                         self.suite = suite(datafile , runlist , grp_calib , offset , 'CettoLaqualunque',console=self.log) #startuppath is set in suite
                         # self.log info
-                        starttime_options = [' '.join(self.suite._the_runs_[k][0].get_timeStart_vector()) for k in range(self.suite.nruns)]
-                        starttime_options.insert(0,'Run start times')
-                        self.suite_box.children[0].children[0].options = starttime_options
-                        self.suite_box.children[0].children[0].value = starttime_options[1]
+                        if self.suite.loadfirst: # suite loaded the data
+                            starttime_options = [' '.join(self.suite._the_runs_[k][0].get_timeStart_vector()) for k in range(self.suite.nruns)]
+                            starttime_options.insert(0,'Run start times')
+                            self.suite_box.children[0].children[0].options = starttime_options
+                            self.suite_box.children[0].children[0].value = starttime_options[1]
 
-                        stoptime_options = [' '.join(self.suite._the_runs_[k][0].get_timeStop_vector()) for k in range(self.suite.nruns)]
-                        stoptime_options.insert(0,'Run stop times')
-                        #self.log('nruns {}, SD_options = {}'.format(self.suite.nruns,starttime_options))
-                        self.suite_box.children[0].children[1].options = stoptime_options
-                        self.suite_box.children[0].children[1].value = stoptime_options[1]
+                            stoptime_options = [' '.join(self.suite._the_runs_[k][0].get_timeStop_vector()) for k in range(self.suite.nruns)]
+                            stoptime_options.insert(0,'Run stop times')
+                            #self.log('nruns {}, SD_options = {}'.format(self.suite.nruns,starttime_options))
+                            self.suite_box.children[0].children[1].options = stoptime_options
+                            self.suite_box.children[0].children[1].value = stoptime_options[1]
 
-                        title_options = [get_title(self.suite._the_runs_[k][0]) for k in range(self.suite.nruns)]
-                        title_options.insert(0,'Titles')
-                        self.suite_box.children[0].children[2].options = title_options
-                        self.suite_box.children[0].children[2].value = title_options[1] 
+                            title_options = [get_title(self.suite._the_runs_[k][0]) for k in range(self.suite.nruns)]
+                            title_options.insert(0,'Titles')
+                            self.suite_box.children[0].children[2].options = title_options
+                            self.suite_box.children[0].children[2].value = title_options[1] 
 
-                        comment_options = [self.suite._the_runs_[k][0].get_comment() for k in range(self.suite.nruns)]
-                        comment_options.insert(0,'Comments')
-                        self.suite_box.children[0].children[3].options = comment_options 
-                        self.suite_box.children[0].children[3].value = comment_options[1]
+                            comment_options = [self.suite._the_runs_[k][0].get_comment() for k in range(self.suite.nruns)]
+                            comment_options.insert(0,'Comments')
+                            self.suite_box.children[0].children[3].options = comment_options 
+                            self.suite_box.children[0].children[3].value = comment_options[1]
 
-                        totalcounts, groupcounts, nsbin, maxbin = get_gtotals(self.suite)
-                        self.suite_box.children[0].children[4].value = nsbin
-                        self.suite_box.children[0].children[5].value = maxbin 
-                        goptions = ['Group counts']
-                        toptions = ['Total counts']
-                        runs,e = derun(runlist)
-                        for runadd,groupcount,totalcount in zip(runs,groupcounts,totalcounts):
-                            run = ','.join([run for run in runadd])
-                            for gc in groupcount:
-                                for k,ggc in enumerate(gc):
-                                    if k:
-                                        counts += ' '+ggc
-                                    else:
-                                        counts = ': '+ggc
-                            goptions.append(run+counts)
-                            toptions.append(run+': '+totalcount[0])
-                        
-                        self.suite_box.children[1].children[6].options = goptions
-                        self.suite_box.children[1].children[7].options = toptions
-                        self.command_box.children[0].children = self.command_0.children
+                            totalcounts, groupcounts, nsbin, maxbin = get_gtotals(self.suite)
+                            self.suite_box.children[0].children[4].value = nsbin
+                            self.suite_box.children[0].children[5].value = maxbin 
+                            goptions = ['Group counts']
+                            toptions = ['Total counts']
+                            runs,e = derun(runlist)
+                            for runadd,groupcount,totalcount in zip(runs,groupcounts,totalcounts):
+                                run = ','.join([run for run in runadd])
+                                for k,gc in enumerate(groupcount):
+                                    counts = ': '+gc
+                                    goptions.append(run+'.'+str(k)+counts)
+                                toptions.append(run+': '+totalcount[0])
+                            
+                            self.suite_box.children[1].children[6].options = goptions
+                            self.suite_box.children[1].children[7].options = toptions
+                            self.command_box.children[0].children = self.command_0.children
+                        else:
+                            tk_error('No runs luaded, runlist {}?'.format(runlist),'suite error',root=self.root)
+                            self.root = None # destroyed by tk_error
                     else:
                         self.log('Please specify runlist')
                 else:
@@ -630,22 +649,94 @@ class dashed(object):
             else:
                 self.log('debug, on_RL, change["new"] was still a dict instead of the new text value')
 
-        def on_DL(change):
+        def on_LG(b):
             """
-            data file load
+            group file load, tkinter 
+
             """
+
+            import os
+            from mujpy.tools.tools import path_file_dialog
+
+            startpath = os.getcwd()
+            grouppath = startpath+os.path.sep+'groups'+os.path.sep
+            if os.path.exists(grouppath):
+                groupfile,self.root = path_file_dialog(grouppath,'grp', root=self.root)
+            else:
+                self.log('Folder {} does not exist'.format(datapath))
+            for kg, group in enumerate(groupfile):
+                    self.suite_box.children[1].children[1].value = groupfile 
+
+        def on_RL_button(b):
+            """
+            simulate RL text change
+            """
+            
+            runlist = self.suite_box.children[2].children[5].value
+            #self.suite_box.children[2].children[5].value =  ''
+            self.suite_box.children[2].children[5].value = runlist 
+
+        def on_DL(b):
+            """
+            data file load, tkinter 
+            """
+
             import os
             from mujpy.tools.tools import path_file_dialog
 
             startpath = os.getcwd()
             datapath = startpath+os.path.sep+'data'+os.path.sep
             if os.path.exists(datapath):
-                datafile = path_file_dialog(datapath,'*')
+                datafile, self.root = path_file_dialog(datapath,'*', root=self.root)
             else:
                 self.log('Folder {} does not exist'.format(datapath))
             if datafile:
-                self.suite_box.children[2].children[1].value = datafile 
+                self.suite_box.children[2].children[2].value = datafile 
 
+        def on_fetch(change):
+            """
+            fetch PSI data
+            """
+
+            """
+            self.fetch_box = VBox([HBox([Dropdown(options=areas,
+                                        description='instrument'
+                                        value='GPS',
+                                        layout=Layout(width='20%')),
+                                Dropdown(options=years,
+                                        description='year'
+                                        value=current_yr,
+                                        layout=Layout(width='20%')),
+                                IntText(value = 1,
+                                        description = 'Start run #',
+                                        layout=Layout(width='20%')),
+                                IntText(value = 2
+                                        description = 'Stop run #',
+                                        layout=Layout(width='20%')),
+                                        fetch_button         
+                                    ]),
+                          Textarea(value='',disabled=True,layout=Layout(width='900px',height='160px'))])
+            """
+            from mujpy.tools.tools import fetch_PSI_data
+            from os.path import split
+            from os import isdir
+            area = self.fetch_box.children[0].children[0].value
+            year = self.fetch_box.children[0].children[1].value
+            run_start = self.fetch_box.children[0].children[2].value
+            run_stop = self.fetch_box.children[0].children[3].value
+            datapath = self.suite_box.children[2].children[2].value
+            if datapath:
+                datapath = datapath if isdir(datapath) else split(datapath)[0]
+                error = fetch_PSI_data(year,area,run_start,run_stop,datapath)
+                if error:
+                    self.fetch_box.children[1].value += 'Error searching PSI database\n {}'.format(error)
+                else:
+                    self.fetch_box.children[1].value = 'Loaded {} file(s) in data/ path'.format(run_stop-run_start+1)
+            else:
+                self.fetch_box.children[1].value = 'No data path present, write one in the Fit tab'
+
+                        
+                
 
 ##########################
 # initiate gui first stage
@@ -698,20 +789,28 @@ class dashed(object):
                        MB_text
                        ])
 
-        groups_width=['8%','15%','8%','15%','8%','24%','16%']
+        groups_width=['7%','15%','7%','18%','14%','10%']
         GR_label = [Label('Group 0:',layout=Layout(width=groups_width[0])),
-                    Label('Group 1:',layout=Layout(width=groups_width[0]))]
+                    Label('Groups ...:',layout=Layout(width=groups_width[0]))]
         GR_text =  [Text(value='3-4',layout=Layout(width=groups_width[1]),tooltip = '3-4\n2,3-4,1\n[fwd-bwd]'),
-                    Text(value='',layout=Layout(width=groups_width[3]),tooltip = '2-1\n[fwd-bwd]')]
+                    Text(value='',placeholder='option, or LG',layout=Layout(width=groups_width[1]),tooltip = 'fw1-bw1;fw2-bw2')]
         alpha_text = [Text(value='1.0',layout=Layout(width=groups_width[2]),tooltip = 'group α'),
-                      Text(value='1.0',layout=Layout(width=groups_width[4]),tooltip = 'group α')]
+                      Text(value='1.0',layout=Layout(width=groups_width[2]),tooltip = 'group α')]
         GT_dropdown = Dropdown(value = 'Group counts',
                                options = ['Group counts','Run: 0, 0'],
                                #disabled = True,
-                               layout = Layout(width=groups_width[5]))
+                               layout = Layout(width=groups_width[3]))
         TO_dropdown = Dropdown(value = 'Total counts',
                                options = ['Total counts','Run: 0'],
-                               layout = Layout(width=groups_width[6]))
+                               layout = Layout(width=groups_width[4]))
+        value = 20 if self.facility == 'PSI' else 7
+        OF_inttext = IntText(value = value,
+                             description = 'OF',
+                             layout = Layout(width=groups_width[5]),
+                             tooltip = 'first good bin')
+        OF_inttext.style.description_width = '30%'
+
+
         #GT_text = [Text(value='0',layout=Layout(width=groups_width[3]),tooltip='Group total',disabled = True),
         #           Text(value='0',layout=Layout(width=groups_width[7]),tooltip='Group total',disabled = True)]
 
@@ -723,33 +822,46 @@ class dashed(object):
                             GR_text[1],
                             alpha_text[1],
                             GT_dropdown,
-                            TO_dropdown
+                            TO_dropdown,
+                            OF_inttext
                             ])
  
-        runs_width = ['4%','58%','8%','5%','16%','10%']
+        runs_width = ['7%','4%','54%','5%','16%']
+        LG_button = Button(description='LG',
+                           tooltip = 'Groups file selection',
+                           layout = Layout(width=runs_width[0]))
+        LG_button.on_click(on_LG)
+        LG_button.style.button_color = self.suite_button_color
         DL_button = Button(description='DL',
                            tooltip = 'Data file selection',
-                           layout = Layout(width=runs_width[2]))
+                           layout = Layout(width=runs_width[0]))
         DL_button.on_click(on_DL)
         DL_button.style.button_color = self.suite_button_color
-        RL_text = Text(value='',
+        #if self.test:
+        #    RL_value = '822' if self.test=='GPS' else '3561' if self.test=='LEM' else '126645'
+        #else:
+        RL_value = ''
+        RL_text = Text(value=RL_value,
+                       placeholder='run #s, Enter or RL',
                       tooltip='e.g. 822\nor 822,823:827:-1',
                       layout=Layout(width=runs_width[4]),
                       continuous_update = False)
         RL_text.observe(on_RL,names='value')
-        value = 20 if self.facility == 'PSI' else 7
-        OF_inttext = IntText(value = value,
-                             description = 'OF',
-                             layout = Layout(width=runs_width[5]),
-                             tooltip = 'first good bin')
-        OF_inttext.style.description_width = '30%'
+        RL_button = Button(description='RL',
+                           tooltip = 'Load run list',
+                           layout = Layout(width=runs_width[0]))
+        RL_button.on_click(on_RL_button)
+        RL_button.style.button_color = self.suite_button_color
 
+        path_value = self.data_dir if self.test else ''
         suite_runs = HBox([
+                        LG_button,
                         Label(value='path',
-                            layout=Layout(width=runs_width[0])),
-                        Text(value = '',
+                            layout=Layout(width=runs_width[1])),
+                        Text(value = path_value,
+                             placeholder = 'to proto-data-file (enables DL)', 
                             tooltip = 'path to proto-run/n(from start path\nor absolute',
-                            layout = Layout(width=runs_width[1]),
+                            layout = Layout(width=runs_width[2]),
                             continuous_update = False),
                         DL_button,
                         Label(value='run list',
@@ -757,7 +869,7 @@ class dashed(object):
                         RL_text,
                         #Label(value='OF',
                         #      layout = Layout(width=runs_width[5]),tooltip = 'first good bin'),
-                        OF_inttext
+                        RL_button
                         ])
                             
         self.suite_box = VBox([suite_info,suite_groups,suite_runs],layout=Layout(width=self.mudashed_width,border='1.5px solid DarkGoldenrod'))
@@ -806,7 +918,8 @@ class dashed(object):
 
         MN_label = Label(value='model acronym',layout=Layout(width=command_width[2]))
         self.MN_text = Text(value = '',
-                            tooltip = 'e.g. mgml\n     almg',
+                            placeholder = 'xx, Enter to lauch',
+                            tooltip = 'e.g. mg\n   almgml',
                             layout = Layout(width=command_width[3],height=self.textheight),
                             continuous_update=False) # requires CR
         self.MN_text.observe(on_MN)
@@ -842,27 +955,54 @@ class dashed(object):
         #panels = HBox([dash,VBox([self.figure_box,self.board_box])],layout={'width':'100%'})
         #now = datetime.now()
         #dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+        areas = ['LEM','GPS','LTF','VMS','Dolly','GPD','HAL','FLAME']
+        current_yr = datetime.today().strftime("%Y")
+        years = [str(yr) for yr in range(2003,int(current_yr)+1)]
+        fetch_button = Button(description = 'Fetch from PSI',
+                                        layout=Layout(width='20%'))
+        fetch_button.on_click(on_fetch)
+        fetch_button.style.button_color = self.suite_button_color
+        self.fetch_box = VBox([HBox([Dropdown(options=areas,
+                                       description='instrument',
+                                        value='GPS',
+                                        layout=Layout(width='20%')),
+                                Dropdown(options=years,
+                                        description='year',
+                                        value=current_yr,
+                                        layout=Layout(width='20%')),
+                                IntText(value = 1,
+                                        description = 'start run',
+                                        layout=Layout(width='20%')),
+                                IntText(value = 2,
+                                        description = 'stop run',
+                                        layout=Layout(width='20%')),
+                                        fetch_button         
+                                    ]),
+                          Textarea(value='Here you may fetch PSI data files.\nAlready have them? Click on Fit tab and selected data/ path',disabled=True,layout=Layout(width='900px',height='160px'))])
         help_box = Textarea(
                             disabled=True, # Prevents users from editing the text
                             layout=Layout(width='900px',height='660px'))
-        help_text = 'Available components, uniuquely identified by two letters, and their Minuit parameters'
+        help_text = 'Available components,  by unique two letters, and their Minuit parameters, (x is a time array [μs])'
         for c in _available_components_():
             help_text += '\n{}: {}'.format(c['name'],c['tip'].replace('\n    ',' ',2)) 
         help_box.value = help_text
         logo_file = open(os.path.join(os.path.join(os.path.dirname(MuJPyName),"logo"),"logo.png"), "rb")
         logo_image = logo_file.read()
         logo = Box([Image(value=logo_image)],layout=Layout(width='114px',height='100px'))
-        about_text = "mujpy        "+'v'+'.'.join([str(version_tup[k]) for k in range(2)])
+        about_text = "mujpy        "+'v'+'.'.join([str(version_tup[k]) for k in range(3)])
         about_text += "\npython μSR data analysis"
-        about_text += "\nby R. De Renzi"
-        about_text += "\n______________________________"
+        about_text += "\nby R. De Renzi 2017-2026"
+        about_text += "\n_________________________________________________"
         about_text += "\ncontributors, direct and indirect"
-        about_text += "\nmusr2py: P. Bonfà, A. Amato, A. Raselli"
+        about_text += "\nmusr2py: P. Bonfà (wrapper), A. Amato, A. Raselli"
         about_text += "\ndynamical KT: G. Allodi"
         about_text += "\nideas stolen from: A. Suter (musrfit)"
+        about_text += "\ncgi-bin fetch and ideas: Z. Salman"
+        about_text += "\nroot by uproot (muroot2py wrapper)"
+        about_text += "\nnexus by nexusformat /muisis2py wrapper)"
+
         about = HBox([logo,Textarea(
             value = about_text,
-            placeholder='',
             disabled=True, # Prevents users from editing the text
             layout=Layout(width='786px',height='160px')           #,height='250px' # Height constraint triggers the scrollbar
             )],layout=Layout(width='900px'))       
@@ -872,8 +1012,8 @@ class dashed(object):
             with SC:
                 display(self.board_box)
         else: 
-            self.tab = Tab([dash,self.board_box,help_box,about],lyout=Layout(width='920px'))
-            self.tab.titles = ['Fit','Log','Help','About']
+            self.tab = Tab([dash,self.fetch_box,self.board_box,help_box,about],lyout=Layout(width='920px'))
+            self.tab.titles = ['Fit','Fetch data','Log','Help','About']
             self.tab.selected_index = 0
             display(css_widget,self.tab)
         # Button( icon = 'fa-trash' #, <i class="fa-thin fa-trash"></i>
