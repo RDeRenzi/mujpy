@@ -1474,7 +1474,7 @@ def glob2widgets(kp,pardict,flags,keylen):
     Label(value=str(kp),layout=Layout(width=keylen[0])), 
     Combobox(options=['α','λ','σ','φ','Δ','β','θ','δ','ν','τ'], #placeholder='ty+sel',
              value=pardict['name'],layout=Layout(width=keylen[1])), 
-    FloatText(value=pardict['value'],layout=Layout(width=keylen[2])), 
+    Text(value=str(pardict['value']),layout=Layout(width=keylen[2])), 
     Dropdown(options = flags,value=pardict['flag'],layout=Layout(width=keylen[3])), 
     FloatText(value=pardict['error'],layout=Layout(width=keylen[4])),
     Text(value=tup2str(pardict['limits']),tooltip='e.g. 0,1\nor 0,None\nor None,None',layout=Layout(width=keylen[5])),
@@ -1565,7 +1565,7 @@ def read_pardict_from_widgets(kids,kmax):
             name, value, flag, function
             (errors, limits and pospar are dealt by adds_step_limits                            
                  
-        used by mudashed.dump_dashed
+        used by mudashed.build_dashed
     """
     from mujpy.tools.tools import muvalid
     import re
@@ -1836,7 +1836,7 @@ def get_grouping(groupcsv):
     # or 1:3,5,7 = 1,2,3,5,7  are also valid
     # no more complex nesting (3:5,5,8:10 is not allowed)
     #       get the shorthand from the gui Text 
-    groupcsv = groupcsv.replace('.',',') # can only be a mistake: '.' means ','
+    #groupcsv = groupcsv.replace('.',',') # can only be a mistake: '.' means ','
     try:
         if groupcsv.find(':')==-1: # no colon, it's a pure csv
             grouping = np.array([int(ss) for ss in groupcsv.split(',')]) # read it
@@ -2630,7 +2630,7 @@ def tk_error(text,title,root=None):
     label.pack()
     button = tk.Button(root, text='OK', width=25, command=root.destroy)
     button.pack()
-    root.geometry('400x100+400+0')
+    root.geometry('600x100+400+10')
     root.mainloop()
 
 def group_syntax(text,root=None):

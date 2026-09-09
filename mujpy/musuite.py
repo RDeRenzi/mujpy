@@ -148,19 +148,25 @@ class suite(object):
         self.__cachepath__ = self.__startuppath__+os.sep+'cache'+os.sep
         # reverse of tools get_grouping is tools get_group
         self.offset = int(offset) # offset belongs to suite, that needs it for asymmetries
-        if self.load_runs(): #           load data instances in self._the_runs_
+
+        self.loadfirst = self.load_runs()
+        self.groups = grp_calib
+        self.grouping = [] # reproduce the same with arrays of histogram numbers, done by tools get_grouping
+        if self.loadfirst: #           load data instances in self._the_runs_
             # grp_calib is a list of dictionaries, one per group, with keys 'forward,'backward','alpha'
             # where groups may be in shorthand notation
-            self.groups = grp_calib
             self.LEM_back_subt = False
             if self._the_instrument_ == 'LEM' and self._the_runs_[0][0].get_histo_fromt0_vector(15)[0]:
                 # in single_for_back_count use next eight background subtracted histo
                 self.console('                            using corrected LEM histograms 8,9,10,11,12,13,14,15') 
                 self.LEM_back_subt = True
-            self.grouping = [] # reproduce the same with arrays of histogram numbers, done by tools get_grouping
-            self.store_groups() #        in self.grouping        self.promptfit(mplot)   #    to be done: make switch for isis
-            self.promptfit(mplot)   #    to be done: switch for isis broken and root lem wip
-            self.timebase()
+                #        in self.grouping        self.promptfit(mplot)   #    to be done: make switch for isis
+            if self.store_groups():
+                self.promptfit(mplot)   #    to be done: switch for isis broken and root lem wip
+                self.timebase()
+            else:
+                self.loadfirst = False
+                self.console('*************  suite exits without data for group issues ****************************')
         # self.console('... end of initialize suite')
         else:
             self.loadfirst = False
@@ -194,7 +200,8 @@ class suite(object):
         from musr2py import MuSR_td_PSI_bin as psiload
         from mujpy.muisis2py.muisis2py import munxs2py as isisload
         # muisis2py has the same methods as musr2py
-        from mujpy.tools.tools import get_datafilename, get_title, short_path
+        from mujpy.tools.tools import get_datafilename, get_title, short_path#, tk_error
+        from os.path import isfile
         
         def instrument(run): # used by 'PSI' bin and mdu files
             # datafilename, e.g. deltat_tdc_gps_0001.bin, contains '_instrument name_'
@@ -204,14 +211,18 @@ class suite(object):
         read_ok = True
         runadd = []
         for j,run in enumerate(self.runs[k]): # run is a single run number
-            path_and_filename =  get_datafilename(self.datafile,run) 
+            path_and_filename =  get_datafilename(self.datafile,run)
+            if not isfile(path_and_filename): 
+                self.console('{} does not exist!'.format(path_and_filename))
+                return False
             # PSI cases
             if self.datafile[-4:]=='root': # 
-                try:
-                    runadd.append(rootload(path_and_filename)) # opens one run in the list
-                    self._the_instrument_ = runadd[-1].get_instrument()
+                run_ = rootload(path_and_filename)
+                if run_.readingOOK:
+                    runadd.append(run_) # opens one run in the list
+                    self._the_instrument_ = run_.get_instrument()
                     self._the_facility_ = 'PSI'
-                except:
+                else:
                     read_ok = False
             elif self.datafile[-3:]=='bin' or self.datafile[-3:]=='mdu':
                 runadd.append(psiload())
@@ -292,7 +303,6 @@ class suite(object):
             periods = len(self._the_runs_[0][0].get_RedGreen_offsets()) # are there RedGreen copies (periods>1)?
         if 'get_beamline' in self._the_runs_[0][0].__dir__(): # PSI only
             numberHisto = numberHisto*periods           
-        #print('group = {} nH =  {} p = {}'.format(group,numberHisto,periods))
         return (group>=0).all()*(group<numberHisto).all()
 
     def store_groups(self):
@@ -303,7 +313,6 @@ class suite(object):
         from mujpy.tools.tools import get_grouping
         for k,group in enumerate(self.groups):
             fgroup, bgroup, alpha = get_grouping(group['forward']), get_grouping(group['backward']), group['alpha']
-
             if alpha>0 and self.check_group(fgroup) and self.check_group(bgroup) and not isinstance(fgroup,str) and not isinstance(bgroup,str): # checks legal grpcalib_file
                 if k==0: self.grouping=[]
                 self.grouping.append({'forward':fgroup, 'backward':bgroup, 'alpha':alpha})

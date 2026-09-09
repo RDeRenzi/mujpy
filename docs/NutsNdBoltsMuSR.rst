@@ -4,10 +4,10 @@
 MuSR, a nuts & bolts approach
 =============================
 
-Spin polarized muons decay asymmetrically, 30% more often in the spin direction then opposite to it. 
-This is captured by the asymmetry of the decay in two [groups of] detectors placed symmetrically along a given axis, one **forward** (spin pointing to it) and one **backward** (opposite). 
-The angle between the initial muon spin and the detector axis determines the decay asymmetry between the two detectors (e.g. if the axis is at 90 deg from the spin, the asymmetry vanishes).
-This information is passed to :code:`mujpy` in the **Group** dictionary.
+Spin polarized muons decay asymmetrically, ~30% more often in the spin direction then opposite to it. 
+This is captured by the asymmetry of the decay in two [groups of] detectors placed symmetrically along a given oriented axis, one **forward** (with respect to the initial muon spin arrow) and one **backward** (opposite). 
+The count rate asymmetry between the two detectors depends on the angle between the muon spin and the detector axis (e.g. if the axis is at 90 deg from the spin, the asymmetry vanishes).
+The detector information is passed to ``mujpy`` in a **Group** dictionary.
 
 Asymmetry
 ---------
@@ -23,7 +23,7 @@ Look closely:
    * discretized time :math:`t_i` implies an array of time bins, of fixed bin-width, with a start time :math:`t_i=0`, when the muon stops in the sample and starts to precess  
    * :math:`N_{f,b}(t_i)` imply a *histogram* per detector, an array with average rate at time :math:`t_i` in each bin. 
    * The data file - the **run** - contains the bin-width and the histograms. So the first operation is to load datafiles into :code:`mujpy`, after downloading them according to facility instructions.
-   * :math:`\alpha` is a normalizer, correcting for forward and backward detector different experimental geometries/efficiency. It must be **calibrated** with a standard experiment when the sample is mounted, and goes in the :code:`mujpy` **Group** dictionary.
+   * :math:`\alpha` is a normalizer, correcting for forward and backward detector different experimental geometries/efficiency. It must be **calibrated** with a standard experiment when the sample is mounted, and goes in the ``mujpy`` **Group** dictionary.
    * Detector rates are decreasing exponentially with time due to the finite lifetime :math:`\tau_\mu` of the muon, but this exponential and the muon lifetime miraculously disappear from :eq:`experimental`, as they must, since the asymmetry is determined uniquely by the muon spin direction at the time of parity-violation weak muon decay. 
      
 Fitting the asymmetry
@@ -70,11 +70,11 @@ where :math:`\sigma(t_i)` is the standard deviation of the experimental asymmetr
 
 Finally, :code:`mujpy` performs global fits on multiple asymmetries, minimizing the sum of their cost functions. This makes sense if the different asymmetries have common parameters. For example:
 
-    * two detector groups, :math:`a,b` generally do not share the same initial asymmetry :math:`A_a,A_b`, but they may share the same muon fraction :math:`f`. A global fit may define :math:`A_a,A-b,f` as global parameters and assign them through **flag** and **function** to the model component amplitudes as :math:`A_1 f, A_2 f`.
-    * This is convenient for two components or more, the amplitudes of the second being :math:`A_1(1-f),A_2(1-f)`: three parameters instead of four, here.
-    * an obvious example is a global fit for a **list** of runs, i.e. asymmetries on the same sample and geometry, while scanning, say, temperature. The model, the maximum asymmetry, the phase and a few other parameters  may be the same across the suite, while other interesting parameters depend on the individual run.  
+    * two detector groups, :math:`a,b` generally do not share the same initial asymmetry :math:`A_a,A_b`, but they may share the same muon fraction :math:`f`. A global fit may define :math:`A_a,A-b,f` as global parameters and assign them through **flag** and **function** to the model component amplitudes of the two detector groups as :math:`A_a f, A_b f`.
+    * This is convenient when the model has two components or more, the amplitudes of the second component being :math:`A_a(1-f),A_a(1-f)`, which requires just three parameters for four quantities.
+    * an obvious example is a global fit for a **list** of runs, i.e. asymmetries on the same sample and geometry, while scanning, say, temperature. The model, the maximum asymmetry, the phase and a few other parameters  may be the same across the suite, while other interesting parameters depend on the individual run conditions.  
 
-This nuts and bolts description illustrates some of the capabilities of :code:`mujpy` and defines the key concepts for its practical usage: 
+This nuts and bolts description illustrates just some of the capabilities of `mujpy` and defines the key concepts for its practical usage: 
 
 .. code::
 

@@ -316,14 +316,23 @@ class dashed(object):
             for k,parwidgs in enumerate(self.global_box.children[1].children[0].children): # left column
                 pardict = {}
                 if k: # skips k=0 labels
-                    invalid = invalid_err_lim(parwidgs.children[2].value,
+                    value = parwidgs.children[2].value # string, can be '1.2' or '[1.2,3.2]'
+                    values = eval(value) if value[0]=='[' else [float(value)]
+                    for value in values:
+                        invalid = invalid_err_lim(value,
                                               parwidgs.children[4].value,
-                                              limits(parwidgs.children[5].value)) 
-                    if invalid: 
-                        raise ValueError('global parameter str(k-1):'+invalid)
+                                              limits(parwidgs.children[5].value))  
+                        if invalid: 
+                            raise ValueError('global parameter str(k-1):'+invalid)
                     pardict['name'] = parwidgs.children[1].value # string
-                    pardict['value'] = parwidgs.children[2].value # float
-                    # for sequentila fits may be a list, i.e. a string as w2idgets value
+                    value = parwidgs.children[2].value
+                    value = eval(value) if value[0]=='[' else float(value)
+                    pardict['value'] =  value # float or list of floats
+                    # for sequential fits may be a list, i.e. a string as widgets value
+                    # but this is broken! parwidg must be Text
+
+                    # for lists need widget to be Text, pardict value to be string, 
+                    # pardict is either float(value) or [x for x in eval(value)]
                     pardict['flag'] = parwidgs.children[3].value # string
                     pardict['error'] = parwidgs.children[4].value # float
                     pardict['limits'] = limits(parwidgs.children[5].value) # translates list of csv string to values
@@ -332,13 +341,18 @@ class dashed(object):
             for k,parwidgs in enumerate(self.global_box.children[1].children[1].children): # right column
                 pardict = {}
                 if k: # skips k=0 labels
-                    invalid = invalid_err_lim(parwidgs.children[2].value,
+                    value = parwidgs.children[2].value # string, can be '1.2' or '[1.2,3.2]'
+                    values = eval(value) if value[0]=='[' else [float(value)]
+                    for value in values:
+                        invalid = invalid_err_lim(value,
                                               parwidgs.children[4].value,
-                                              limits(parwidgs.children[5].value)) 
-                    if invalid: 
-                        raise ValueError('global parameter str(k-1):'+invalid)
+                                              limits(parwidgs.children[5].value))  
+                        if invalid: 
+                            raise ValueError('global parameter str(k-1):'+invalid)
                     pardict['name'] = parwidgs.children[1].value # string
-                    pardict['value'] = parwidgs.children[2].value # float
+                    value = parwidgs.children[2].value
+                    value = eval(value) if value[0]=='[' else float(value)
+                    pardict['value'] =  value # float
                     # for sequentila fits may be a list, i.e. a string as w2idgets value
                     pardict['flag'] = parwidgs.children[3].value # string
                     pardict['error'] = parwidgs.children[4].value # float
@@ -538,7 +552,7 @@ class dashed(object):
 
             import os
             from mujpy.musuite import suite
-            from mujpy.tools.tools import derun, get_title, get_gtotals, get_grouping, group_syntax
+            from mujpy.tools.tools import derun, get_title, get_gtotals, get_grouping, group_syntax, tk_error
             from numpy import all
 
 
@@ -573,7 +587,7 @@ class dashed(object):
                 if grp:
                     try:
                         alph = self.suite_box.children[1].children[5].value 
-                        groups,alphas = grp.split(';'),alph
+                        groups,alphas = grp.split(';'),alph.split(';')
                         for group,alpha in zip(groups,alphas):
                             forward1, backward1 = group.split('-')
                             if all(get_grouping(forward1)>=0) and all(get_grouping(backward1)>=0):
@@ -639,7 +653,7 @@ class dashed(object):
                             self.suite_box.children[1].children[7].options = toptions
                             self.command_box.children[0].children = self.command_0.children
                         else:
-                            tk_error('No runs luaded, runlist {}?'.format(runlist),'suite error',root=self.root)
+                            tk_error('No runs loaded, runlist {}?'.format(runlist),'suite error',root=self.root)
                             self.root = None # destroyed by tk_error
                     else:
                         self.log('Please specify runlist')
@@ -656,16 +670,34 @@ class dashed(object):
             """
 
             import os
-            from mujpy.tools.tools import path_file_dialog
+            from mujpy.tools.tools import path_file_dialog, tk_error
 
             startpath = os.getcwd()
             grouppath = startpath+os.path.sep+'groups'+os.path.sep
             if os.path.exists(grouppath):
                 groupfile,self.root = path_file_dialog(grouppath,'grp', root=self.root)
+                if groupfile:
+                    with open(groupfile,"r") as f:
+                        grp_calib = f.readline()
+                    groupshnd1 = None
+                    for kg, group in enumerate(eval(grp_calib)):
+                        alpha = str(group['alpha'])
+                        groupshnd = group['forward']+'-'+group['backward']
+                        if kg == 0:
+                            self.suite_box.children[1].children[1].value = groupshnd
+                            self.suite_box.children[1].children[2].value = alpha
+                        elif kg == 1:
+                            alpha1 = alpha
+                            groupshnd1 = groupshnd
+                        else:
+                            alpha1 += ';'+alpha
+                            groupshnd1 += ';'+groupshnd
+                    if groupshnd1:
+                        self.suite_box.children[1].children[4].value = groupshnd1
+                        self.suite_box.children[1].children[5].value = alpha1
             else:
-                self.log('Folder {} does not exist'.format(datapath))
-            for kg, group in enumerate(groupfile):
-                    self.suite_box.children[1].children[1].value = groupfile 
+                tk_error('Folder {} does not exist'.format(datapath),'Load groups error', root=self.root)
+             
 
         def on_RL_button(b):
             """
