@@ -5,26 +5,26 @@ MuSR, a nuts & bolts approach
 =============================
 
 Spin polarized muons decay asymmetrically, ~30% more often in the spin direction then opposite to it. 
-This is captured by the asymmetry of the decay in two [groups of] detectors placed symmetrically along a given oriented axis, one **forward** (with respect to the initial muon spin arrow) and one **backward** (opposite). 
-The count rate asymmetry between the two detectors depends on the angle between the muon spin and the detector axis (e.g. if the axis is at 90 deg from the spin, the asymmetry vanishes).
-The detector information is passed to ``mujpy`` in a **Group** dictionary.
+This is captured by the asymmetry of the decay count rates in two [groups of] detectors placed symmetrically along a given oriented axis, one **forward** (with respect to the initial muon spin arrow) and one **backward** (opposite). 
+The count rate asymmetry between the two detectors depends on the angle between the muon spin and the detector axis at the time of decay (e.g. if the axis is at 90 deg from the spin, the asymmetry vanishes). The measured asymmetry is an ensemble average over all detected muon decays in a run. 
+The detectors information is selected in a ``mujpy`` **Group**, either providing a dictionary or its shorthand equivalent in the GUI.
 
 Asymmetry
 ---------
-The experimental asymmetry :math:`A_e(t)` coincides with the normalized difference in forward, :math:`N_f(t)`\ ,  and backward, :math:`N_b(t)` count rates:
+The experimental asymmetry :math:`A_e(t)` is measured as the normalized difference between forward, :math:`N_f(t)`\ ,  and backward, :math:`N_b(t)` count rates:
 
 .. math::
    :label: experimental
 
         A_e(t_i) = \frac{N_f(t_i)-\alpha N_b(t_i)}{N_f(t_i)+\alpha N_b(t_i)}
    
-Look closely:
+Please, look closely:
 
    * discretized time :math:`t_i` implies an array of time bins, of fixed bin-width, with a start time :math:`t_i=0`, when the muon stops in the sample and starts to precess  
    * :math:`N_{f,b}(t_i)` imply a *histogram* per detector, an array with average rate at time :math:`t_i` in each bin. 
    * The data file - the **run** - contains the bin-width and the histograms. So the first operation is to load datafiles into :code:`mujpy`, after downloading them according to facility instructions.
    * :math:`\alpha` is a normalizer, correcting for forward and backward detector different experimental geometries/efficiency. It must be **calibrated** with a standard experiment when the sample is mounted, and goes in the ``mujpy`` **Group** dictionary.
-   * Detector rates are decreasing exponentially with time due to the finite lifetime :math:`\tau_\mu` of the muon, but this exponential and the muon lifetime miraculously disappear from :eq:`experimental`, as they must, since the asymmetry is determined uniquely by the muon spin direction at the time of parity-violation weak muon decay. 
+   * Detector rates are decreasing exponentially with time due to the finite lifetime :math:`\tau_\mu` of the muon, but this exponential and the muon lifetime *miraculously* disappear from :eq:`experimental`, as they must, since the asymmetry is determined uniquely by the muon spin direction at the time of parity-violation weak muon decay. 
      
 Fitting the asymmetry
 ---------------------
