@@ -1,10 +1,14 @@
 class dashed(object):
     '''
-    barebone ipywidgets fit editor for jupiter nb, produces dashboard.json files
+    ipywidgets GUI fit editor for jupiter nb, hence voila, produces dashboard.json files, fits, ...
 
-    a subset of a full fledged mudash GUI interface
-        changing MN (model) or NG (number of globals) require rerun
-        cannot delete components or single global parameters
+    a GUI interface
+    ::
+        1. insert the data path, press DL and choose the first run
+        2. edit Group0 [Groups ... for multi group] or load a standard groupomg with LG 
+        2. insert the run # in the run list; Enter of press RL
+        3. insert [NG (number of globals)], the MN model acronym + Enter, or LL load last, or LF load a fit model  
+        4. Press Fit or Plot guess.
     '''
 
 
@@ -50,96 +54,168 @@ class dashed(object):
 
     def log(self,string):
         """
-        written output
+        redirects log text to self.board_box ipywidgets Output  
         """
 
         with self.board_box: # just an Output
             # THIS MUST BE print, NOT self.log!
             print(string) 
 
+    def _global(self):
+        """
+        True for self.dashboard with "globpardicts_guess" key
+
+        """
+
+        return "globpardicts_guess" in self.dashboard.keys()
+
+    def _C12(self):
+        """
+        True if fit is C1 or C2
+        """
+        if self._global():
+            return any([pardict['flag']=='#' for pardict in self.dashboard["globpardicts_guess"]])
+        else:
+            return False
+
+    def _C1(self):
+        """
+        True for C1 fit
+        """
+
+        if self._C12() and not self._function_multi():
+            return True
+        else:
+            return False
+    def _C2(self):
+        """
+        True for C2 fit
+        """
+
+        if self._C12() and self._function_multi():
+            return True
+        else:
+            return False
+
+    def _function_multi(self):
+        """
+        True for A21, B21, C2 (global multigroup)
+        """
+
+        return any(['function_multi' in pardict.keys() for component in self.dashboard['model_guess'] for pardict in component['pardicts']])
+
+    def _AB21(self):
+        """
+        True if no hash and function_multi
+        """
+    
+        return self._global() and not self._C12()
+
+    def _multigroup(self):
+        """
+        True if len(self.suite.groups)>1
+        """
+
+        return len(self.suite.groups)>1
+
+    def _multirun(self):
+        """
+        True if self.suite.nruns>1
+        """
+
+        return self.suite.nruins>1
+
+    def _on_Fit(self,b):
+        """
+        invokes mufit and muplotfit extracting their args from the widgets
+
+        .. code::
+
+            the_fit = mufit(self.suite,dashboard_file)
+            the_plot = mufitplot(plot_range,the_fit,rotating_frame_frequencyMHz =rotfreq,plot_out=self.figure_box,fig_fit=self.fig_fit)
+        """
+
+        import json
+        from mujpy.mufit import mufit
+        from mujpy.mufitplot import mufitplot
+        from mujpy.tools.tools import tk_error
+
+        OK = False if self._global() else True
+        if not OK:
+            title = 'Suite & global fit model mismatch'
+            # global fit, check that groups and run list agree with dashboard
+            if self._AB21() or self._C2():
+                if not self._multigroup():
+                    msg = 'Groups ...: are empty and a multi group fit was selected\n(some model function contains ;-separated values)'
+                    self.root = tk_error(msg,title,root=self.root)
+                elif self._AB21(): OK = True
+            elif self._C12():
+                if not self._multirun:
+                    msg = 'Single run in run list submitting multi run fit\n(#-flags in global parameters)'
+                    self.root = tk_error(msg,title,root=self.root)
+                else:
+                    OK = True
+        if self.build_dashed() and OK: # creates self.dashboard and returns True if no validation raise occurred
+            dashboard_file = self.suite.__fitpath__+'dashed.json'
+            with open(dashboard_file,'w') as f:
+                json.dump(self.dashboard,f) # mufit wants to read this from a file
+            self.board_box.clear_output()
+            the_fit = mufit(self.suite,dashboard_file,dash_log = self.log) # writes text to board_box
+            #self.figure_box.clear_output()
+            plot_range = self.command_1.children[8].value
+            rotfreq = self.command_1.children[9].value
+            fft_range = self.command_1.children[12].value # not yet in use 
+            lb = self.command_1.children[13].value # not yet in use 
+            self.tab.selected_index = 2
+            the_plot = mufitplot(plot_range, the_fit, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box, fig_fit = self.fig_fit) # plots in self.figure_box
+            self.fig_fit = the_plot.fig
+                
+
+    def _on_Plot(self,b):
+        """
+        invokes mufitplot from mudashed extracting its args from the widgets
+
+        .. code::
+
+            the_plot = mufitplot(plot_range,self.the_fit,rotating_frame_frequencyMHz=rotfreq,plot_out=self.figure_box,fig_fit=self.fig_fit)
+        """
+        
+        # read dashed widget values (including guess, rotfreq
+        # json.dump again
+        # self.figure_box.clear_output()
+        # if guess: mufit(plot_range,dashboard_file, no_fit = not guess,out=self.figure_box)
+        # mufitplot(plot_range, guess = guess, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box)
+        import json
+        from mujpy.mufit import mufit
+        from mujpy.mufitplot import mufitplot
+        if self.build_dashed(): # creates self.dashboard and returns True if no validation raise occurred
+            dashboard_file = self.suite.__fitpath__+'dashed.json'
+            self.log('dumping {}'.format(dashboard_file))
+            with open(dashboard_file,'w') as f:
+                json.dump(self.dashboard,f) # mufit wants to read this from a file
+            guess = self.command_1.children[6].value=='Guess'
+            self.the_fit = mufit(self.suite,dashboard_file,no_fit = guess, dash_log = self.log) # writes text to board_box
+            #self.figure_box.clear_output()
+            plot_range = self.command_1.children[8].value
+            rotfreq = self.command_1.children[9].value
+            the_plot = mufitplot(plot_range, 
+                                 self.the_fit, 
+                                 rotating_frame_frequencyMHz = rotfreq, 
+                                 plot_out = self.figure_box, 
+                                 fig_fit = self.fig_fit) # plots in self.figure_box
+            self.fig_fit = the_plot.fig
+
+
+    def _on_FFT(self,b):
+        # later
+        self.log('Nothing yet!')
+
+
     def command2dash(self):
         """
         activates second row self.command_1 of mudashed command_box
 
-            Button Fit 8%
-            Label FR 5%
-            Text FR range 12%
-            Label VR 5%
-            Text VR tag 8%
-            Button Plot 8%
-            Dropdown Fit/Guess 10%
-            Label PR 5%
-            Text PR range 16%
-            Label RF 5%
-            FloatText RF frequency 8%
-            Button FFT 8%
-            Label nuR 5%
-            Text nuR range 10%
-            Label LB 5%
-            FloatText LB 8%
-            Tot 25% + 24% + 48% = 97% 
         """
-        # begins below def build_dashed
-        def on_Fit(b):
-            # build_dashed()
-            # the_fit = mufit(self.suite,dashboard_file)
-            # with self.figure_box:
-            #     the_plot = mufitplot(plot_range,the_fit)
-
-            import json
-            from mujpy.mufit import mufit
-            from mujpy.mufitplot import mufitplot
-            if self.build_dashed(): # creates self.dashboard and returns True if no validation raise occurred
-                dashboard_file = self.suite.__fitpath__+'dashed.json'
-                with open(dashboard_file,'w') as f:
-                    json.dump(self.dashboard,f) # mufit wants to read this from a file
-                self.board_box.clear_output()
-                the_fit = mufit(self.suite,dashboard_file,dash_log = self.log) # writes text to board_box
-                #self.figure_box.clear_output()
-                plot_range = self.command_1.children[8].value
-                rotfreq = self.command_1.children[9].value
-                fft_range = self.command_1.children[12].value # not yet in use 
-                lb = self.command_1.children[13].value # not yet in use 
-                self.tab.selected_index = 2
-                the_plot = mufitplot(plot_range, the_fit, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box, fig_fit = self.fig_fit) # plots in self.figure_box
-                self.fig_fit = the_plot.fig
-                
-
-        def on_Plot(b):
-            """
-            invokes mufitplot from mudashed
-
-            """
-            
-            # read dashed widget values (including guess, rotfreq
-            # json.dump again
-            # self.figure_box.clear_output()
-            # if guess: mufit(plot_range,dashboard_file, no_fit = not guess,out=self.figure_box)
-            # mufitplot(plot_range, guess = guess, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box)
-            import json
-            from mujpy.mufit import mufit
-            from mujpy.mufitplot import mufitplot
-            if self.build_dashed(): # creates self.dashboard and returns True if no validation raise occurred
-                dashboard_file = self.suite.__fitpath__+'dashed.json'
-                self.log('dumping {}'.format(dashboard_file))
-                with open(dashboard_file,'w') as f:
-                    json.dump(self.dashboard,f) # mufit wants to read this from a file
-                guess = self.command_1.children[6].value=='Guess'
-                self.the_fit = mufit(self.suite,dashboard_file,no_fit = guess, dash_log = self.log) # writes text to board_box
-                #self.figure_box.clear_output()
-                plot_range = self.command_1.children[8].value
-                rotfreq = self.command_1.children[9].value
-                the_plot = mufitplot(plot_range, 
-                                     self.the_fit, 
-                                     rotating_frame_frequencyMHz = rotfreq, 
-                                     plot_out = self.figure_box, 
-                                     fig_fit = self.fig_fit) # plots in self.figure_box
-                self.fig_fit = the_plot.fig
-
-
-        def on_FFT():
-            # later
-            self.log('Nothing yet!')
 
         from ipywidgets.widgets import Layout, Button, Label, Text, Dropdown, FloatText, HTML
         command1_width = ['10%','5%','10%','5%','6%','12%','10%','5%','16%','10%','8%','5%','8%','10%']
@@ -147,13 +223,13 @@ class dashed(object):
         version = self.dashboard['version'] if 'dashboard' in self.__dir__() else '1'
 
         buttonfit = Button(description='Fit',layout=Layout(width=command1_width[0]))
-        buttonfit.on_click(on_Fit)
+        buttonfit.on_click(self._on_Fit)
         buttonfit.style.button_color = self.command_button_color
         buttonplot = Button(description='Plot',layout=Layout(width=command1_width[5]))
-        buttonplot.on_click(on_Plot)
+        buttonplot.on_click(self._on_Plot)
         buttonplot.style.button_color = self.command_button_color
         buttonfft = Button(description='FFT',layout=Layout(width=command1_width[10]))
-        buttonfft.on_click(on_FFT)
+        buttonfft.on_click(self._on_FFT)
         buttonfft.style.button_color = self.command_button_color
         RF_float = FloatText(value=0,
                              description = 'RF', 
@@ -189,9 +265,11 @@ class dashed(object):
         '''
         builds second stage widgets & value from self.dashboard - LD and LF - or from NG_int.value and self.MN_text_value
 
-        assumes self.dashboard is loaded before calling json2dash and valid (check!)
-        adds rows beyond first one, according to json content of file
-            ['model_guess'] and ['globpardicts_guess']
+        assumes 
+        ::
+                - either self.dashboard is already loaded and valid before calling json2dash, tnen displays it in widgets
+                - or builds empty widgets according to NG and MN acronym
+        adds rows for ['model_guess'] and ['globpardicts_guess']
         '''
 
         from ipywidgets.widgets import HBox, VBox, Label, HTML, Text, Layout
@@ -213,11 +291,15 @@ class dashed(object):
                 self.command_0.children[0].value='global fit'
                 self.NG_int.value = len(pardicts)
                 hashed = '#' in [pardict['flag'] for pardict in pardicts]
+            else:
+                self.command_0.children[0].value='sequential fit'
+                self.NG_int.value = 0
+                self.global_box.children = []
         else:
             if self.NG_int.value > 0:
                 pardicts = []
                 for kp in range(self.NG_int.value):
-                    pardicts.append({'name':'','value':0.0,'flag':'~','error':0.001,'limits':'None,None','positive_parity':False})
+                    pardicts.append({'name':'','value':0.0,'flag':'~','error':0.001,'limits':[None,None],'positive_parity':False})
 
         # skip this if fit is sequential
         glob = False
@@ -226,14 +308,17 @@ class dashed(object):
             global_title = HBox([hspacer,HTML(gbt_style),glotitle,hspacer])
             flags = ['~','!','#'] if hashed or 'dashboard' not in self.__dir__() else ['~','!']
             # unwraps unique pardict keys into labels
-            keys = list(max(pardicts,key=len).keys()) # list of all unique pardicts keys
-            keys.insert(0,'p[k]') # order is 'p[k]' 'name' 'value' 'flag' 'error' 'limits' 'par>0'
+            # added a multipurpose dropdown: insert/delete/select subplot 
+            keys = ['p[k]','name','value','flag','error','limits','plot','par>0']
+            #list(max(pardicts,key=len).keys()) # list of all unique pardicts keys
+            #keys.insert(0,'p[k]') # order is 'p[k]' 'name' 'value' 'flag' 'error' 'limits' 'par>0'
+            #keys.insert(6,'plot')   # order is 'p[k]' 'name' 'value' 'flag' 'error' 'limits' 'par>0' 'plot'
             if 'positive_parity' in keys:
                 keys[keys.index('positive_parity')]='par>0'
                 # p[k] name value flag error limits par>0
-            keylen = ['5%','12%','18%','12%','16%','20%','9%']
+            # lengths of widgets in each column of global parameters    
+            keylen = ['5%','10%','20.5%','9%','16%','19%','8%','8%']
             labels = [Label(value=key,layout=Layout(width=klen)) for key,klen in zip(keys,keylen)]
-            
             n_columns = self.NG_int.value//2+self.NG_int.value%2
             
             # now add one row of widgets per pardict
@@ -251,7 +336,7 @@ class dashed(object):
             model = self.dashboard['model_guess'] # list of components
             model_name = ''.join([component['name'] for component in model])
             self.MN_text.value = model_name 
-        # MN_text calls on_MN but  empty global_box and model_bosonly if self.dashboard does not exist  
+        # MN_text calls _on_MN but  empty global_box and model_bosonly if self.dashboard does not exist  
         else:
             components = [self.MN_text.value[i:i + 2] for i in range(0, len(self.MN_text.value), 2)]
             model = [av for component in components for av in _available_components_() if component == av['name']] 
@@ -336,7 +421,7 @@ class dashed(object):
                     pardict['flag'] = parwidgs.children[3].value # string
                     pardict['error'] = parwidgs.children[4].value # float
                     pardict['limits'] = limits(parwidgs.children[5].value) # translates list of csv string to values
-                    if parwidgs.children[6].value: pardict['positive_parity'] = parwidgs.children[6].value
+                    if parwidgs.children[7].value: pardict['positive_parity'] = parwidgs.children[7].value
                     pardicts.append(pardict)
             for k,parwidgs in enumerate(self.global_box.children[1].children[1].children): # right column
                 pardict = {}
@@ -357,7 +442,7 @@ class dashed(object):
                     pardict['flag'] = parwidgs.children[3].value # string
                     pardict['error'] = parwidgs.children[4].value # float
                     pardict['limits'] = limits(parwidgs.children[5].value) # translates list of csv string to values
-                    if parwidgs.children[6].value: pardict['positive_parity'] = parwidgs.children[6].value
+                    if parwidgs.children[7].value: pardict['positive_parity'] = parwidgs.children[7].value
                     pardicts.append(pardict)
             self.dashboard['globpardicts_guess'] = pardicts
         model = []
@@ -405,15 +490,362 @@ class dashed(object):
         #    self.log('build_dashed ValueError: {}'.format(e))
         #    return False
 
+    def _on_fit_type(self,change):
+        '''
+        toggle NG disabled False/enabled True and set self.NG_int.value = 0/1
+
+        '''
+
+        #value = change['value']
+        if change['new'] == 'sequential fit':
+            self.NG_int.value = 0
+            self.NG_int.disabled = True
+        else:
+            #with self.board_box:
+            #    self.log('fit_type global fit')
+            self.NG_int.value = 1
+            self.NG_int.disabled = False
+
+    def _on_LL(self,change):
+        '''
+        Load Last dashed.json, if it exists
+        '''
+
+        import json
+        import os
+
+        self.loading_dash = True # to allow json2dash to write MN_text
+        file_json = self.suite.__fitpath__+'dashed.json'
+        if os.path.isfile(file_json):
+            with open(file_json,'r') as f:
+                self.dashboard = json.load(f) # copies json dict to self.dashboard
+            self.command2dash()
+            self.json2dash() # builds widgets for this model
+        else:
+            self.log('>>>>>>>>>>>>>>>> file dashed.json not found')
+        self.loading_dash = False # builds widgets for this model
+ 
+    def _on_LF(self,b):
+        '''
+        Choose fit model to load from ./fit/ folder
+        '''
+
+        from mujpy.tools.tools import path_file_dialog 
+        import json
+        import os
+
+        self.loading_dash = True # to allow json2dash to write MN_text
+        file_json, self.root = path_file_dialog(self.suite.__fitpath__,'json',root = self.root)
+        # self.log('Trying to load {} ...'.format(file_json))
+        if os.path.isfile(file_json):
+            if file_json[-4:]=='json':
+                with open(file_json,'r') as f:
+                    self.dashboard = json.load(f) # copies json dict to self.dashboard
+                self.log('Loaded model from {}'.format(file_json))
+                self.command2dash()
+                self.json2dash() # builds widgets for this model
+        else:
+            self.log('no valid json file was selected {}'.format(file_json))
+        self.loading_dash = False # to allow dash to change MN_text
+ 
+    def _on_MN(self,change):
+        '''
+        if valid model, adds widgets to regenerate the second stage of mudashed (the complete editor) 
+        '''
+    
+        # command box, global box: VBox of rows (HBox)
+        # model_box: HBox of two columns (VBox) of components (VBox) of rows, pardicts (HBox) of component widgets
+        from mujpy.tools.tools import validmodel 
+        from json import loads as str2lst
+        from ipywidgets import Text, IntText, Layout, Button, HBox,  \
+                               VBox, ToggleButtons, Label, FloatText
+        from tkinter.messagebox import askyesno, showerror
+        #self.log('change["new"] is {}'.format(change['new']))
+
+        if not self.loading_dash: # to allow json2dash to set model_name without interference 
+
+            if self.NG_int.value==1: # suspicious!
+                no = not askyesno(title='Check!', message="NG=1 global parameter\ndo you need more?")
+    
+            model = self.MN_text.value.strip() # removes accidental lead & trail blanks
+    
+            no = True               
+            if model and no: # when model is set to '', below on_model is alerted again but nothing happens
+
+                if validmodel(model):
+#                    with self.board_box:
+#                        self.log('MN {} is valid'.format(self.MN_text.value))                   # self.log('{} is a valid model'.format(model))
+                    # model_box stricly needs to be self since _on_MN has no return
+                    self.command2dash()
+                    self.json2dash()  # in this case self.dashboard is not loaded from a json file 
+                                        # an model variable equivalent to self.dashboard is created 
+                                        # model is used to build the second stage gui
+                    #with self.board_box:
+                        #self.log('self.command_1.children {}'.format(self.command_1.children))
+                        #self.log('self.global_box.children {}'.format(self.global_box.children))
+ 
+                    #display(panels)
+                else:
+                    showerror(title='Wrong model syntax',message='{} not made of valid components!'.format(model))
+                    self.MN_text.value = ''
+            else:
+                self.MN_text.value = ''
+
+    def _on_RL(self,change):
+        """
+        start suite from run list input, checks path file exists
+
+        beware: as of ipywidgets v. 8.1.5 this continuous_update=False is a bit of a mess
+                change['new'] is initially a dict instead of a value
+                and Enter triggers a double call.
+                proceeds only id change['new'] is not a dict
+        """
+
+        import os
+        from mujpy.musuite import suite
+        from mujpy.tools.tools import derun, get_title, get_gtotals, get_grouping 
+        from mujpy.tools.tools import group_syntax, tk_error, check_multigroup
+        from numpy import all
+
+
+        runlist  = change['new']
+        if not isinstance(runlist,dict):
+            datafile = self.suite_box.children[2].children[2].value  # path Text value
+            #self.log('runlist = {}'.format(runlist))
+
+            try:
+                grp = self.suite_box.children[1].children[1].value
+                forward, backward = grp.split('-')
+                if all(get_grouping(forward)>=0) and all(get_grouping(backward)>=0):
+                    grp_calib = [{'forward':forward, 
+                              'backward':backward, 
+                              'alpha':float(self.suite_box.children[1].children[2].value)}]
+                else:
+                    raise NameError('No Group0')
+            except ValueError as e:
+                f,b = get_grouping(forward), get_grouping(backward)
+                if isinstance(f,str):
+                    e = f
+                    if isinstance(b,str): e += ';'+b
+                elif isinstance(b,str): e = b
+                #self.log('Exception {}'.format(e))
+                #self.log('group syntax error: {}'.format(grp))
+                text = 'Exception {}'.format(e)
+                text += '\nGroup0 syntax error: {}'.format(grp)
+                self.root = group_syntax(text,root=self.root)
+                #self.log('Group0 group_syntax return a self.root = {}'.format(self.root))
+                return
+            grp = self.suite_box.children[1].children[4].value
+            alph = self.suite_box.children[1].children[5].value 
+            if grp:
+                # these are potentially a ;-separated multigroup strings
+                groups = grp.split(';')
+                alphas = alph.split(';')
+                for group, alpha in zip(groups,alphas):
+                    grp_c = check_multigroup(group,alpha)
+                    if isinstance(grp_c, str):
+                        self.root = group_syntax(grp_c, root=self.root)
+                        return
+                    grp_calib.append(grp_c)
+
+            offset = self.suite_box.children[1].children[8].value
+            if os.path.isfile(datafile):
+                if runlist:
+                    self.suite = suite(datafile , runlist , grp_calib , offset , 'CettoLaqualunque',console=self.log) #startuppath is set in suite
+                    # self.log info
+                    if self.suite.loadfirst: # suite loaded the data
+                        starttime_options = [' '.join(self.suite._the_runs_[k][0].get_timeStart_vector()) for k in range(self.suite.nruns)]
+                        starttime_options.insert(0,'Run start times')
+                        self.suite_box.children[0].children[0].options = starttime_options
+                        self.suite_box.children[0].children[0].value = starttime_options[1]
+
+                        stoptime_options = [' '.join(self.suite._the_runs_[k][0].get_timeStop_vector()) for k in range(self.suite.nruns)]
+                        stoptime_options.insert(0,'Run stop times')
+                        #self.log('nruns {}, SD_options = {}'.format(self.suite.nruns,starttime_options))
+                        self.suite_box.children[0].children[1].options = stoptime_options
+                        self.suite_box.children[0].children[1].value = stoptime_options[1]
+
+                        title_options = [get_title(self.suite._the_runs_[k][0]) for k in range(self.suite.nruns)]
+                        title_options.insert(0,'Titles')
+                        self.suite_box.children[0].children[2].options = title_options
+                        self.suite_box.children[0].children[2].value = title_options[1] 
+
+                        comment_options = [self.suite._the_runs_[k][0].get_comment() for k in range(self.suite.nruns)]
+                        comment_options.insert(0,'Comments')
+                        self.suite_box.children[0].children[3].options = comment_options 
+                        self.suite_box.children[0].children[3].value = comment_options[1]
+
+                        totalcounts, groupcounts, nsbin, maxbin = get_gtotals(self.suite)
+                        self.suite_box.children[0].children[4].value = nsbin
+                        self.suite_box.children[0].children[5].value = maxbin 
+                        goptions = ['Group counts']
+                        toptions = ['Total counts']
+                        runs,e = derun(runlist)
+                        for runadd,groupcount,totalcount in zip(runs,groupcounts,totalcounts):
+                            run = ','.join([run for run in runadd])
+                            for k,gc in enumerate(groupcount):
+                                counts = ': '+gc
+                                goptions.append(run+'.'+str(k)+counts)
+                            toptions.append(run+': '+totalcount[0])
+                        
+                        self.suite_box.children[1].children[6].options = goptions
+                        self.suite_box.children[1].children[7].options = toptions
+                        self.command_box.children[0].children = self.command_0.children
+                    else:
+                        self.root = tk_error('No runs loaded, runlist {}?'.format(runlist),'suite error',root=self.root)
+                else:
+                    self.log('Please specify runlist')
+            else:
+                self.log('File {} not found'.format(datafile))
+                self.log('paths must be either in startup path and below or absolute')
+        else:
+            self.log('debug, _on_RL, change["new"] was still a dict instead of the new text value')
+
+    def _on_LG(self,b):
+        """
+        group dict file load, by tkinter filedialog
+
+        """
+
+        import os
+        from mujpy.tools.tools import path_file_dialog, tk_error
+
+        startpath = os.getcwd()
+        grouppath = startpath+os.path.sep+'groups'+os.path.sep
+        if os.path.exists(grouppath):
+            groupfile,self.root = path_file_dialog(grouppath,'grp', root=self.root)
+            if groupfile:
+                with open(groupfile,"r") as f:
+                    grp_calib = f.readline()
+                groupshnd1 = None
+                for kg, group in enumerate(eval(grp_calib)):
+                    alpha = str(group['alpha'])
+                    groupshnd = group['forward']+'-'+group['backward']
+                    if kg == 0:
+                        self.suite_box.children[1].children[1].value = groupshnd
+                        self.suite_box.children[1].children[2].value = alpha
+                    elif kg == 1:
+                        alpha1 = alpha
+                        groupshnd1 = groupshnd
+                    else:
+                        alpha1 += ';'+alpha
+                        groupshnd1 += ';'+groupshnd
+                if groupshnd1:
+                    grp_txt = self.suite_box.children[1].children[4]
+                    alpha_txt = self.suite_box.children[1].children[5]
+                    grp_txt.unobserve(self._on_multigroup,names='value')
+                    alpha_txt.unobserve(self._on_multigroup,names='value')
+                    grp_txt.value = groupshnd1
+                    alpha_txt.value = alpha1
+                    grp_txt.observe(self._on_multigroup,names='value')
+                    alpha_txt.observe(self._on_multigroup,names='value')
+                text = 'PRESS RL! to load new group data'
+                self.root = tk_error(text,'REMEMBER!',root=self.root)
+        else:
+            self.root = tk_error('Folder {} does not exist'.format(datapath),'Load groups error', root=self.root)
+ 
+    def _on_RL_button(self,b):
+        """
+        simulate RL text change
+        """
+        
+        runlist = self.suite_box.children[2].children[5].value
+        self.suite_box.children[2].children[5].value =  ''
+        self.suite_box.children[2].children[5].value = runlist 
+
+    def _on_DL(self,b):
+        """
+        data file load, tkinter 
+        """
+
+        import os
+        from mujpy.tools.tools import path_file_dialog
+
+        startpath = os.getcwd()
+        datapath = startpath+os.path.sep+'data'+os.path.sep
+        if os.path.exists(datapath):
+            datafile, self.root = path_file_dialog(datapath,'*', root=self.root)
+        else:
+            self.log('Folder {} does not exist'.format(datapath))
+        if datafile:
+            self.suite_box.children[2].children[2].value = datafile 
+
+    def _on_multigroup(self,change):
+        """
+        inserted further goups, check syntax and check that RL is pressed (again?)
+        """
+
+        from mujpy.tools.tools import check_multigroup, tk_error
+        if change['owner'].tooltip[0] == 'f':
+            remind = True
+            grp = change['new']
+            alph = self.suite_box.children[1].children[5].value
+        else:
+            remind = False
+            alph = change['new']
+            grp = self.suite_box.children[1].children[4].value
+        run_list = self.suite_box.children[2].children[5].value
+        OK = len(grp.split(';'))==len(alph.split(';'))
+        if grp and run_list and OK:
+            grp_c = check_multigroup(grp,alph) # simply a syntax pre check 
+            if isinstance(grp_c, str) and remind:
+                self.root = group_syntax(grp_c, root=self.root)
+                return
+            self.root = tk_error('Press RL to load new group data!','REMEMBER!',root=self.root)
+
+    def _on_fetch(self,change):
+        """
+        fetch PSI data
+        """
+
+        """
+        self.fetch_box = VBox([HBox([Dropdown(options=areas,
+                                    description='instrument'
+                                    value='GPS',
+                                    layout=Layout(width='20%')),
+                            Dropdown(options=years,
+                                    description='year'
+                                    value=current_yr,
+                                    layout=Layout(width='20%')),
+                            IntText(value = 1,
+                                    description = 'Start run #',
+                                    layout=Layout(width='20%')),
+                            IntText(value = 2
+                                    description = 'Stop run #',
+                                    layout=Layout(width='20%')),
+                                    fetch_button         
+                                ]),
+                      Textarea(value='',disabled=True,layout=Layout(width='900px',height='160px'))])
+        """
+        from mujpy.tools.tools import fetch_PSI_data
+        from os.path import isdir, split
+        area = self.fetch_box.children[0].children[0].value
+        year = self.fetch_box.children[0].children[1].value
+        run_start = self.fetch_box.children[0].children[2].value
+        run_stop = self.fetch_box.children[0].children[3].value
+        datapath = self.suite_box.children[2].children[2].value
+        if datapath:
+            datapath = datapath if isdir(datapath) else split(datapath)[0]
+            error = fetch_PSI_data(year,area,run_start,run_stop,datapath)
+            if error:
+                self.fetch_box.children[1].value += 'Error searching PSI database\n {}'.format(error)
+            else:
+                self.fetch_box.children[1].value = 'Loaded {} file(s) in data/ path'.format(run_stop-run_start+1)
+        else:
+            self.fetch_box.children[1].value = 'No data path present, write one in the Fit tab'
 
     def board(self):
         '''
-        entry, draws the gui editor in 3 stages, suite, model selection, editor
+        gui entry point, draws the gui editor in 3 stages, suite, model selection, editor
 
-            for suite input and information
-            for command actions (Fit,Plot,FFT,Ranges ...)
-            for 'model_guess' list of components and their pardicts
-            for 'globpardicts_guess' list of global parameters
+        each stage a new box is added to the gui:
+        ::
+            * suite box input and information
+            * command box 
+            *    model selection
+            *    actions (Fit,Plot,FFT,Ranges ...)
+            * ['globpardicts_guess' list of global parameters]
+            * 'model_guess' list of components and their parameters
         '''
 
         from ipywidgets.widgets import Output, ToggleButtons, Button, Label, Layout, Text, IntText
@@ -440,333 +872,7 @@ class dashed(object):
         #     self.command2dash() self.json2dash() build model_box, global_box children for all three cases
         # [widgets with tooltips, some actions preceeded by two letter label]
         ###################################################################################################
-
-        def on_fit_type(change):
-            '''
-            toggle NG disabled False/True and set self.NG_int.value = 1,0
-
-            '''
-
-            if fit_type.value == 'sequential fit':
-                self.NG_int.value = 0
-                self.NG_int.disabled = True
-            else:
-                #with self.board_box:
-                #    self.log('fit_type global fit')
-                self.NG_int.value = 1
-                self.NG_int.disabled = False
-
-        def on_LL(change):
-            '''
-            Load Last dashed.json if it exists
-            '''
-
-            import json
-            import os
-
-            self.loading_dash = True # to allow json2dash to write MN_text
-            file_json = self.suite.__fitpath__+'dashed.json'
-            if os.path.isfile(file_json):
-                with open(file_json,'r') as f:
-                    self.dashboard = json.load(f) # copies json dict to self.dashboard
-                self.command2dash()
-                self.json2dash() # builds widgets for this model
-            else:
-                self.log('>>>>>>>>>>>>>>>> file dashed.json not found')
-            self.loading_dash = False # builds widgets for this model
- 
-        def on_LF(change):
-            '''
-            Choose fit model from ./fit/ folder to load
-            '''
-
-            from mujpy.tools.tools import path_file_dialog 
-            import json
-            import os
-
-            self.loading_dash = True # to allow json2dash to write MN_text
-            file_json, self.root = path_file_dialog(self.suite.__fitpath__,'json',root = self.root)
-            # self.log('Trying to load {} ...'.format(file_json))
-            if os.path.isfile(file_json):
-                if file_json[-4:]=='json':
-                    with open(file_json,'r') as f:
-                        self.dashboard = json.load(f) # copies json dict to self.dashboard
-                    self.command2dash()
-                    self.json2dash() # builds widgets for this model
-            else:
-                self.log('no valid json file was selected {}'.format(file_json))
-            self.loading_dash = False # to allow dash to change MN_text
-    
-        def on_MN(change):
-            '''
-            if valid model, adds widgets to regenerate the second stage of mudashed (complete editor) 
-            '''
-    
-            # command box, global box: VBox of rows (HBox)
-            # model_box: HBox of two columns (VBox) of components (VBox) of rows, pardicts (HBox) of component widgets
-            from mujpy.tools.tools import validmodel 
-            from json import loads as str2lst
-            from ipywidgets import Text, IntText, Layout, Button, HBox,  \
-                                   VBox, ToggleButtons, Label, FloatText
-            from tkinter.messagebox import askyesno, showerror
-            #self.log('change["new"] is {}'.format(change['new']))
-
-            if not self.loading_dash: # to allow json2dash to set model_name without interference 
-
-                if self.NG_int.value==1: # suspicious!
-                    no = not askyesno(title='Check!', message="NG=1 global parameter\ndo you need more?")
-        
-                model = self.MN_text.value.strip() # removes accidental lead & trail blanks
-        
-                no = True               
-                if model and no: # when model is set to '', below on_model is alerted again but nothing happens
-
-                    if validmodel(model):
-#                        with self.board_box:
-#                            self.log('MN {} is valid'.format(self.MN_text.value))                   # self.log('{} is a valid model'.format(model))
-                        # model_box stricly needs to be self since on_MN has no return
-                        self.command2dash()
-                        self.json2dash()  # in this case self.dashboard is not loaded from a json file 
-                                            # an model variable equivalent to self.dashboard is created 
-                                            # model is used to build the second stage gui
-                        #with self.board_box:
-                            #self.log('self.command_1.children {}'.format(self.command_1.children))
-                            #self.log('self.global_box.children {}'.format(self.global_box.children))
- 
-                        #display(panels)
-                    else:
-                        showerror(title='Wrong model syntax',message='{} not made of valid components!'.format(model))
-                        self.MN_text.value = ''
-                else:
-                    self.MN_text.value = ''
-
-        def on_RL(change):
-            """
-            start suite from run list input, checks path file exists
-
-            beware: as of ipywidgets v. 8.1.5 this continuous_update=False is a bit of a mess
-                    change['new'] is initially a dict instead of a value
-                    and Enter triggers a double call.
-                    proceeds only id change['new'] is not a dict
-            """
-
-            import os
-            from mujpy.musuite import suite
-            from mujpy.tools.tools import derun, get_title, get_gtotals, get_grouping, group_syntax, tk_error
-            from numpy import all
-
-
-            runlist  = change['new']
-            if not isinstance(runlist,dict):
-                datafile = self.suite_box.children[2].children[2].value  # path Text value
-                #self.log('runlist = {}'.format(runlist))
-
-                try:
-                    grp = self.suite_box.children[1].children[1].value
-                    forward, backward = grp.split('-')
-                    if all(get_grouping(forward)>=0) and all(get_grouping(backward)>=0):
-                        grp_calib = [{'forward':forward, 
-                                  'backward':backward, 
-                                  'alpha':float(self.suite_box.children[1].children[2].value)}]
-                    else:
-                        raise NameError('No Group0')
-                except ValueError as e:
-                    f,b = get_grouping(forward), get_grouping(backward)
-                    if isinstance(f,str):
-                        e = f
-                        if isinstance(b,str): e += ';'+b
-                    elif isinstance(b,str): e = b
-                    #self.log('Exception {}'.format(e))
-                    #self.log('group syntax error: {}'.format(grp))
-                    text = 'Exception {}'.format(e)
-                    text += '\nGroup0 syntax error: {}'.format(grp)
-                    self.root = group_syntax(text,root=self.root)
-                    #self.log('Group0 group_syntax return a self.root = {}'.format(self.root))
-                    return
-                grp = self.suite_box.children[1].children[4].value
-                if grp:
-                    try:
-                        alph = self.suite_box.children[1].children[5].value 
-                        groups,alphas = grp.split(';'),alph.split(';')
-                        for group,alpha in zip(groups,alphas):
-                            forward1, backward1 = group.split('-')
-                            if all(get_grouping(forward1)>=0) and all(get_grouping(backward1)>=0):
-                                grp_calib.append({'forward':forward1, 
-                                      'backward':backward1, 
-                                       'alpha':float(alpha)})
-                    except ValueError as e:
-                        f,b = get_grouping(forward), get_grouping(backward)
-                        if isinstance(f,str):
-                            e = f
-                            if isinstance(b,str): e += ';'+b
-                        elif isinstance(b,str): e = b
-                        #self.log('Exception {}'.format(e))
-                        #self.log('other group syntax error: {}, alpha {}'.format(grp,alph))
-                        #self.tab.selected_index = 2
-                        text = 'Exception {}'.format(e)
-                        text += '\nGroups ... syntax error: {}'.format(grp)
-                        self.root = group_syntax(text, root=self.root)
-                        #self.log('Groups ... group_syntax return a self.root = {}'.format(self.root))
-                        return
-
-                offset = self.suite_box.children[1].children[8].value
-                if os.path.isfile(datafile):
-                    if runlist:
-                        self.suite = suite(datafile , runlist , grp_calib , offset , 'CettoLaqualunque',console=self.log) #startuppath is set in suite
-                        # self.log info
-                        if self.suite.loadfirst: # suite loaded the data
-                            starttime_options = [' '.join(self.suite._the_runs_[k][0].get_timeStart_vector()) for k in range(self.suite.nruns)]
-                            starttime_options.insert(0,'Run start times')
-                            self.suite_box.children[0].children[0].options = starttime_options
-                            self.suite_box.children[0].children[0].value = starttime_options[1]
-
-                            stoptime_options = [' '.join(self.suite._the_runs_[k][0].get_timeStop_vector()) for k in range(self.suite.nruns)]
-                            stoptime_options.insert(0,'Run stop times')
-                            #self.log('nruns {}, SD_options = {}'.format(self.suite.nruns,starttime_options))
-                            self.suite_box.children[0].children[1].options = stoptime_options
-                            self.suite_box.children[0].children[1].value = stoptime_options[1]
-
-                            title_options = [get_title(self.suite._the_runs_[k][0]) for k in range(self.suite.nruns)]
-                            title_options.insert(0,'Titles')
-                            self.suite_box.children[0].children[2].options = title_options
-                            self.suite_box.children[0].children[2].value = title_options[1] 
-
-                            comment_options = [self.suite._the_runs_[k][0].get_comment() for k in range(self.suite.nruns)]
-                            comment_options.insert(0,'Comments')
-                            self.suite_box.children[0].children[3].options = comment_options 
-                            self.suite_box.children[0].children[3].value = comment_options[1]
-
-                            totalcounts, groupcounts, nsbin, maxbin = get_gtotals(self.suite)
-                            self.suite_box.children[0].children[4].value = nsbin
-                            self.suite_box.children[0].children[5].value = maxbin 
-                            goptions = ['Group counts']
-                            toptions = ['Total counts']
-                            runs,e = derun(runlist)
-                            for runadd,groupcount,totalcount in zip(runs,groupcounts,totalcounts):
-                                run = ','.join([run for run in runadd])
-                                for k,gc in enumerate(groupcount):
-                                    counts = ': '+gc
-                                    goptions.append(run+'.'+str(k)+counts)
-                                toptions.append(run+': '+totalcount[0])
-                            
-                            self.suite_box.children[1].children[6].options = goptions
-                            self.suite_box.children[1].children[7].options = toptions
-                            self.command_box.children[0].children = self.command_0.children
-                        else:
-                            tk_error('No runs loaded, runlist {}?'.format(runlist),'suite error',root=self.root)
-                            self.root = None # destroyed by tk_error
-                    else:
-                        self.log('Please specify runlist')
-                else:
-                    self.log('File {} not found'.format(datafile))
-                    self.log('paths must be either in startup path and below or absolute')
-            else:
-                self.log('debug, on_RL, change["new"] was still a dict instead of the new text value')
-
-        def on_LG(b):
-            """
-            group file load, tkinter 
-
-            """
-
-            import os
-            from mujpy.tools.tools import path_file_dialog, tk_error
-
-            startpath = os.getcwd()
-            grouppath = startpath+os.path.sep+'groups'+os.path.sep
-            if os.path.exists(grouppath):
-                groupfile,self.root = path_file_dialog(grouppath,'grp', root=self.root)
-                if groupfile:
-                    with open(groupfile,"r") as f:
-                        grp_calib = f.readline()
-                    groupshnd1 = None
-                    for kg, group in enumerate(eval(grp_calib)):
-                        alpha = str(group['alpha'])
-                        groupshnd = group['forward']+'-'+group['backward']
-                        if kg == 0:
-                            self.suite_box.children[1].children[1].value = groupshnd
-                            self.suite_box.children[1].children[2].value = alpha
-                        elif kg == 1:
-                            alpha1 = alpha
-                            groupshnd1 = groupshnd
-                        else:
-                            alpha1 += ';'+alpha
-                            groupshnd1 += ';'+groupshnd
-                    if groupshnd1:
-                        self.suite_box.children[1].children[4].value = groupshnd1
-                        self.suite_box.children[1].children[5].value = alpha1
-            else:
-                tk_error('Folder {} does not exist'.format(datapath),'Load groups error', root=self.root)
-             
-
-        def on_RL_button(b):
-            """
-            simulate RL text change
-            """
-            
-            runlist = self.suite_box.children[2].children[5].value
-            #self.suite_box.children[2].children[5].value =  ''
-            self.suite_box.children[2].children[5].value = runlist 
-
-        def on_DL(b):
-            """
-            data file load, tkinter 
-            """
-
-            import os
-            from mujpy.tools.tools import path_file_dialog
-
-            startpath = os.getcwd()
-            datapath = startpath+os.path.sep+'data'+os.path.sep
-            if os.path.exists(datapath):
-                datafile, self.root = path_file_dialog(datapath,'*', root=self.root)
-            else:
-                self.log('Folder {} does not exist'.format(datapath))
-            if datafile:
-                self.suite_box.children[2].children[2].value = datafile 
-
-        def on_fetch(change):
-            """
-            fetch PSI data
-            """
-
-            """
-            self.fetch_box = VBox([HBox([Dropdown(options=areas,
-                                        description='instrument'
-                                        value='GPS',
-                                        layout=Layout(width='20%')),
-                                Dropdown(options=years,
-                                        description='year'
-                                        value=current_yr,
-                                        layout=Layout(width='20%')),
-                                IntText(value = 1,
-                                        description = 'Start run #',
-                                        layout=Layout(width='20%')),
-                                IntText(value = 2
-                                        description = 'Stop run #',
-                                        layout=Layout(width='20%')),
-                                        fetch_button         
-                                    ]),
-                          Textarea(value='',disabled=True,layout=Layout(width='900px',height='160px'))])
-            """
-            from mujpy.tools.tools import fetch_PSI_data
-            from os.path import split
-            from os import isdir
-            area = self.fetch_box.children[0].children[0].value
-            year = self.fetch_box.children[0].children[1].value
-            run_start = self.fetch_box.children[0].children[2].value
-            run_stop = self.fetch_box.children[0].children[3].value
-            datapath = self.suite_box.children[2].children[2].value
-            if datapath:
-                datapath = datapath if isdir(datapath) else split(datapath)[0]
-                error = fetch_PSI_data(year,area,run_start,run_stop,datapath)
-                if error:
-                    self.fetch_box.children[1].value += 'Error searching PSI database\n {}'.format(error)
-                else:
-                    self.fetch_box.children[1].value = 'Loaded {} file(s) in data/ path'.format(run_stop-run_start+1)
-            else:
-                self.fetch_box.children[1].value = 'No data path present, write one in the Fit tab'
-
+   
                         
                 
 
@@ -825,9 +931,11 @@ class dashed(object):
         GR_label = [Label('Group 0:',layout=Layout(width=groups_width[0])),
                     Label('Groups ...:',layout=Layout(width=groups_width[0]))]
         GR_text =  [Text(value='3-4',layout=Layout(width=groups_width[1]),tooltip = '3-4\n2,3-4,1\n[fwd-bwd]'),
-                    Text(value='',placeholder='option, or LG',layout=Layout(width=groups_width[1]),tooltip = 'fw1-bw1;fw2-bw2')]
+                    Text(value='',placeholder='option, or LG',continuous_update=False,layout=Layout(width=groups_width[1]),tooltip = 'fw1-bw1;fw2-bw2')]
+        GR_text[1].observe(self._on_multigroup,names='value')
         alpha_text = [Text(value='1.0',layout=Layout(width=groups_width[2]),tooltip = 'group α'),
-                      Text(value='1.0',layout=Layout(width=groups_width[2]),tooltip = 'group α')]
+                      Text(value='1.0',continuous_update=False,layout=Layout(width=groups_width[2]),tooltip = 'group α')]
+        alpha_text[1].observe(self._on_multigroup,names='value')
         GT_dropdown = Dropdown(value = 'Group counts',
                                options = ['Group counts','Run: 0, 0'],
                                #disabled = True,
@@ -862,12 +970,12 @@ class dashed(object):
         LG_button = Button(description='LG',
                            tooltip = 'Groups file selection',
                            layout = Layout(width=runs_width[0]))
-        LG_button.on_click(on_LG)
+        LG_button.on_click(self._on_LG)
         LG_button.style.button_color = self.suite_button_color
         DL_button = Button(description='DL',
                            tooltip = 'Data file selection',
                            layout = Layout(width=runs_width[0]))
-        DL_button.on_click(on_DL)
+        DL_button.on_click(self._on_DL)
         DL_button.style.button_color = self.suite_button_color
         #if self.test:
         #    RL_value = '822' if self.test=='GPS' else '3561' if self.test=='LEM' else '126645'
@@ -878,11 +986,11 @@ class dashed(object):
                       tooltip='e.g. 822\nor 822,823:827:-1',
                       layout=Layout(width=runs_width[4]),
                       continuous_update = False)
-        RL_text.observe(on_RL,names='value')
+        RL_text.observe(self._on_RL,names='value')
         RL_button = Button(description='RL',
                            tooltip = 'Load run list',
                            layout = Layout(width=runs_width[0]))
-        RL_button.on_click(on_RL_button)
+        RL_button.on_click(self._on_RL_button)
         RL_button.style.button_color = self.suite_button_color
 
         path_value = self.data_dir if self.test else ''
@@ -939,7 +1047,7 @@ class dashed(object):
                                  value = 'sequential fit',
                                  tooltips = ['A1 A20 B1 B20\nsingle asymmetry fit','A21 B21 C1 C2\nmulti asymmetries fit'],
                                  layout = Layout(width=command_width[0]))
-        fit_type.observe(on_fit_type)
+        fit_type.observe(self._on_fit_type,names='value')
         fit_type.style.description_width='0%'
 
         self.NG_int = IntText(value = 0,description='global parameters',
@@ -954,18 +1062,18 @@ class dashed(object):
                             tooltip = 'e.g. mg\n   almgml',
                             layout = Layout(width=command_width[3],height=self.textheight),
                             continuous_update=False) # requires CR
-        self.MN_text.observe(on_MN)
+        self.MN_text.observe(self._on_MN)
 
         LL_button = Button(description = 'LL',
                            tooltip = 'Load last model\nif exists',
                            layout = Layout(width=command_width[4]))
-        LL_button.on_click(on_LL)
+        LL_button.on_click(self._on_LL)
         LL_button.style.button_color = self.command_button_color
         
         LF_button = Button(description = 'LF',
                            tooltip = 'Load fit file',
                            layout = Layout(width=command_width[5]))
-        LF_button.on_click(on_LF)
+        LF_button.on_click(self._on_LF)
         LF_button.style.button_color = self.command_button_color
 
         layout = Layout(width=self.mudashed_width,border='1px solid CadetBlue')
@@ -992,7 +1100,7 @@ class dashed(object):
         years = [str(yr) for yr in range(2003,int(current_yr)+1)]
         fetch_button = Button(description = 'Fetch from PSI',
                                         layout=Layout(width='20%'))
-        fetch_button.on_click(on_fetch)
+        fetch_button.on_click(self._on_fetch)
         fetch_button.style.button_color = self.suite_button_color
         self.fetch_box = VBox([HBox([Dropdown(options=areas,
                                        description='instrument',
@@ -1044,7 +1152,7 @@ class dashed(object):
             with SC:
                 display(self.board_box)
         else: 
-            self.tab = Tab([dash,self.fetch_box,self.board_box,help_box,about],lyout=Layout(width='920px'))
+            self.tab = Tab([dash,self.fetch_box,self.board_box,help_box,about],layout=Layout(width='940px'))
             self.tab.titles = ['Fit','Fetch data','Log','Help','About']
             self.tab.selected_index = 0
             display(css_widget,self.tab)

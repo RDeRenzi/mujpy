@@ -25,40 +25,39 @@
      },
     {
         "name": "f",
+        "value": 0.3,
+        "flag": "~",
         "error": 0.0002,
         "limits": [
             0,
             1
-        ],
-        "value": 0.5,
-        "flag": "~",
-        "local": false
+        ]
     },
     {
         "name": "A34",
+        "value": 0.28,
+        "flag": "~",
         "error": 0.0002,
         "limits": [
             0,
             null
-        ],
-        "value": 0.28,
-        "flag": "~"
+        ]
     },     
     {
         "name": "A21",
+        "value": 0.25,
+        "flag": "~",
         "error": 0.0002,
         "limits": [
             0,
             null
-        ],
-        "value": 0.25,
-        "flag": "~"
+        ]
      },     
      {
         "name": "B",
         "value": 10.0,
         "flag": "~",
-         "error": 0.01,
+        "error": 0.01,
         "limits": [
             null,
             null
@@ -67,33 +66,33 @@
      {
         "name": "φ",
         "value": 34,
+        "flag": "~",
         "error": 0.1,
         "limits": [
             null,
             null
-        ],
-        "flag": "~"
+        ]
      },
     {
         "name": "σ",
         "value": 1.5,
+        "flag": "~",
         "error": 0.02,
         "limits": [
             0.0,
             null
         ],
-        "positive_parity": true,
-        "flag": "~"
+        "positive_parity": true
     },
     {
         "name": "λ",
         "value": 0.16,
+        "flag": "~",
         "error": 0.002,
         "limits": [
             null,
             null
-        ],
-        "flag": "~"
+        ]
     }
    ],
     "model_guess": [

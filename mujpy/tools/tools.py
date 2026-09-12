@@ -1478,8 +1478,9 @@ def glob2widgets(kp,pardict,flags,keylen):
     Dropdown(options = flags,value=pardict['flag'],layout=Layout(width=keylen[3])), 
     FloatText(value=pardict['error'],layout=Layout(width=keylen[4])),
     Text(value=tup2str(pardict['limits']),tooltip='e.g. 0,1\nor 0,None\nor None,None',layout=Layout(width=keylen[5])),
-    Checkbox(value=pardict['positive_parity'],indent=False,layout=Layout(width=keylen[6]))]
-    )
+    Dropdown(value='add',options = ['add','del','0','1','2','3','4','5'],layout=Layout(width=keylen[6])),
+    Checkbox(value=pardict['positive_parity'],indent=False,layout=Layout(width=keylen[7]))
+    ])
 
 def comp2widgets(component,k):
     '''
@@ -1869,6 +1870,31 @@ def get_grouping(groupcsv):
         
     return grouping
 
+def check_multigroup(grp,alph):
+    """
+    check shorthand in grp and alph for further groups and returns grp_cal dict 
+    """
+
+    from mujpy.tools.tools import get_grouping
+    try:
+        groups,alphas = grp.split(';'),alph.split(';')
+        for group,alpha in zip(groups,alphas):
+            forward, backward = group.split('-')
+            if all(get_grouping(forward)>=0) and all(get_grouping(backward)>=0):
+                grp_cal = ({'forward':forward, 
+                      'backward':backward, 
+                       'alpha':float(alpha)})
+                return grp_cal
+    except ValueError as e:
+        f,b = get_grouping(forward), get_grouping(backward)
+        if isinstance(f,str):
+            e = f
+            if isinstance(b,str): e += ';'+b
+        elif isinstance(b,str): e = b
+        text = 'Exception {}'.format(e)
+        text += '\nGroups ... syntax error: {}'.format(grp)
+        return
+
 def init_csv_row(filespec, the_run, group = False):
     """
     writes beginning of csv row with nrun T [T eT T eT] B
@@ -2128,15 +2154,14 @@ def path_file_dialog(path,spec,root=None):
         used in mudashed
     """
 
-    import tkinter
-    from tkinter import filedialog
+    from tkinter import filedialog, Tk
     import os
 
-    if not root:
-        root = tkinter.Tk() # Close the root window
-        root.geometry("+400+10")
-    else:
+    try:
         root.deiconify()
+    except:
+        root = Tk() # Close the root window
+        root.geometry("+400+10")
     spc, spcdef = '.'+spec,'*.'+spec
     in_path = filedialog.askopenfilename(initialdir = path, filetypes=((spc,spcdef),('all','*.*')))
     root.withdraw()
@@ -2258,7 +2283,6 @@ def scanms(y,n):
             if istop-istart == n:
                 return istop
     return -1
-
 
 def spec_prec(a):
     """
@@ -2618,40 +2642,40 @@ def tk_error(text,title,root=None):
     popup warning for generic typo
     """
 
-    import tkinter as tk
-    from tkinter import messagebox as mb
-    if not root:
-        root = tk.Tk() # Close the root window
+    from tkinter import Tk, Label, Button #messagebox as mb
+    try:
+        root.deiconify()
+    except:
+        root = Tk() # Close the root window
         root.geometry("+400+10")
-    else:
-        root.deiconify() 
     root.title(title)
-    label = tk.Label(root, text = text)
+    label = Label(root, text = text)
     label.pack()
-    button = tk.Button(root, text='OK', width=25, command=root.destroy)
+    button = Button(root, text='OK', width=25, command=root.destroy)
     button.pack()
     root.geometry('600x100+400+10')
     root.mainloop()
+    return root
 
 def group_syntax(text,root=None):
     """
     popup warning for group syntax
     """
 
-    import tkinter as tk
-    from tkinter import messagebox as mb
-    if not root:
-        root = tk.Tk() # Close the root window
-        root.geometry("+400+10")
-    else:
-        root.deiconify() 
+    from tkinter import Tk, Label, Button #messagebox as mb
+    try:
+        root.deiconify()
+    except:
+        root = Tk() # Close the root window
+        root.geometry("+400+10") 
     root.title("Watch the group syntax")
-    label = tk.Label(root, text = text)
+    label = Label(root, text = text)
     label.pack()
-    button = tk.Button(root, text='OK', width=25, command=root.destroy)
+    button = Button(root, text='OK', width=25, command=root.destroy)
     button.pack()
     root.geometry('400x100+400+0')
     root.mainloop()
+    return root
 
 def savetests():
     """

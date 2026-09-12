@@ -4,12 +4,11 @@
 Reference
 +++++++++
 
-This is the mujpy Reference Manual, v. 2.7.3.
-Any fit can be lauched also without Jupyterlab by means of the following classes:
+This is the mujpy Reference Manual, v. 2.7 (obsolete) 
+Any action can be lauched by a python script (see tests/*.py), using the following classes:
 
 musuite
 -------
-::
 
     from mujpy.musuite import suite
     the_suite = suite(datafile,runlist,grp_calib,offset,startuppath,**kwargs)

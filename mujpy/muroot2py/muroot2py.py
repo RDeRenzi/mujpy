@@ -5,8 +5,10 @@ class muroot2py():                        # defines the python class
 
     """
     the user method names are standardized, when possible, to those of MuSR_td_PSI_bin() by Amato Raselli
-    usage::
-      from muroot2py import muroot2py as muld
+    
+    .. code::
+
+      from mujpy.muroot2py import muroot2py as muld
       path2file = 'path and filename'
       run = muld()  # this is the method instance
      """
@@ -17,7 +19,10 @@ class muroot2py():                        # defines the python class
                                   # used by all get_ calls
     def read(self,path_filename):
         """
-        usage::
+        read
+        
+        .. code::
+
           run = muld(path2file)  # this is the method instance 
           initiated on the data file
           returns True (success) or False (insuccess)
@@ -112,12 +117,21 @@ class muroot2py():                        # defines the python class
 # user methods
 
     def Filename(self):
+        """
+        filename
+
+        """
+
         return self._header_dictionary['File Name']
         
     def readingOK(self):
         return self.readingOOK
 
     def Show(self):
+        """
+        print RunHeader, fFolders
+        """
+
         k1 = len(self.run["RunHeader;1"].members['fFolders'][:])
         for k in range(k1):
             k2 = len(self.run["RunHeader;1"].members['fFolders'][k][:])
@@ -126,8 +140,11 @@ class muroot2py():                        # defines the python class
                 
     def get_binWidth_ns(self):
         """
-        usage:: 
-          from muroot2py import muroot2py as muld
+        bin width in ns
+        
+        .. code::
+ 
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
@@ -135,12 +152,16 @@ class muroot2py():                        # defines the python class
           # dt is now a float with the time resolution in ns
 
         """
+
         return self._header_dictionary['Time Resolution']
 
     def get_binWidth_us(self):
         """
-        usage:: 
-          from muroot2py import muroot2py as muld
+        bin width in us
+
+        .. code::
+ 
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
@@ -148,36 +169,52 @@ class muroot2py():                        # defines the python class
           # dt is now a float with the time resolution in ns
 
         """
+
         return self._header_dictionary['Time Resolution']/1000.
 
     def get_histoLength_bin(self):
         """
-        usage::
+        histogram length in bins
+
+        .. code::
+
           run = muld(path2file)  # this is the class instance initiated on the data file
           l = run.get_histoLength_bin() # l is now an integer with the number of bins in PSI detector histo
         """
+
         return int(self._histo_dictionary['Histo Length 0'])
 
     def get_numberHisto_int(self):
         """
-        usage::
+        number of histograms
+
+        .. code::
+
           run = muld(path2file)  # this is the class instance initiated on the data file
           l = run.get_numberHisto_int(histo) # l is now an integer with the number of detectors
        """
+
         return self._header_dictionary['No of Histos']
     
     def get_RedGreen_offsets(self):
         """
-        usage::
+        offset in red-green mode
+
+        .. code::
+
           run = muld(path2file)  # this is the class instance initiated on the data file
           offsets = run.get_RedGreen_offsets() # offsets is now a list of integer offsets for PSI RedGreen mode
           # beware, histograms are contuiguous, the offset is in the PSI Histo Number
        """
+
         return [int(k) for k in self._header_dictionary['RedGreen Offsets'].split(';')]
     
     def get_histo_int(self, histogram,nbin):
         """
-        usage::
+        counts in histogram at nbin
+
+        .. code::
+
           run = muld(path2file)  # this is the class instance initiated on the data file
           
           # histogram in range(self.get_numberHisto_int())
@@ -185,12 +222,17 @@ class muroot2py():                        # defines the python class
           # h is now the integer count of bin 100 in the 3rd histogram (PSI convention), python index 2
         (remember python indices starts from 0)
         """
+
         return int(self._histos()[histogram].counts()[nbin])
 
     def get_histo_vector(self,histogram,binning=1):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+
+        numpy array of counts for histogram 
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
@@ -198,6 +240,7 @@ class muroot2py():                        # defines the python class
           h = run.get_histo_vector(offset)
           # h is a column of numpy row array (not list!) of integers containing the number of events per histo for the histos with a given offset
         """
+
         if binning == 1:
             return np.array(self._histos()[histogram].counts())
         else:
@@ -205,8 +248,11 @@ class muroot2py():                        # defines the python class
     
     def get_histo_vector_no0(self,histogram,binning=1):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        numpy array of counts for histogram with 0s replaced by 0.1
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
@@ -214,6 +260,7 @@ class muroot2py():                        # defines the python class
           h = run.get_histo_vector_no0(offset)
           # h is a column of numpy row array (not list!) of integers containing the number of events per histo for the histos with zeros replaced by 0.1
         """
+
         hist = np.array(self._histos()[histogram].counts())
         if binning != 1:
             hist = self._rbn(hist,binning)
@@ -221,8 +268,11 @@ class muroot2py():                        # defines the python class
     
     def get_histo_fromt0_vector(self,histogram,binning=1,offset=0):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        numpy array of counts for histogram from t0 bin
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
@@ -230,6 +280,7 @@ class muroot2py():                        # defines the python class
           h = run.get_histo_fromt0_vector(offset)
           # h is a column of numpy row array (not list!) of integers containing the number of events per histo for the histos with a given offset after t0 
         """
+
         hist = np.array(self._histos()[histogram].counts())[self.get_t0_int(histogram)+offset:]
         if binning == 1:
             return hist
@@ -238,8 +289,11 @@ class muroot2py():                        # defines the python class
 
     def get_histo_fromt0_minus_bckgrd_vector(self,histogram,first_bkg,last_bkg,binning=1,offset=0):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        numpy array of counts for histogram from t0 bin with background subtraction from t<t0 mean
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
@@ -248,6 +302,7 @@ class muroot2py():                        # defines the python class
           # h is a column of numpy row array (not list!) of integers containing the number of events per histo for the histos with a given offset after t0
           # with background subrtaction as estimated between first_bkg and last_bkg included
         """
+
         hist = np.array(self._histos()[histogram].counts())[self.get_t0_int(histogram)+offset:]
         background = np.array(self._histos()[histogram].counts())[first_bkg:last_bkg+1].sum()/(last_bkg+1-first_bkg)
         if binning == 1:
@@ -256,106 +311,167 @@ class muroot2py():                        # defines the python class
             return self._rbn(hist,binning)-background   
     
     def get_instrument(self):
+        """
+        instrument from header
+
+        """
+
         return self._header_dictionary['Instrument']
 
     def get_title(self):
+        """
+        title
+        """
+
         return self._header_dictionary['Run Title']
 
     def get_runNumber_int(self):
+        """
+        run number
+        """
+
         return self._header_dictionary['Run Number']
 
     def get_beamline(self):
-        '''
-        '''
+        """
+        beamline from header
+        """
+
         return self._header_dictionary['Muon Source']
 
     def get_transport_energy(self):
+        """
+        transport energy from header (LEM)
+        """
+
         if self._header_dictionary['Instrument']=='LEM':
             return self._header_dictionary['Moderator HV']
 
     def get_sample_HV(self):
+        """
+        HV from header (LEM)
+        """
+
         if self._header_dictionary['Instrument']=='LEM':
            return self._header_dictionary['Sample HV']
 
     def get_implantation_energy(self):
+        """
+        Implantation Energy from header (LEM)
+        """
+
         if self._header_dictionary['Instrument']=='LEM':
             return self._header_dictionary['Implantation Energy']
 
     def get_spin_angle(self):
+        """
+        spin rotator angle (LEM)
+        """
+
         if self._header_dictionary['Instrument']=='LEM':
             return self._header_dictionary['Muon Spin Angle']
 
     def get_proposal_number(self):
+        """
+        Proposal number
+        """
+
         return self._header_dictionary['Proposal Number']
         
     def get_proposer(self):
+        """
+        PI
+        """
+
         if self._header_dictionary['Instrument']=='LEM':
             return self._header_dictionary['Main Proposer']
  
     def get_comment(self):
         """
+        comment
+
         usage: 
-          from muroot2py import muroot2py as muld
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           run.red(path2file)
           comment = run.get_comment()
           # comment is now a string with the run comment
         """
+
         return self._header_dictionary['Comment']
 
     def get_temp(self):
         """
-        usage:: 
-          from muroot2py import muroot2py as muld
+        temperature with error (string)
+
+        .. code::
+ 
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
           T = run.get_temp()
           # T is now a string with error
         """
+
         return self._header_dictionary['Sample Temperature string'].split(' +- ')[0]+'K'
 
     def get_temperature(self):
         """
-        usage:: 
-          from muroot2py import muroot2py as muld
+        temerature (float)
+
+        .. code::
+ 
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
           T = run.get_temperature()
-          # T is now a float ?
+          # T is now a float
         """
+
         return self._header_dictionary['Sample Temperature']
 
     def get_t0_int(self, histogram):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        t0 bin 
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
           t0 = run.get_t0_double()
           # t0 is now a float with the t0 bin 
         """
+
         return int(self._histo_dictionary['Time Zero Bin '+str(histogram)])
 
     def get_t0_double(self, histogram):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        t0 float as string
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
           t0 = run.get_t0_double()
           # t0 is now a float with the t0 bin 
         """
+
         return self._histo_dictionary['Time Zero Bin '+str(histogram)]
 
     def get_sample(self):
         """
-        usage:: 
-          from muroot2py import muroot2py as muld
+        sample 
+
+        .. code::
+ 
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
@@ -363,12 +479,16 @@ class muroot2py():                        # defines the python class
           # samplename is now a string with the sample name
 
         """
+
         return self._header_dictionary['Sample Name']
 
     def get_orient(self):
         """
-        usage:: 
-          from muroot2py import muroot2py as muld
+        orientation
+
+        .. code::
+ 
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
@@ -376,6 +496,7 @@ class muroot2py():                        # defines the python class
           # orient is now a string with the sample orientation info
 
         """
+
         if 'Sample Orientation' in self._header_dictionary.keys():
             return self._header_dictionary['Sample Orientation']
         else:
@@ -383,32 +504,43 @@ class muroot2py():                        # defines the python class
 
     def get_field_str(self):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        field value string
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
           fieldstr = run.get_field()
           # fieldstr is now a string with the field value 
         """
+
         return self._header_dictionary['Sample Magnetic Field string']
 
     def get_field(self):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        field float
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
-          fieldstr = run.get_field()
-          # fieldstr is now a float field value 
+          field = run.get_field()
+          # field is now a float field value 
         """
+
         return self._header_dictionary['Sample Magnetic Field']
 
     def get_timeTemperature_vector(self):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        temperature time log
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           t,T = run.get_timeTemperature_vector()
@@ -424,6 +556,7 @@ class muroot2py():                        # defines the python class
           a.plot(t,T)
           show()          
         """
+
         from datetime import datetime as DT
         from numpy import arange
         t_format = "%Y-%m-%d %H:%M:%S"
@@ -440,8 +573,11 @@ class muroot2py():                        # defines the python class
         
     def get_nameHisto(self,histogram):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        histogram descriptor
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
@@ -449,6 +585,7 @@ class muroot2py():                        # defines the python class
           name = run.get_nameHisto(histogram)
           # name is now a string descriptor of the detector
         """
+
         if histogram<0 or histogram>=self.get_numberHisto_int()*len(self.get_RedGreen_offsets()):
             return 'Histogram {} does not exist. Max histogram is {}'.format(histogram,self.get_numberHisto_int()*len(self.get_RedGreen_offsets())-1)
         else:
@@ -456,8 +593,11 @@ class muroot2py():                        # defines the python class
    
     def get_histoNames_vector(self):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        list of histogram descriptors
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
@@ -465,12 +605,16 @@ class muroot2py():                        # defines the python class
           name = run.get_histoNames_vector()
           # name is now a list of string descriptors of the detectors
         """
+
         return [self._histo_dictionary['Name '+str(k)] for k in range(self.get_numberHisto_int()*len(self.get_RedGreen_offsets()))]
    
     def get_numberTemperature_int(self):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        number of T sensors
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
@@ -478,54 +622,71 @@ class muroot2py():                        # defines the python class
           # num is now the number of temperature sensors, 1 for root files and 4 for bin files
           # use self.Show() lines 127 ... for more info on sensors
         """
+
         return 1
     
     def get_temperatures_vector(self):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        list of T sensor values
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
           T = run.get_temperatures_vector()
           # T is now a list of temperature sensor values, 1 for root files and 4 for bin files (only first 2 non zero)
         """
+
         return [self._header_dictionary['Sample Temperature']]
     
     def get_devTemperatures_vector(self):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        list of T sensor stds
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           
           T = run.get_devTemperatures_vector()
           # T is now a list of temperature sensor std values, 1 for root files and 4 for bin files (only first 2 non zero)
         """
+
         return [self._temperature_error_float()]
     
     def get_timeStart_vector(self):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        run start time
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           timeStart = run.get_timeStart_vector()
           # timeStart is the start run yyyy-mm-dd hh:mm:ss string 
 
         """
+
         return self._header_dictionary["Run Start Time"].strip().split()
       
     def get_timeStop_vector(self):
         """
-        usage::
-          from muroot2py import muroot2py as muld
+        run stop time
+
+        .. code::
+
+          from mujpy.muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
           timeStop = run.get_timeStop_vector()
           # timeStop is the stop run yyyy-mm-dd hh:mm:ss string
 
         """
+
         return self._header_dictionary["Run Stop Time"].strip().split()
 
 # commented methods below work for lem only
@@ -608,8 +769,11 @@ class muroot2py():                        # defines the python class
        
 if __name__ == '__main__':
     """
-    usage::
-      from muroot2py import muroot2py as muld
+    test of muroot2py 
+
+    .. code::
+
+      from mujpy.muroot2py import muroot2py as muld
       path2file = 'path and filename'
       run = muld()  # this is the instance
       

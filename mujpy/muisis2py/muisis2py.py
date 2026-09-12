@@ -42,7 +42,8 @@ class munxs2py():                        # defines the python class
 
     def get_numberHisto_int(self):
         """
-        usage::
+        .. code::
+
           from muisis2py import muisis2py as muld
           path2file = 'path and filename'
           run = muld(path2file,'r')  # this is the run data nexus file
@@ -53,7 +54,8 @@ class munxs2py():                        # defines the python class
     
     def get_histoLength_bin(self):
         """
-        usage::
+        .. code::
+
           from muisis2py import muisis2py as muld
           path2file = 'path and filename'
           run = muld(path2file,'r')  # this is the run data nexus file
@@ -66,7 +68,8 @@ class munxs2py():                        # defines the python class
     
     def get_RedGreen_offsets(self):
         """
-        usage::
+        .. code::
+
           run = muld(path2file)  # this is the class instance initiated on the data file
           period = run.get_RedGreen_offsets() # offsets is now a list of integer imdices for the first dimension of the histo vector
           # check on a RedGreenm mode data set
@@ -81,7 +84,8 @@ class munxs2py():                        # defines the python class
     
     def get_histo_int(self,histogram,nbin):
         """
-        usage::
+        .. code::
+
           run = muld(path2file)  # this is the class instance initiated on the data file
           
           # histogram in range(self.get_numberHisto_int())
@@ -93,7 +97,8 @@ class munxs2py():                        # defines the python class
 
     def get_histo_vector(self,histogram,binning=1):
         """
-        usage::
+        .. code::
+
           from muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
@@ -109,7 +114,8 @@ class munxs2py():                        # defines the python class
     
     def get_histo_vector_no0(self,histogram,binning=1):
         """
-        usage::
+        .. code::
+
           from muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
@@ -125,7 +131,8 @@ class munxs2py():                        # defines the python class
     
     def get_histo_fromt0_vector(self,histogram,binning=1,offset=0):
         """
-        usage::
+        .. code::
+
           from muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
@@ -142,7 +149,8 @@ class munxs2py():                        # defines the python class
 
     def get_numberTemperature_int(self):
         """
-        usage:: 
+        .. code::
+ 
           from muisis2py import muisis2py as muld
           path2file = 'path and filename'
           run = muld(path2file,'r')  # this is the run data nexus file
@@ -154,7 +162,8 @@ class munxs2py():                        # defines the python class
     
     def get_temperatures_vector(self):
         """
-        usage:: 
+        .. code::
+ 
           from muisis2py import muisis2py as muld
           path2file = 'path and filename'
           run = muld(path2file,'r')  # this is the run data nexus file
@@ -165,7 +174,8 @@ class munxs2py():                        # defines the python class
     
     def get_binWidth_ns(self):
         """
-        usage:: 
+        .. code::
+ 
           from muisis2py import muisis2py as muld
           path2file = 'path and filename'
           run = muld(path2file,'r')  # this is the run data nexus file
@@ -177,7 +187,8 @@ class munxs2py():                        # defines the python class
   
     def get_binWidth_us(self):
         """
-        usage:: 
+        .. code::
+ 
           from muisis2py import muisis2py as muld
           path2file = 'path and filename'
           run = muld(path2file,'r')  # this is the run data nexus file
@@ -189,7 +200,8 @@ class munxs2py():                        # defines the python class
   
     def get_t0_int(self, histogram=0):
         """
-        usage::
+        .. code::
+
           from muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
@@ -201,7 +213,8 @@ class munxs2py():                        # defines the python class
         
     def get_t0_double(self, histogram=0):
         """
-        usage::
+        .. code::
+
           from muroot2py import muroot2py as muld
           path2file = 'path and filename'
           run = muld(path2file)  # this is the class instance initiated on the data file
@@ -214,7 +227,8 @@ class munxs2py():                        # defines the python class
 
     def get_sample(self):
         """
-        usage:: 
+        .. code::
+ 
           from muisis2py import muisis2py as muld
           path2file = 'path and filename'
           run = muld(path2file,'r')  # this is the run data nexus file
@@ -226,7 +240,8 @@ class munxs2py():                        # defines the python class
 
     def get_field(self):
         """
-        usage::
+        .. code::
+
           from muisis2py import muisis2py as muld
           path2file = 'path and filename'
           run = muld(path2file,'r')  # this is the run data nexus file
@@ -238,7 +253,8 @@ class munxs2py():                        # defines the python class
 
     def get_orient(self):
         """
-        usage::
+        .. code::
+
           from muisis2py import muisis2py as muld
           path2file = 'path and filename'
           run = muld(path2file,'r')  # this is the run data nexus file
@@ -250,7 +266,8 @@ class munxs2py():                        # defines the python class
 
     def get_temp(self):
         """
-        usage::
+        .. code::
+
           from muisis2py import muisis2py as muld
           path2file = 'path and filename'
           run = muld(path2file,'r')  # this is the run data nexus file
@@ -273,7 +290,8 @@ class munxs2py():                        # defines the python class
 
     def get_eventsHisto_vector(self):
         """
-        usage::
+        .. code::
+
           from muisis2py import muisis2py as muld
           path2file = 'path and filename'
           run = muld(path2file,'r')  # this is the run data nexus file
@@ -296,7 +314,8 @@ class munxs2py():                        # defines the python class
 
 #  def get_timeTemperature_vector(self):
 #    """
-#    usage::
+#    .. code::
+
 #      from muisis2py import muisis2py as muld
 #      path2file = 'path and filename'
 #      run = muld(path2file,'r')  # this is the run data nexus file
@@ -313,7 +332,8 @@ class munxs2py():                        # defines the python class
 
     def get_timeStart_vector(self):
         """
-        usage::
+        .. code::
+
           from muisis2py import muisis2py as muld
           path2file = 'path and filename'
           run = muld(path2file,'r')  # this is the run data nexus file
@@ -325,7 +345,8 @@ class munxs2py():                        # defines the python class
       
     def get_timeStop_vector(self):
         """
-        usage::
+        .. code::
+
           from muisis2py import muisis2py as muld
           path2file = 'path and filename'
           run = muld(path2file,'r')  # this is the run data nexus file
@@ -341,7 +362,8 @@ class munxs2py():                        # defines the python class
 class muisis2py(): # broken since 
   def get_numberHisto_int(self):
     """
-    usage::
+    .. code::
+
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -354,7 +376,8 @@ class muisis2py(): # broken since
     
   def get_histoLength_bin(self):
     """
-    usage::
+    .. code::
+
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -367,7 +390,8 @@ class muisis2py(): # broken since
     
   def get_histo_array_int(self, histogram):
     """
-    usage::
+    .. code::
+
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -381,7 +405,8 @@ class muisis2py(): # broken since
     
   def get_numberTemperature_int(self):
     """
-    usage:: 
+    .. code::
+ 
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -394,7 +419,8 @@ class muisis2py(): # broken since
     
   def get_temperatures_vector(self):
     """
-    usage:: 
+    .. code::
+ 
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -406,7 +432,8 @@ class muisis2py(): # broken since
     
   def get_binWidth_ns(self):
     """
-    usage:: 
+    .. code::
+ 
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -419,7 +446,8 @@ class muisis2py(): # broken since
   
   def get_t0_double(self, histogram):
     """
-    usage::
+    .. code::
+
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -432,7 +460,8 @@ class muisis2py(): # broken since
 
   def get_sample(self):
     """
-    usage:: 
+    .. code::
+ 
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -445,7 +474,8 @@ class muisis2py(): # broken since
 
   def get_field(self):
     """
-    usage::
+    .. code::
+
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -458,7 +488,8 @@ class muisis2py(): # broken since
 
   def get_orient(self):
     """
-    usage::
+    .. code::
+
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -471,7 +502,8 @@ class muisis2py(): # broken since
 
   def get_temp(self):
     """
-    usage::
+    .. code::
+
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -503,7 +535,8 @@ class muisis2py(): # broken since
 
   def get_eventsHisto_vector(self):
     """
-    usage::
+    .. code::
+
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -528,7 +561,8 @@ class muisis2py(): # broken since
 
   def get_timeTemperature_vector(self):
     """
-    usage::
+    .. code::
+
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -545,7 +579,8 @@ class muisis2py(): # broken since
 
   def get_timeStart_vector(self):
     """
-    usage::
+    .. code::
+
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -558,7 +593,8 @@ class muisis2py(): # broken since
       
   def get_timeStop_vector(self):
     """
-    usage::
+    .. code::
+
       from muisis2py import muisis2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file
@@ -572,7 +608,8 @@ class muisis2py(): # broken since
 
 if __name__ == '__main__':
     """
-    usage::
+    .. code::
+
       from muisis2py import munxs2py as muld
       path2file = 'path and filename'
       run = muld(path2file,'r')  # this is the run data nexus file

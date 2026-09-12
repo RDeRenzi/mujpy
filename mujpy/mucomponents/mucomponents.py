@@ -5,54 +5,79 @@ from iminuit.util import make_func_code
 
 class mumodel(object):
     """
-    Defines the components of the fitting model. Provides a chi_square function for Minuit.
+    Defines the components of the fitting model. Provides cost (chi_square) functions for iminuit.
 
-    #################################################################################################
-    # mumodel knows it all, for homogeneous fit and plot
-    #                           fit types: A1, A20, A21, B1, B20, B21, C1, C2 (see mufit)
-    #                           calib fits: alpha is a parameter, asymm, asyme must be recalculated
-    #----------- Methods --------------------------------------------------------------------------
-    # _load_(suite, methods_keys)       unique entry point for any mufit specific model
-    #                                   selects a suite data slice 
-    #                                   overloads _add_ as _add_plain or _add_calib_ 
-    # _rebin_(tup)                      mufit data frontend, rebins the slice
-    #                                   calls _set_alpha_, _asymmetry_ if _calib else suite.asymmetry_slice in _load_
-    # _rebin_plot_(tup,lastfits)        mufitplot data frontend, rebins the entire suite
-    #                                   allows for suite > slice (sequential fits A20, B1, B20, B21)
-    #                                   calls _set_alpha_plot, _asymmetry_plot_ if _calib else suite.slice_asymmetry(-1,-1)
-    #---------- General structure ------------------------------------------------------------------
-    # _fit_types                        overload mufit.fit_types, called in _alpha_plot_
-    # _add_                             overloaded method to distributes Minuit parameters to fit components and
-    #                                                     to add components into model function
-    #                                   called by mufit dofit_ which invokes tools methods:
-    #       int2min_...                       to pass val err fix lim names pospar as plain lists
-    #           int2min for A1, A20, B1, B20 fits
-    #           int2min_global for A21, B21, C1, C2 fits
-    #       int2_..._method_key             to prepare [bndmthd [...[k,..]..]]
-    #                                       each bndmthd method taking k = key_as_lambda functions for each marameter
-    #                                       such that       pars = [eval('k(p)'), ...]     
-    #                                                       bndmthd(x,*pars)  is the component value
-    # _add_plot_                        overloaded method to distributes lastfits Minuit parameters to fit components and
-    #                                                     to add components into model function
-    #                                                     also for suite > fit slices (sequential fits A20, B1, B20, B21)
-    # ------------------------------------------------------------------------------------------------------
-    # Data, alphas and model functions share a (squeezed) numpy array structure: array([[[time bins], ...  ], ... ])
-    #                                           1d, 2d or 3d                                   bins   groups  runs
-    #                                           e.g. fit A1 has a 1d suite=slice, fit A20 2d suite, 1d slice, fit C2 3d suite=slice
-    #       parameters replicate the structure as lists, hence keys in methods_keys do as well
-    #       tools cstack or ccstack vectorize methods
-    #       _set_alpha and _alpha_plot_ vectorize alphas
-    #       _add_ and _add_plot: vectorizes 
-    ####################################################################################################
-    # methods not starting with _ are fit components, 
-    # tools method _available_components_ automagically creates a dictionary ready for the dashboard.json but for the key 'value'
-    #       mufit collects several methods in a model identified as 
-    #                       ''.join(method.__getattribute__(name)) for method in model
-    #
-    # _chisquare_            Minuit cost function at self._x_ through self._add_, self_y_, self._e_
-    # _chisquare_calib_      Minuit cost function at self._t_ through self._add_, self_y_, self._e_
-    #                                                         recomputed by self._add_ -> calib
-    ####################################################################################################
+    Synopsis
+    ``mufit``, ``mufitplot`` both use ``mumodel`` methods for slicing data
+    
+    :fit types: A1, A20, A21, B1, B20, B21, C1, C2 (see mufit)           
+    :calib fits: alpha is a parameter, asymm, asyme must be recalculated 
+    
+    .. note::
+        **Methods** 
+    .. code:: 
+
+        _load_(suite, methods_keys)     unique entry point for any mufit specific model
+                                        selects a suite data slice 
+                                        overloads _add_ as _add_plain or _add_calib_ 
+        _rebin_(tup)                    mufit data frontend, rebins the slice
+                                        calls _set_alpha_, _asymmetry_ if _calib else suite.asymmetry_slice in _load_
+        _rebin_plot_(tup,lastfits)      mufitplot data frontend, rebins the entire suite
+                                        allows for suite > slice (sequential fits A20, B1, B20, B21)
+                                        calls _set_alpha_plot, _asymmetry_plot_ if _calib else suite.slice_asymmetry(-1,-1)
+    
+    .. note::
+        **General structure**                          |
+    .. code::
+
+        _fit_types  overload mufit.fit_types, called in _alpha_plot_
+        _add_       overloaded method to distributes Minuit parameters to fit components and
+        _add_plot_  overloaded method to distributes lastfits Minuit parameters to fit components
+                            to add components into model function
+                            also for suite > fit slices (sequential fits A20, B1, B20, B21)
+    .. note::
+        called by mufit ``dofit_`` which invokes the following ``tools`` methods:
+
+
+    .. code::
+
+        int2min_...         to pass val err fix lim names pospar as plain lists
+        int2min                         for A1, A20, B1, B20 fits
+        int2min_global                  for A21, B21, C1, C2 fits
+        int2_..._method_key             to prepare [bndmthd [...[k,..]..]]
+                                        each bndmthd method taking k = key_as_lambda functions for each marameter
+                                        such that       pars = [eval('k(p)'), ...]     
+                                                        bndmthd(x,*pars)  is the component value
+   
+    .. note::
+        **numpy arrays**
+
+        Data, alphas and model functions share a (squeezed) numpy array structure:
+    .. code::
+
+        array(  [   [   [time bins], ...  ], ... ])
+        1d, 2d or 3d          bins  groups   runs 
+                    e.g. fit A1 has a 1d suite=slice,
+                    fit A20 2d suite, 1d slice,
+                    fit C2  3d suite=slice
+        parameters replicate the structure as lists,
+                    hence keys in methods_keys do as well
+        tools   cstack or ccstack vectorize methods
+                _set_alpha and _alpha_plot_ vectorize alphas
+                _add_ and _add_plot: vectorizes
+    
+    .. note::
+        methods not starting with _ are fit components, 
+
+        tools method _available_components_ automagically creates a dictionary ready for the dashboard.json but for the key 'value'
+
+        mufit collects several methods in a model identified as ''.join(method.__getattribute__(name)) for method in model
+
+    .. code ::
+
+        _chisquare_            Minuit cost function at self._x_ through self._add_, self_y_, self._e_
+        _chisquare_calib_      Minuit cost function at self._t_ through self._add_, self_y_, self._e_
+                               recomputed by self._add_ -> calib
     """
 
     def __init__(self):

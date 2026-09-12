@@ -1,4 +1,5 @@
 .. _Source:
+.. |mSR| replace:: :math:`\mu`\ SR
 
 ====================
 Source documentation
@@ -6,74 +7,79 @@ Source documentation
 -------
 musuite
 -------
-musr data reader class
-
--- automodule: musuite
-    :members:
-    :undoc-members:
-    :private-members:
+.. autoclass:: musuite.suite
+   :members:
+   :private-members:
 
 ------
-mudash
+muedge
 ------
-new mujpy gui class
+.. autoclass:: mucomponents.muedge.muedge
+   :members:
 
-.. automodule:: mudash
+--------
+muprompt
+--------
+.. autoclass:: mucomponents.muprompt.muprompt
     :members:
-    :undoc-members:
+
+--------
+mudashed
+--------
+.. autoclass:: mudashed.dashed
+    :members:
     :private-members:
+
 
 -----
 mufit
 -----
-iminuit fit class
+.. autoclass:: mufit.mufit
     :members:
-    :undoc-members:
     :private-members:
 
 ---------
 mufitplot
 ---------
-fit plot class
+.. autoclass:: mufitplot.mufitplot
     :members:
-    :undoc-members:
     :private-members:
 
-------
-muplot
-------
-plot service class
+----
+plot
+----
+.. automodule:: tools.plot
     :members:
-    :undoc-members:
     :private-members:
 
 -----
 tools
 -----
-Utilities
-
 .. automodule:: tools.tools
     :members:
-    :undoc-members:
     :private-members:
 
-------------
-mucomponents
-------------
-Components for data fit with iminuit
-
-.. automodule:: mucomponents.mucomponents
+-------
+mumodel
+-------
+.. autoclass:: mucomponents.mucomponents.mumodel
     :members:
-    :undoc-members:
     :private-members:
 
 ---------
-muisis2py
+muroot2py
 ---------
-wrapper to the nexux class
+.. autoclass:: muroot2py.muroot2py.muroot2py
+   :members:
 
-.. automodule:: muisis2py.muisis2py
+--------
+munxs2py
+--------
+.. autoclass:: muisis2py.muisis2py.munxs2py
     :members:
-    :undoc-members:
-    :private-members:
+
+-------
+musr2py
+-------
+wrapper by P. Bonfà, `musr2py <https://github.com/bonfus/musr2py>`_ to MuSR_td_PSI_bin, extracted from Class_MuSR_PSI by A. Amato and A. Raselli, and described in `psi format <https://www.psi.ch/sites/default/files/2026-04/psi_format.pdf>`_ 
 

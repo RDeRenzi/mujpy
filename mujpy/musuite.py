@@ -2,14 +2,14 @@ class suite(object):
     """
     A suite class, file read through musr2py (bin, mdu), muroot2py (root, old and MusrRoot), muisis2py (nxs)
     
-      muroot2py provides methods equivalent to all MuSR_td_PSI_bin(), same syntax (but data are always numpy arrays) 
-      
+    musr2py muisis2py muroot2py provids equivalent methods, same syntax as MuSR_td_PSI_bin() (isis and root data are np.array)
+    ::
       Different Instruments/Facilities require different methods for setting t0, specifically:
-            HAL not known
-            GPS, GPD, DOLLY, FLAME, LTF, determine a prompt position by identifying the count maximum
+           - HAL not known
+           - GPS, GPD, DOLLY, FLAME, LTF, determine a prompt position by identifying the count maximum
                                          and fit a prompt peak over a given interval around the peak
-            LEM trust the instrument tof calibration encoded in the header
-            NXS fit the edge ISIS function, common to all instrument hence to the nxs file spec
+           - LEM trust the instrument tof calibration encoded in the header
+           - NXS fit the edge ISIS function, common to all instrument hence to the nxs file spec
       Instrument identification as of 2024 is BY FILE SPEC: mdu ->   HAL (hifi), bin -> GPS, FLAME, GPD, DOLLY, nxs -> ISIS
       However, from 2023 on root can be any instrument 
       Instrument identification must be performed early in the method. Root contains it. Bin can be oly gps, gpd, flame, dolly, ltf so it's ok.
