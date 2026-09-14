@@ -1673,7 +1673,7 @@ def par2widgets(pardict,k,glob=False):
     flag = pardict['flag'] if 'flag' in pardict else '=' if glob else '~'
     drop.value = None
     drop.options = options
-    print('debug tools.par2widgets options {} flag {}'.format(options,flag))
+    #print('debug tools.par2widgets options {} flag {}'.format(options,flag))
     drop.value = flag
     widgets = [Label(value=str(k),layout=Layout(width=width[0])),
                Text(value=pardict['name'],disabled=True,layout=Layout(width=width[1])),
@@ -2318,9 +2318,24 @@ def path_file_dialog(path,spec,root=None):
         used in mudashed
     """
 
+    #from ipywidgets.widgets import FileUpload
     from tkinter import filedialog, Tk
     import os
 
+
+    # out Output in tab dialogs 
+    # observe is 
+    # def on_file_upload(c):
+    #     with out;
+    #     out.clear_output()
+    #     if not uploader.value:
+    #         return
+    #     uploaded_file = uploader.value[0]
+    #     file_name = uploaded_file['name']
+    #     file_content = uploaded_file['content']
+
+    # uploader = FileUpload(accept=spec, multiple=False) # in tools to be able to select different specs
+    #
     try:
         root.deiconify()
     except:
@@ -2328,6 +2343,7 @@ def path_file_dialog(path,spec,root=None):
         root.geometry("+400+10")
     spc, spcdef = '.'+spec,'*.'+spec
     in_path = filedialog.askopenfilename(initialdir = path, filetypes=((spc,spcdef),('all','*.*')))
+    in_path = '' if in_path == () else in_path
     root.withdraw()
     return in_path,root
 

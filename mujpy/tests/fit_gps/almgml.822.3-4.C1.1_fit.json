@@ -2,8 +2,17 @@
     "version": "1",
     "fit_range": "0,20000,40",
     "offset": 20,
-        "userpardicts_guess": [
-    {
+        "globpardicts_guess": [
+     {
+        "name": "α34",
+        "value": 1.1,
+        "flag": "~",
+        "error": 0.0002,
+        "limits": [
+            0,
+            null
+        ]
+    },   {
         "name": "f",
         "value": 0.2,
         "flag": "~",
@@ -66,30 +75,41 @@
      }
    ],
     "model_guess": [
-    {
+	{
+	"name":"al",
+        "label": "0",
+        "pardicts": [
+	{
+	  "name": "α",
+	  "fla": "=",
+	  "function": "p[0]"
+	}
+	]
+	},	
+    	{
       "name": "mg",
       "label": "0",
       "pardicts": [
         {
           "name": "A",
           "flag": "=",
-          "function": "p[0]*p[1]"
+          "function": "p[1]*p[2]"
           
 	},
         {
           "name": "B",
           "flag": "=",
-          "function": "p[2]"
+          "function": "p[3]"
         },
         {
           "name": "φ",
           "flag": "=",
-          "function":"p[3]"
+          "function":"p[4]"
 	},
         {
           "name": "σ",
           "flag": "=",
-          "function": "p[4]"	  
+          "function": "p[5]"	  
 	}
  
       ]
@@ -101,22 +121,22 @@
         {
           "name": "A",
           "flag": "=",
-          "function": "(1-p[0])*p[1]"
+          "function": "(1-p[1])*p[2]"
         },
         {
           "name": "B",
 	  "flag": "=",
-          "function": "p[2]"
+          "function": "p[3]"
          },
          {
           "name": "φ",
           "flag": "=",
-          "function":"p[3]"
+          "function":"p[4]"
         },
         {
           "name": "λ",
           "flag": "=",
-	  "function": "p[5]"
+	  "function": "p[6]"
         }
       ]
     }

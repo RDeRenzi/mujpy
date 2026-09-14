@@ -133,7 +133,7 @@ class dashed(object):
         from mujpy.tools.tools import widg2pardicts, pardicts2widgets
         from functools import partial as addkwarg
         if change['type'] == 'change' and change['name'] == 'value':
-            self.log('debug mudashed._on_add_del_plot')
+            #self.log('debug mudashed._on_add_del_plot')
             value = change['new']
             drop = change['owner']
             kp = int(drop.tooltip)
@@ -197,6 +197,7 @@ class dashed(object):
                     OK = True
         if self.build_dashed() and OK: # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
+            #self.log('debug mudashed._on_Fit pardicts with # {}'.format(any([True for pardict in self.dashboard['globpardicts_guess'] if pardict['flag']=='#']))) 
             with open(dashboard_file,'w') as f:
                 json.dump(self.dashboard,f) # mufit wants to read this from a file
             self.board_box.clear_output()
@@ -415,6 +416,7 @@ class dashed(object):
         glob = self.global_box.children # empty list is false
         if glob: 
             pardicts, kmax, error = widg2pardicts(self.global_box)
+            #self.log('debug mudashed.build_dashed pardicts with # {}'.format(any([True for pardict in pardicts if pardict['flag']=='#']))) 
             self.dashboard['globpardicts_guess'] = pardicts
         model = []
         components = [self.MN_text.value[i:i + 2] for i in range(0, len(self.MN_text.value), 2)]
@@ -485,7 +487,10 @@ class dashed(object):
         if os.path.isfile(file_json):
             with open(file_json,'r') as f:
                 self.dashboard = json.load(f) # copies json dict to self.dashboard
-            self.command2dash()
+            self.log('Loaded model from {}'.format(file_json))
+            if not self.command_1.children: 
+                self.log('calling command2dash, file {}'.format(file_json))
+                self.command2dash()
             self.json2dash() # builds widgets for this model
         else:
             self.log('>>>>>>>>>>>>>>>> file dashed.json not found')
@@ -506,7 +511,7 @@ class dashed(object):
                 with open(file_json,'r') as f:
                     self.dashboard = json.load(f) # copies json dict to self.dashboard
                 self.log('Loaded model from {}'.format(file_json))
-                self.command2dash()
+                if not self.command_1.children: self.command2dash()
                 self.json2dash() # builds widgets for this model
         else:
             self.log('no valid json file was selected {}'.format(file_json))
