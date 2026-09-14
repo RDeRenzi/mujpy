@@ -43,7 +43,6 @@ class dashed(object):
         self.root = None # initialize for tkinter
         self.fig_fit = None
         self.fig_fft = None
-        self.loading_dash = False # ensures widgets are built for empty model, unless loaded from file
         self.test, self.data_dir, writeable_folder  = make_links(test) # links groups, plus data and fit if test
         if writeable_folder and self.data_dir: # normal and test mode
             self.board()
@@ -125,6 +124,47 @@ class dashed(object):
 
         return self.suite.nruins>1
 
+    def _on_add_del_plot(self,change):
+        """
+        callback for the global parameter end Dropbox, add, del a parameter or subplot it!
+
+        which kp is calling add/del/subplot action is hitchhicked in tiptool
+        """
+        from mujpy.tools.tools import widg2pardicts, pardicts2widgets
+        from functools import partial as addkwarg
+        if change['type'] == 'change' and change['name'] == 'value':
+            self.log('debug mudashed._on_add_del_plot')
+            value = change['new']
+            drop = change['owner']
+            kp = int(drop.tooltip)
+            pardicts, _, error = widg2pardicts(self.global_box) 
+            flags = ['~','!','#']
+            if error:
+                self.log(error)
+                return
+            elif value == 'add':
+                drop.unobserve(addkwarg(self._on_add_del_plot,kp),names='value')
+                drop.value='+-'
+                drop.observe(addkwarg(self._on_add_del_plot,kp),names='value')
+                pardicts.insert(kp+1,{'name':'','value':'','flag':'~','error':0.001,'limits':[None,None]})
+                self.NG_int.value += 1
+                # pardicts2widgets returns [global_title,HBox([VBox(left_column),VBox(right_column)])]   
+                self.global_box.children = list(pardicts2widgets(pardicts,flags,self.NG_int.value,self._on_add_del_plot))
+            elif value == 'del':
+                drop.unobserve(addkwarg(self._on_add_del_plot,kp),names='value')
+                drop.value='+-'
+                drop.observe(addkwarg(self._on_add_del_plot,kp),names='value') 
+                pardicts.pop(kp)
+                self.NG_int.value -= 1
+                # pardicts2widgets returns tuple([global_title,HBox([VBox(left_column),VBox(right_column)])]) 
+                self.global_box.children = list(pardicts2widgets(pardicts,flags,self.NG_int.value,self._on_add_del_plot))
+            else:
+                # nothing happens
+                try: 
+                    self.log('This will plot parameter {} vs. runs in subplot {}'.format(kp,int(value)))
+                except:
+                    self.log('change["new"] = {} is not a string integer'.format(value))
+            
     def _on_Fit(self,b):
         """
         invokes mufit and muplotfit extracting their args from the widgets
@@ -168,8 +208,7 @@ class dashed(object):
             lb = self.command_1.children[13].value # not yet in use 
             self.tab.selected_index = 2
             the_plot = mufitplot(plot_range, the_fit, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box, fig_fit = self.fig_fit) # plots in self.figure_box
-            self.fig_fit = the_plot.fig
-                
+            self.fig_fit = the_plot.fig                
 
     def _on_Plot(self,b):
         """
@@ -273,14 +312,16 @@ class dashed(object):
         '''
 
         from ipywidgets.widgets import HBox, VBox, Label, HTML, Text, Layout
-        from mujpy.tools.tools import glob2widgets, comp2widgets, par2widgets, par2labels 
+        from mujpy.tools.tools import pardicts2widgets, comp2widgets, par2widgets, par2labels 
         from mujpy.tools.tools import _available_components_, add_step_limits
         
-        hashed = False
+        #hashed = False
+        #hspacer = Label(' ',layout={'width':'42%','height':'16pt'})
+        #glotitle = Text(value='global parameters',disabled=True,layout={'width':'14%','height':'16pt'})
+        #gbt_style = "<style>.gbt_input input { background-color:#FFDAB9 !important; }</style>"
+        #glotitle.add_class('gbt_input')
+
         hspacer = Label(' ',layout={'width':'42%','height':'16pt'})
-        glotitle = Text(value='global parameters',disabled=True,layout={'width':'14%','height':'16pt'})
-        gbt_style = "<style>.gbt_input input { background-color:#FFDAB9 !important; }</style>"
-        glotitle.add_class('gbt_input')
         modtitle = Text(value='model parameters',disabled=True,layout={'width':'14%','height':'16pt'}) 
         mod_style = "<style>.mod_input input { background-color:#DDC1B0 !important; }</style>"
         modtitle.add_class('mod_input')
@@ -291,10 +332,12 @@ class dashed(object):
                 self.command_0.children[0].value='global fit'
                 self.NG_int.value = len(pardicts)
                 hashed = '#' in [pardict['flag'] for pardict in pardicts]
+                flags = ['~','!','#'] if hashed or 'dashboard' not in self.__dir__() else ['~','!']
             else:
                 self.command_0.children[0].value='sequential fit'
                 self.NG_int.value = 0
                 self.global_box.children = []
+                flags = ['~','!']
         else:
             if self.NG_int.value > 0:
                 pardicts = []
@@ -305,38 +348,17 @@ class dashed(object):
         glob = False
         if self.NG_int.value > 0: # 'globpardicts_guess' in self.dashboard: 
             glob = True
-            global_title = HBox([hspacer,HTML(gbt_style),glotitle,hspacer])
-            flags = ['~','!','#'] if hashed or 'dashboard' not in self.__dir__() else ['~','!']
-            # unwraps unique pardict keys into labels
-            # added a multipurpose dropdown: insert/delete/select subplot 
-            keys = ['p[k]','name','value','flag','error','limits','plot','par>0']
-            #list(max(pardicts,key=len).keys()) # list of all unique pardicts keys
-            #keys.insert(0,'p[k]') # order is 'p[k]' 'name' 'value' 'flag' 'error' 'limits' 'par>0'
-            #keys.insert(6,'plot')   # order is 'p[k]' 'name' 'value' 'flag' 'error' 'limits' 'par>0' 'plot'
-            if 'positive_parity' in keys:
-                keys[keys.index('positive_parity')]='par>0'
-                # p[k] name value flag error limits par>0
-            # lengths of widgets in each column of global parameters    
-            keylen = ['5%','10%','20.5%','9%','16%','19%','8%','8%']
-            labels = [Label(value=key,layout=Layout(width=klen)) for key,klen in zip(keys,keylen)]
-            n_columns = self.NG_int.value//2+self.NG_int.value%2
-            
-            # now add one row of widgets per pardict
-            left_column, right_column = [HBox(labels)],[HBox(labels)] # first row of labels
-            for kp,pardict in enumerate(pardicts[:n_columns]):
-                if 'positive_parity' not in pardict: pardict['positive_parity']=False
-                left_column.append(glob2widgets(kp,pardict,flags,keylen))
-            for kp,pardict in enumerate(pardicts[n_columns:]):
-                if 'positive_parity' not in pardict: pardict['positive_parity']=False
-                right_column.append(glob2widgets(kp+n_columns,pardict,flags,keylen))
-            self.global_box.children = [global_title,HBox([VBox(left_column),VBox(right_column)])]
-            # global lists k name value flag error limits pospar
-            # always add model, = self.dashboard or from _available_components_, + label + value + error + limits  
+            self.global_box.children = list(pardicts2widgets(pardicts,flags,self.NG_int.value,self._on_add_del_plot)) 
+            # [global_title,HBox([VBox(left_column),VBox(right_column)])]
+            #  global lists k name value flag error limits pospar
+            #  always add model, = self.dashboard or from _available_components_, + label + value + error + limits  
         if 'dashboard' in self.__dir__():
             model = self.dashboard['model_guess'] # list of components
             model_name = ''.join([component['name'] for component in model])
+            self.MN_text.unobserve(self._on_MN,names='value')
             self.MN_text.value = model_name 
-        # MN_text calls _on_MN but  empty global_box and model_bosonly if self.dashboard does not exist  
+            self.MN_text.observe(self._on_MN,names='value') # observe again
+       # MN_text calls _on_MN but  empty global_box and model_bosonly if self.dashboard does not exist  
         else:
             components = [self.MN_text.value[i:i + 2] for i in range(0, len(self.MN_text.value), 2)]
             model = [av for component in components for av in _available_components_() if component == av['name']] 
@@ -382,8 +404,8 @@ class dashed(object):
             - 0 <= get_indices < kmax = NG_int.value for global fits and mudashed index of this parameter
         """
 
-        from mujpy.tools.tools import limits, _available_components_, read_pardict_from_widgets
-        from mujpy.tools.tools import invalid_err_lim, add_step_limits
+        from mujpy.tools.tools import _available_components_, read_pardict_from_widgets
+        from mujpy.tools.tools import add_step_limits, widg2pardicts
 
         self.dashboard = {}
         kids = self.command_1.children
@@ -392,58 +414,7 @@ class dashed(object):
         self.dashboard['offset'] = str(self.suite.offset)
         glob = self.global_box.children # empty list is false
         if glob: 
-            pardicts = []
-            #                    kid[0]             kid[1]     kidd0  kiddd0...n   Kidd1 kiddd0...m
-            # global_box = VBox([HBox([hsp,gt,hsp]),HBox([VBox([HBox(leftparwidgs),HBox(rightparwidgs)])])])
-            n_col_left, n_col_right = len(self.global_box.children[1].children[0].children),len(self.global_box.children[1].children[1].children)
-            kmax = n_col_left+n_col_right-2 # number of parameters aka NG_int.value (n_col includes labels)
-            # needed for ki, i.e. for read_pardict_from_widgets
-            for k,parwidgs in enumerate(self.global_box.children[1].children[0].children): # left column
-                pardict = {}
-                if k: # skips k=0 labels
-                    value = parwidgs.children[2].value # string, can be '1.2' or '[1.2,3.2]'
-                    values = eval(value) if value[0]=='[' else [float(value)]
-                    for value in values:
-                        invalid = invalid_err_lim(value,
-                                              parwidgs.children[4].value,
-                                              limits(parwidgs.children[5].value))  
-                        if invalid: 
-                            raise ValueError('global parameter str(k-1):'+invalid)
-                    pardict['name'] = parwidgs.children[1].value # string
-                    value = parwidgs.children[2].value
-                    value = eval(value) if value[0]=='[' else float(value)
-                    pardict['value'] =  value # float or list of floats
-                    # for sequential fits may be a list, i.e. a string as widgets value
-                    # but this is broken! parwidg must be Text
-
-                    # for lists need widget to be Text, pardict value to be string, 
-                    # pardict is either float(value) or [x for x in eval(value)]
-                    pardict['flag'] = parwidgs.children[3].value # string
-                    pardict['error'] = parwidgs.children[4].value # float
-                    pardict['limits'] = limits(parwidgs.children[5].value) # translates list of csv string to values
-                    if parwidgs.children[7].value: pardict['positive_parity'] = parwidgs.children[7].value
-                    pardicts.append(pardict)
-            for k,parwidgs in enumerate(self.global_box.children[1].children[1].children): # right column
-                pardict = {}
-                if k: # skips k=0 labels
-                    value = parwidgs.children[2].value # string, can be '1.2' or '[1.2,3.2]'
-                    values = eval(value) if value[0]=='[' else [float(value)]
-                    for value in values:
-                        invalid = invalid_err_lim(value,
-                                              parwidgs.children[4].value,
-                                              limits(parwidgs.children[5].value))  
-                        if invalid: 
-                            raise ValueError('global parameter str(k-1):'+invalid)
-                    pardict['name'] = parwidgs.children[1].value # string
-                    value = parwidgs.children[2].value
-                    value = eval(value) if value[0]=='[' else float(value)
-                    pardict['value'] =  value # float
-                    # for sequentila fits may be a list, i.e. a string as w2idgets value
-                    pardict['flag'] = parwidgs.children[3].value # string
-                    pardict['error'] = parwidgs.children[4].value # float
-                    pardict['limits'] = limits(parwidgs.children[5].value) # translates list of csv string to values
-                    if parwidgs.children[7].value: pardict['positive_parity'] = parwidgs.children[7].value
-                    pardicts.append(pardict)
+            pardicts, kmax, error = widg2pardicts(self.global_box)
             self.dashboard['globpardicts_guess'] = pardicts
         model = []
         components = [self.MN_text.value[i:i + 2] for i in range(0, len(self.MN_text.value), 2)]
@@ -453,7 +424,6 @@ class dashed(object):
         # list of two VBox, to be read, left and right columns
         rowleft, rowright, ki = 0, 0, 0
 
-        #self.log('debug build_dashed start pardicts')
         for kc,npar in enumerate(nparam): # ks is component index and npar its number of parameters
             # skip (component+legend) and read npar rows
             # writes    name,  None, flag, [function] or function_multi if glob
@@ -486,9 +456,6 @@ class dashed(object):
         else:
             self.dashboard['model_guess'] = model
         return True
-        #except ValueError as e:
-        #    self.log('build_dashed ValueError: {}'.format(e))
-        #    return False
 
     def _on_fit_type(self,change):
         '''
@@ -514,7 +481,6 @@ class dashed(object):
         import json
         import os
 
-        self.loading_dash = True # to allow json2dash to write MN_text
         file_json = self.suite.__fitpath__+'dashed.json'
         if os.path.isfile(file_json):
             with open(file_json,'r') as f:
@@ -523,7 +489,6 @@ class dashed(object):
             self.json2dash() # builds widgets for this model
         else:
             self.log('>>>>>>>>>>>>>>>> file dashed.json not found')
-        self.loading_dash = False # builds widgets for this model
  
     def _on_LF(self,b):
         '''
@@ -534,7 +499,6 @@ class dashed(object):
         import json
         import os
 
-        self.loading_dash = True # to allow json2dash to write MN_text
         file_json, self.root = path_file_dialog(self.suite.__fitpath__,'json',root = self.root)
         # self.log('Trying to load {} ...'.format(file_json))
         if os.path.isfile(file_json):
@@ -546,50 +510,74 @@ class dashed(object):
                 self.json2dash() # builds widgets for this model
         else:
             self.log('no valid json file was selected {}'.format(file_json))
-        self.loading_dash = False # to allow dash to change MN_text
  
     def _on_MN(self,change):
         '''
-        if valid model, adds widgets to regenerate the second stage of mudashed (the complete editor) 
+        if model_box is empty adds third stage widgets else edits model_box
         '''
     
         # command box, global box: VBox of rows (HBox)
         # model_box: HBox of two columns (VBox) of components (VBox) of rows, pardicts (HBox) of component widgets
-        from mujpy.tools.tools import validmodel 
+        from mujpy.tools.tools import validmodel, find_model_difference, _available_components_
         from json import loads as str2lst
         from ipywidgets import Text, IntText, Layout, Button, HBox,  \
                                VBox, ToggleButtons, Label, FloatText
         from tkinter.messagebox import askyesno, showerror
+        from mujpy.tools.tools import tk_choose
         #self.log('change["new"] is {}'.format(change['new']))
 
-        if not self.loading_dash: # to allow json2dash to set model_name without interference 
+        if change['type'] == 'change' and change['name'] == 'value':
 
-            if self.NG_int.value==1: # suspicious!
-                no = not askyesno(title='Check!', message="NG=1 global parameter\ndo you need more?")
-    
-            model = self.MN_text.value.strip() # removes accidental lead & trail blanks
-    
-            no = True               
-            if model and no: # when model is set to '', below on_model is alerted again but nothing happens
-
-                if validmodel(model):
-#                    with self.board_box:
-#                        self.log('MN {} is valid'.format(self.MN_text.value))                   # self.log('{} is a valid model'.format(model))
-                    # model_box stricly needs to be self since _on_MN has no return
-                    self.command2dash()
-                    self.json2dash()  # in this case self.dashboard is not loaded from a json file 
-                                        # an model variable equivalent to self.dashboard is created 
-                                        # model is used to build the second stage gui
-                    #with self.board_box:
-                        #self.log('self.command_1.children {}'.format(self.command_1.children))
-                        #self.log('self.global_box.children {}'.format(self.global_box.children))
- 
-                    #display(panels)
-                else:
-                    showerror(title='Wrong model syntax',message='{} not made of valid components!'.format(model))
-                    self.MN_text.value = ''
-            else:
+            go = True
+            model = change['new'].strip() # removes accidental lead & trail blanks
+            #self.log('debug mudashed._on_MN change["new"] {}'.format(model))
+            if not validmodel(model):
+                showerror(title='Wrong model syntax',message='{} not made of valid components!'.format(model))
+                self.MN_text.unobserve(self._on_MN,names='value')
                 self.MN_text.value = ''
+                self.MN_text.observe(self._on_MN,names='value') # observe again
+            if self.NG_int.value==1: # tarting route, butuspicious! forgot to set?
+                go = not askyesno(title='Check!', message="only NG=1 global parameter\ndon't you need more?")
+ 
+            else: # includes also starting route!
+                oldmodel = change['old']
+                indices = find_model_difference(oldmodel,model)
+
+                if len(indices)==0: # includes also starting route!
+                    if len(self.model_box.children)==0: # startin route only               
+                        go = askyesno(title='{} will be a NEW EMPTY model'.format(model),message='Is this OK?\n(NO keeps the old model)')
+                if oldmodel != '' and model and go: # edit the dash
+                    k = indices[0]
+                    indices = [abs(j)-1 for j in indices] if k<0 else indices
+                    action = 'add after' if k>0 else 'remove'
+                    m_c = model if k>0 else oldmodel
+                    cc = [m_c[i:i+2] for i in range(0, len(m_c), 2)]
+                    #self.log('debug mudashed._on_MN cc {}'.format(cc))
+                    components = [cc[i] for i in indices] # indices are 
+                    if len(indices)>1: #decide which
+                        ki = tk_choose('model {}: {}'.format(model,action),'Choose which',components,root = self.root)
+                    elif len(indices)==1: # single component
+                        ki = abs(k)
+                    else: # complez
+                        yes = askyesno(title='{} is a NEW EMPTY model'.format(model),message='Is this OK? NO keeps the old model.')
+
+                    if k<0: # remove component  len(indices)==1 an
+                        del self.dashboard['model_guess'][ki]
+                    else: # add component
+                        #self.log('debug mudashed._on_MN cc[k] {}'.format(cc[k]))
+                        for c in _available_components_():
+                            if c['name'] == cc[k]: component = c
+                        for j,p in enumerate(component['pardicts']):
+                            component['pardicts'][j]['flag']='=' if 'globpardicts_guess' in self.dashboard else '~'
+                        #self.log('debug mudashed._on_MN component {}'.format(component))
+                        self.dashboard['model_guess'].insert(ki,component)
+                        self.log('{}: inserted empty component {} in position {}'.format(m_c,cc[k],k))
+                elif len(self.model_box.children)==0: # starting route
+                    # rebuilds self.dashboard from widgets
+                    if self.build_dashed():
+                        self.command2dash() # create command_box from scratch
+                # a complex new model edit with a yes askyesno answer jumps here 
+                self.json2dash()  # always, if model and OK
 
     def _on_RL(self,change):
         """
@@ -739,8 +727,8 @@ class dashed(object):
                     alpha_txt.value = alpha1
                     grp_txt.observe(self._on_multigroup,names='value')
                     alpha_txt.observe(self._on_multigroup,names='value')
-                text = 'PRESS RL! to load new group data'
-                self.root = tk_error(text,'REMEMBER!',root=self.root)
+                #text = 'PRESS RL! to load new group data'
+                #self.root = tk_error(text,'REMEMBER!',root=self.root)
         else:
             self.root = tk_error('Folder {} does not exist'.format(datapath),'Load groups error', root=self.root)
  
@@ -1062,7 +1050,7 @@ class dashed(object):
                             tooltip = 'e.g. mg\n   almgml',
                             layout = Layout(width=command_width[3],height=self.textheight),
                             continuous_update=False) # requires CR
-        self.MN_text.observe(self._on_MN)
+        self.MN_text.observe(self._on_MN,names='value')
 
         LL_button = Button(description = 'LL',
                            tooltip = 'Load last model\nif exists',

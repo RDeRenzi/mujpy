@@ -1460,16 +1460,130 @@ def rshp(y):
 # MUDASHED AUX need pruning deprecated methods
 ##############
 
-def glob2widgets(kp,pardict,flags,keylen):
+def widg2pardicts(global_box):
+    """
+    transforms global_box widgets into dashboard["globpardicts_guess"]
+    """
+    from mujpy.tools.tools import invalid_err_lim, limits
+
+    pardicts = []
+    #                    kid[0]             kid[1]     kidd0  kiddd0...n   Kidd1 kiddd0...m
+    # global_box = VBox([HBox([hsp,gt,hsp]),HBox([VBox([HBox(leftparwidgs),HBox(rightparwidgs)])])])
+    n_col_left, n_col_right = len(global_box.children[1].children[0].children),len(global_box.children[1].children[1].children)
+    kmax = n_col_left+n_col_right-2 # number of parameters aka NG_int.value (n_col includes labels)
+    # needed for ki, i.e. for read_pardict_from_widgets
+    error = ''
+    for k,parwidgs in enumerate(global_box.children[1].children[0].children): # left column
+        pardict = {}
+        if k: # skips k=0 labels
+            value = parwidgs.children[2].value # string, can be '1.2' or '[1.2,3.2]'
+            if value:
+                values = eval(value) if value[0]=='[' else [float(value)]
+            else:
+                values = [0]
+            for value in values:
+                invalid = invalid_err_lim(value,
+                                      parwidgs.children[4].value,
+                                      limits(parwidgs.children[5].value))  
+                if invalid: 
+                    error += '\nglobal parameter {}:'.format(k-1)+invalid
+            pardict['name'] = parwidgs.children[1].value # string
+            value = parwidgs.children[2].value
+            #if value:
+            #    values = eval(value) if value[0]=='[' else [float(value)]
+            #else:
+            #    values = [0]
+            pardict['value'] =  values if len(values)>1 else values[0] # float
+            # for sequential fits may be a list, i.e. a string as widgets value
+            # but this is broken! parwidg must be Text
+
+            # for lists need widget to be Text, pardict value to be string, 
+            # pardict is either float(value) or [x for x in eval(value)]
+            pardict['flag'] = parwidgs.children[3].value # string
+            pardict['error'] = parwidgs.children[4].value # float
+            pardict['limits'] = limits(parwidgs.children[5].value) # translates list of csv string to values
+            if parwidgs.children[7].value: pardict['positive_parity'] = parwidgs.children[7].value
+            pardicts.append(pardict)
+    for k,parwidgs in enumerate(global_box.children[1].children[1].children): # right column
+        pardict = {}
+        if k: # skips k=0 labels
+            value = parwidgs.children[2].value # string, can be '1.2' or '[1.2,3.2]'
+            if value:
+                values = eval(value) if value[0]=='[' else [float(value)]
+            else:
+                values = [0]
+            for value in values:
+                invalid = invalid_err_lim(value,
+                                      parwidgs.children[4].value,
+                                      limits(parwidgs.children[5].value))  
+                if invalid: 
+                    error += '\nglobal parameter {}:'.format(k-1)+invalid
+            pardict['name'] = parwidgs.children[1].value # string
+            #value = parwidgs.children[2].value
+            #if value:
+            #    values = eval(value) if value[0]=='[' else [float(value)]
+            #else:
+            #    values = [0]
+            pardict['value'] =  values if len(values)>1 else values[0] # float
+            # for sequentila fits may be a list, i.e. a string as w2idgets value
+            pardict['flag'] = parwidgs.children[3].value # string
+            pardict['error'] = parwidgs.children[4].value # float
+            pardict['limits'] = limits(parwidgs.children[5].value) # translates list of csv string to values
+            if parwidgs.children[7].value: pardict['positive_parity'] = parwidgs.children[7].value
+            pardicts.append(pardict)
+    return pardicts, kmax, error
+
+def pardicts2widgets(pardicts,flags,NG,observe):
+    """
+    unwraps pardicts list of dicts into global_box boxes of widgets
+
+    input pardicts is globpardicts_guess
+          flags is allowed flag values
+          NG is number of global parameters
+          observe is self._on_add_del_plot (but self is an instance, not known a priori
+    """
+
+    from mujpy.tools.tools import glob2widgets
+    from ipywidgets.widgets import Text, HBox, HTML, Label, Layout, VBox
+
+    hspacer = Label(' ',layout={'width':'42%','height':'16pt'})
+    glotitle = Text(value='global parameters',disabled=True,layout={'width':'14%','height':'16pt'})
+    gbt_style = "<style>.gbt_input input { background-color:#FFDAB9 !important; }</style>"
+    glotitle.add_class('gbt_input')
+    global_title = HBox([hspacer,HTML(gbt_style),glotitle,hspacer])
+    keys = ['p[k]','name','value','flag','error','limits','\u2003+-plt','par>0']
+    keylen = ['5%','10%','20.5%','9%','16%','19%','10%','8%']
+    labels = [Label(value=key,layout=Layout(width=klen)) for key,klen in zip(keys,keylen)]
+    n_columns = NG//2+NG%2
+    
+    # now add one row of widgets per pardict
+    left_column, right_column = [HBox(labels)],[HBox(labels)] # first row of labels
+    for kp,pardict in enumerate(pardicts[:n_columns]):
+        if 'positive_parity' not in pardict: pardict['positive_parity']=False
+        left_column.append(glob2widgets(kp,pardict,flags,keylen,observe))
+    for kp,pardict in enumerate(pardicts[n_columns:]):
+        if 'positive_parity' not in pardict: pardict['positive_parity']=False
+        right_column.append(glob2widgets(kp+n_columns,pardict,flags,keylen,observe))
+    return [global_title,HBox([VBox(left_column),VBox(right_column)])]   
+
+def glob2widgets(kp,pardict,flags,keylen,observe):
     """
     unwraps pardict in widgets
 
-    order is 'p[k]' 'name' 'value' 'flag' 'error' 'limits' 'par>0'
+    input is kp, internal dashbord parameter index
+             pardict the dashboard dict for this parameter
+             flags the allowed flag symbols
+             keylen the widgets widths
+             observe the callback function for the 'plot' Dropbox, drop
+    order is 'p[k]' 'name' 'value' 'flag' 'error' 'limits' ' +-plt' 'par>0'
         used in mudashed
     """
 
     from ipywidgets.widgets import HBox, Label, Combobox, FloatText, Dropdown, Text, Checkbox, Layout
-                #
+    from functools import partial as addkwarg
+    
+    drop = Dropdown(value='+-',options = ['+-','add','del','0','1','2','3','4','5'],tooltip='del,add\nor subplot\npar {}'.format(kp),layout=Layout(width=keylen[6]))
+    drop.observe(addkwarg(observe,kp),names='value')
     return HBox([
     Label(value=str(kp),layout=Layout(width=keylen[0])), 
     Combobox(options=['α','λ','σ','φ','Δ','β','θ','δ','ν','τ'], #placeholder='ty+sel',
@@ -1478,8 +1592,8 @@ def glob2widgets(kp,pardict,flags,keylen):
     Dropdown(options = flags,value=pardict['flag'],layout=Layout(width=keylen[3])), 
     FloatText(value=pardict['error'],layout=Layout(width=keylen[4])),
     Text(value=tup2str(pardict['limits']),tooltip='e.g. 0,1\nor 0,None\nor None,None',layout=Layout(width=keylen[5])),
-    Dropdown(value='add',options = ['add','del','0','1','2','3','4','5'],layout=Layout(width=keylen[6])),
-    Checkbox(value=pardict['positive_parity'],indent=False,layout=Layout(width=keylen[7]))
+    drop,
+    Checkbox(value=pardict['positive_parity'],tooltip='2nd migrad'+'\nunbound p['+str(kp)+']',indent=False,layout=Layout(width=keylen[7]))
     ])
 
 def comp2widgets(component,k):
@@ -1494,15 +1608,27 @@ def comp2widgets(component,k):
         used in mudashed
     '''
 
-    from ipywidgets.widgets import HBox, Text, Label, Checkbox, Layout
+    from ipywidgets.widgets import HBox, Text, Label, Checkbox, Layout, HTML, VBox
+    ruler = HTML(
+    value="""
+    <div style="width:100%; background: #eee; border: 0px solid #ccc; position: relative; height: 3px;">
+    </div>
+    """
+    )   
+    #<div style="position: absolute; left: 0%; border-left: 2px solid black; height: 100%;"></div>
+    #<div style="position: absolute; left: 25%; border-left: 1px solid gray; height: 50%;">25</div>
+    #<div style="position: absolute; left: 50%; border-left: 2px solid black; height: 100%;">50</div>
+    #<div style="position: absolute; left: 75%; border-left: 1px solid gray; height: 50%;">75</div>
+    #<div style="position: absolute; left: 100%; border-left: 2px solid black; height: 100%; transform: translateX(-100%);">100</div>
     width = ['15%','8%','5%','12%','7%','4%'] # total 36%
-    widgets = [Label(value='component',layout=Layout(width=width[0])),
-               Text(value=str(k)+':'+component['name'],disabled=True,layout=Layout(width=width[1])),
+    widgets = [Label(value='component:',layout=Layout(width=width[0])),
+               Text(value=component['name'],disabled=True,layout=Layout(width=width[1])),
                Label(value='tag',layout=Layout(width=width[2])),
                Text(value=str(k),tooltip='par name tag',layout=Layout(width=width[3])),
                Label(value='FFT',layout=Layout(width=width[4])),
-               Checkbox(value=True,tooltip='subtract/n(residues FFT)',indent=False,layout=Layout(width=width[5]))]
-    return HBox(widgets)
+               Checkbox(value=True,tooltip='subtract\n(residues FFT)',indent=False,layout=Layout(width=width[5]))]
+    component_box =  VBox([ruler,HBox(widgets)])# if k else  VBox([HBox(widgets)])
+    return component_box  
 
 def par2labels(pardict):
     '''
@@ -1543,10 +1669,16 @@ def par2widgets(pardict,k,glob=False):
         function = pardict['function']
     else:
         function = ''
+    drop = Dropdown(tooltip='~ free\n! fix,\n= Function',layout=Layout(width=width[3]))
+    flag = pardict['flag'] if 'flag' in pardict else '=' if glob else '~'
+    drop.value = None
+    drop.options = options
+    print('debug tools.par2widgets options {} flag {}'.format(options,flag))
+    drop.value = flag
     widgets = [Label(value=str(k),layout=Layout(width=width[0])),
                Text(value=pardict['name'],disabled=True,layout=Layout(width=width[1])),
                FloatText(value=value,tooltip='a float',layout=Layout(width=width[2])),
-               Dropdown(options=options,value=pardict['flag'],layout=Layout(width=width[3])),
+               drop,
                Text(value=function,layout=Layout(width=width[4]))]
     return HBox(widgets)
 
@@ -1640,6 +1772,38 @@ def validmodel(model):
         if model.count('al')>1 or model.index('al')>0:
             return False      
     return True
+
+def find_model_difference(oldmodel,model):
+    """
+    distinguish une component addition, removal from more complex changes
+
+    input 
+        oldmodel string
+        model string
+    return 
+        [k] k is one-based index of added component, its negative for subtracted, zero for complex
+        if the added/removed component is repeated, all possibilities are listed [k,j,...]
+        no checks on syntax, model names have already been verified
+    """
+    # Ensure both strings have even lengths for 2-letter syllables
+
+    # Split strings into lists of 2-letter syllables
+    sys1 = [oldmodel[i:i+2] for i in range(0, len(oldmodel), 2)]
+    sys2 = [model[i:i+2] for i in range(0, len(model), 2)]
+
+    out = []
+    if len(sys2) == len(sys1) + 1:
+        for i in range(len(sys2)):
+            if sys1[:i] + [sys2[i]] + sys1[i:] == sys2:
+                out.append(i)
+                
+    # Case 2: First string is the second plus a syllable
+    # (i.e., Removing a single syllable from sys1 at index i creates sys2)
+    elif len(sys1) == len(sys2) + 1:
+        for i in range(len(sys1)):
+            if sys1[:i] + sys1[i+1:] == sys2:
+                out.append(-(i))                
+    return out
 
 def chi2std(nu):
     """
@@ -2636,6 +2800,24 @@ def make_links(test):
     else:
         data_dir = True # test True, False means abort 
     return test,data_dir,writeable # allow check writeable
+
+def tk_choose(text,title,options,root=None):
+    from tkinter import Tk, Label, Button, Radiobutton, IntVar
+    #    ^ Use capital T here if using Python 2.7
+    try:
+        root.deiconify()
+    except:
+        root = Tk() # Close the root window
+        root.geometry("+400+10")
+    root.title(title)
+    Label(root, text=text).pack()
+    Button(text="Submit", command=root.destroy).pack()
+    v = IntVar()
+    for i, option in enumerate(options):
+        Radiobutton(root, text=option, variable=v, value=i, command=root.destroy).pack(anchor="w")
+    root.mainloop()
+    if v.get() == 0: return None
+    return options[v.get()]
 
 def tk_error(text,title,root=None):
     """
