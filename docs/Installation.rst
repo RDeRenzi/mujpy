@@ -28,7 +28,7 @@ To upgrade to the newest distribution
 Windows
 -------
 
-Download the python `installer <https://www.python.org/downloads/>`_ and run it. See if you have already pip by ``py -m pip --version``, if you do not ``py -m ensurepip --default-pip``. Create a vitrual environment: ``py -m venv mujpy-env``, ``mujpy-env/Script/activate``, choose where you want to install mujpy  and ``pip install mujpy``. If it still does not work for windows you can install git.
+As of 09/26, from `i <https://www.python.org/downloads/windows>`_ click on the link``Latest Python install manager`` and then on the link ``using the Microsoft Store app``. Install this. You now have ``pip``, check opening ``Start\PowerShell`` and type  ``py -m pip --version``. Create a virtual environment: ``py -m venv mujpy-env``, ``mujpy-env/Script/activate``, choose where you want to install mujpy  and ``pip install mujpy``. If it still does not work for windows you can install git.
 
 Download `git <https://git-scm.com/install/windowsi>`, run it, accepting all defaults and including Git Bash.  From the Git Bash term ``git clone https://github.com/RDeRenzi/mujpy.git``, ``cd mujpy`` and ``pip install .``
 

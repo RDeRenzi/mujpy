@@ -1,3 +1,4 @@
+.. encoding: utf-8
 .. |mSR| replace:: :math:`\mu`\ SR
 
 =====
@@ -26,9 +27,8 @@ details. Main technical features:
 
 You only need to:  [#1]_
 
-  1. Install python (python3 is assumed) 
-  2. Install pip [perhaps create a venv] 
-  3. invoke ``pip install mujpy``
+  1. Install the latest Python from the Miscrosoft Store app (search Python download windows)
+  2. invoke ``pip install mujpy``
 
 This repository includes ```Mudashed.ipynb```, a static notebook. Type its two cells yourself in jupyterlab:
 
