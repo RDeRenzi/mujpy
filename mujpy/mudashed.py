@@ -188,13 +188,15 @@ class dashed(object):
                     msg = 'Groups ...: are empty and a multi group fit was selected\n(some model function contains ;-separated values)'
                     self.root = tk_error(msg,title,root=self.root)
                 elif self._AB21(): OK = True
-            elif self._C12():
+            if self._C12():
+                OK = True
                 if not self._multirun:
                     msg = 'Single run in run list submitting multi run fit\n(#-flags in global parameters)'
                     self.root = tk_error(msg,title,root=self.root)
-                else:
-                    OK = True
-        if self.build_dashed() and OK: # creates self.dashboard and returns True if no validation raise occurred
+                    OK = False
+        self.tab.selected_index = 2
+        dashbd = self.build_dashed()
+        if dashbd and OK: # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
             #self.log('debug mudashed._on_Fit pardicts with # {}'.format(any([True for pardict in self.dashboard['globpardicts_guess'] if pardict['flag']=='#']))) 
             with open(dashboard_file,'w') as f:
@@ -206,9 +208,10 @@ class dashed(object):
             rotfreq = self.command_1.children[9].value
             fft_range = self.command_1.children[12].value # not yet in use 
             lb = self.command_1.children[13].value # not yet in use 
-            self.tab.selected_index = 2
             the_plot = mufitplot(plot_range, the_fit, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box, fig_fit = self.fig_fit) # plots in self.figure_box
-            self.fig_fit = the_plot.fig                
+            self.fig_fit = the_plot.fig
+        else: 
+            self.log('build dashboard was unsuccessful, no fit')
 
     def _on_Plot(self,b):
         """
@@ -229,7 +232,7 @@ class dashed(object):
         from mujpy.mufitplot import mufitplot
         if self.build_dashed(): # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
-            self.log('dumping {}'.format(dashboard_file))
+            #self.log('debug mudashed._on_Plot: dumping {}'.format(dashboard_file))
             with open(dashboard_file,'w') as f:
                 json.dump(self.dashboard,f) # mufit wants to read this from a file
             guess = self.command_1.children[6].value=='Guess'
@@ -416,6 +419,9 @@ class dashed(object):
         glob = self.global_box.children # empty list is false
         if glob: 
             pardicts, kmax, error = widg2pardicts(self.global_box)
+            if error: 
+                self.log('widg2pardicts error?: {} '+error)
+                return False
             #self.log('debug mudashed.build_dashed pardicts with # {}'.format(any([True for pardict in pardicts if pardict['flag']=='#']))) 
             self.dashboard['globpardicts_guess'] = pardicts
         model = []
@@ -438,7 +444,10 @@ class dashed(object):
                 for kp in range(npar):
                     kmax = kmax if glob else ki
                     pardict = read_pardict_from_widgets(right.children[rowright],kmax) # from widgets
-                    if not isinstance(pardict,dict): self.log('debug right build_dash pardict {}'.format(pardict)) # is an erro message from read_pardict_from_widgets
+                    if not isinstance(pardict,dict): 
+                        self.log('right build_dash pardict {}'.format(pardict)) # is an erro message from read_pardict_from_widgets
+                        self.log('------------------------ Is this right?')
+                        return False
                     pardicts.append(pardict) # returns a pardict
                     rowright += 1 # incremented only for odd kc
                     ki +=1 # internal dashed parameter index incremented always
@@ -447,7 +456,10 @@ class dashed(object):
                 for kp in range(npar):
                     kmax = kmax if glob else ki
                     pardict = read_pardict_from_widgets(left.children[rowleft],kmax)
-                    if not isinstance(pardict,dict): self.log('debug left build_dash pardict {}'.format(pardict)) # is an erro message from read_pardict_from_widgets
+                    if not isinstance(pardict,dict): 
+                        self.log('debug left build_dash pardict {}'.format(pardict))
+                        self.log('------------------------ Is this right?')
+                        return False# is an erro message from read_pardict_from_widgets
                     pardicts.append(pardict) # returns a pardict
                     rowleft += 1 # incremented only for even kc
                     ki +=1 # internal dashed parameter index incremented always
@@ -482,17 +494,24 @@ class dashed(object):
 
         import json
         import os
+        from mujpy.tools.tools import check_dashboard_json
 
         file_json = self.suite.__fitpath__+'dashed.json'
         if os.path.isfile(file_json):
             with open(file_json,'r') as f:
                 self.dashboard = json.load(f) # copies json dict to self.dashboard
+            ck = check_dashboard_json(self.dashboard)
+            if ck:
+                del self.dashboard
+                self.log(ck+' typo in '+file_json)
+                self.tab.selected_index = 2
+                return
             self.log('Loaded model from {}'.format(file_json))
             if not self.command_1.children: 
-                self.log('calling command2dash, file {}'.format(file_json))
                 self.command2dash()
             self.json2dash() # builds widgets for this model
         else:
+            self.tab.selected_index = 2
             self.log('>>>>>>>>>>>>>>>> file dashed.json not found')
  
     def _on_LF(self,b):
@@ -500,7 +519,7 @@ class dashed(object):
         Choose fit model to load from ./fit/ folder
         '''
 
-        from mujpy.tools.tools import path_file_dialog 
+        from mujpy.tools.tools import path_file_dialog, check_dashboard_json 
         import json
         import os
 
@@ -510,10 +529,17 @@ class dashed(object):
             if file_json[-4:]=='json':
                 with open(file_json,'r') as f:
                     self.dashboard = json.load(f) # copies json dict to self.dashboard
-                self.log('Loaded model from {}'.format(file_json))
-                if not self.command_1.children: self.command2dash()
-                self.json2dash() # builds widgets for this model
+            ck = check_dashboard_json(self.dashboard)
+            if ck:
+                del self.dashboard
+                self.log(ck+' typo in '+file_json)
+                self.tab.selected_index = 2
+                return
+            self.log('Loaded model from {}'.format(file_json))
+            if not self.command_1.children: self.command2dash()
+            self.json2dash() # builds widgets for this model
         else:
+            self.tab.selected_index = 2
             self.log('no valid json file was selected {}'.format(file_json))
  
     def _on_MN(self,change):

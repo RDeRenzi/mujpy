@@ -181,11 +181,13 @@ def TauMu_mus():
     """
     muon mean lifetime in microsecond
 
-    from Particle Data Group 2017 
+    from Particle Data Group 2022
+    Review of Particle Physics (PDF). Chinese Physics C. 40 (10) p.714
+    http://bib-pubdb1.desy.de/record/311549/files/cpc_40_10_100001.pdf 
     (not present in scipy.constants)
     """
 
-    return 2.1969811 
+    return 2.196981 # error 0.000002
     
 def _errors_(component):
     """
@@ -316,6 +318,50 @@ def _available_components_():
     # list of just mucomponents method names
     return available_components
 
+def check_dashboard_json(dashboard):
+    """
+    checks for typos against list of allowed keys
+    """
+
+    allowed_keys = ["version",
+                    "fit_range",
+                    "offset",
+                    "globpardicts_guess",
+                    "model_guess",
+                    "globpardicts_result",
+                    "model_result",
+                    "name",
+                    "value",
+                    "flag",
+                    "error",
+                    "limits",
+                    "positive_parity",
+                    "label",
+                    "pardicts",
+                    "function",
+                    "function_multi",
+                    "std",
+                    "chi2"
+                    ]
+    #print(len(allowed_keys))
+    for key in dashboard.keys():
+        allowed = [allowed_keys[i] for i in [0,1,2,3,4,5,6,18]]
+        if key not in allowed: return 'dashboard keys'
+    if allowed_keys[3] in dashboard.keys(): # globpardicts
+        allowed = [allowed_keys[i] for i in range(7,13)]
+        for pardict in dashboard[allowed_keys[3]]:
+            for key in pardict: 
+                if key not in allowed: return 'globpardicts_guess keys'
+    for kc,component in enumerate(dashboard[allowed_keys[4]]):
+        allowed = [allowed_keys[i] for i in [7,13,14]]
+        for key in component:
+            if key not in allowed: return 'model keys'
+        allowed = [allowed_keys[i] for i in [7,8,9,10,11,15,16]]
+        for kp,pardict in enumerate(component["pardicts"]):
+            for key in pardict:
+                if key not in allowed: return '{}{} pardict {} keys'.format(component['name'],kc,kp)
+    return ''
+  
 def check_function(dashboard,groups):
     """
     checks function syntax for max 100 parameters [must be extended]
