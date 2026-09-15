@@ -124,11 +124,11 @@ class dashed(object):
 
         return self.suite.nruins>1
 
-    def _on_add_del_plot(self,change):
+    def _on_add_del_plot(self,kp,change):
         """
-        callback for the global parameter end Dropbox, add, del a parameter or subplot it!
+        callback for the global parameter end Dropbox, add, del a parameter or subplot it
 
-        which kp is calling add/del/subplot action is hitchhicked in tiptool
+        which kp is calling add/del/subplot action is hitchhicked in tiptool, kp is José, prima!
         """
         from mujpy.tools.tools import widg2pardicts, pardicts2widgets
         from functools import partial as addkwarg
@@ -136,28 +136,27 @@ class dashed(object):
             #self.log('debug mudashed._on_add_del_plot')
             value = change['new']
             drop = change['owner']
-            kp = int(drop.tooltip)
+            #self.log('debug mudashed._on_add_del_plot change["owner"] is {}'.format(drop))
+            #kp = int(drop.tooltip)
             pardicts, _, error = widg2pardicts(self.global_box) 
             flags = ['~','!','#']
+            callback = self._pardicts_observers[kp]
             if error:
                 self.log(error)
                 return
-            elif value == 'add':
-                drop.unobserve(addkwarg(self._on_add_del_plot,kp),names='value')
+            elif value in ['add','del']:
+                drop.unobserve(callback,names='value')
                 drop.value='+-'
-                drop.observe(addkwarg(self._on_add_del_plot,kp),names='value')
-                pardicts.insert(kp+1,{'name':'','value':'','flag':'~','error':0.001,'limits':[None,None]})
-                self.NG_int.value += 1
+                drop.observe(callback,names='value')
+                if value=='add':
+                    pardicts.insert(kp+1,{'name':'','value':'','flag':'~','error':0.0002,'limits':[None,None]})
+                    self.NG_int.value += 1
                 # pardicts2widgets returns [global_title,HBox([VBox(left_column),VBox(right_column)])]   
-                self.global_box.children = list(pardicts2widgets(pardicts,flags,self.NG_int.value,self._on_add_del_plot))
-            elif value == 'del':
-                drop.unobserve(addkwarg(self._on_add_del_plot,kp),names='value')
-                drop.value='+-'
-                drop.observe(addkwarg(self._on_add_del_plot,kp),names='value') 
-                pardicts.pop(kp)
-                self.NG_int.value -= 1
-                # pardicts2widgets returns tuple([global_title,HBox([VBox(left_column),VBox(right_column)])]) 
-                self.global_box.children = list(pardicts2widgets(pardicts,flags,self.NG_int.value,self._on_add_del_plot))
+                else:
+                    pardicts.pop(kp)
+                    self.NG_int.value -= 1
+                kids, self._pardicts_observers = pardicts2widgets(pardicts,flags,self.NG_int.value,self._on_add_del_plot)
+                self.global_box.children = kids
             else:
                 # nothing happens
                 try: 
@@ -349,7 +348,8 @@ class dashed(object):
         glob = False
         if self.NG_int.value > 0: # 'globpardicts_guess' in self.dashboard: 
             glob = True
-            self.global_box.children = list(pardicts2widgets(pardicts,flags,self.NG_int.value,self._on_add_del_plot)) 
+            kids, self._pardicts_observers = pardicts2widgets(pardicts,flags,self.NG_int.value,self._on_add_del_plot)
+            self.global_box.children = kids 
             # [global_title,HBox([VBox(left_column),VBox(right_column)])]
             #  global lists k name value flag error limits pospar
             #  always add model, = self.dashboard or from _available_components_, + label + value + error + limits  

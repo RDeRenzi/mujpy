@@ -1545,6 +1545,7 @@ def pardicts2widgets(pardicts,flags,NG,observe):
 
     from mujpy.tools.tools import glob2widgets
     from ipywidgets.widgets import Text, HBox, HTML, Label, Layout, VBox
+    from functools import partial as addkwarg
 
     hspacer = Label(' ',layout={'width':'42%','height':'16pt'})
     glotitle = Text(value='global parameters',disabled=True,layout={'width':'14%','height':'16pt'})
@@ -1558,15 +1559,20 @@ def pardicts2widgets(pardicts,flags,NG,observe):
     
     # now add one row of widgets per pardict
     left_column, right_column = [HBox(labels)],[HBox(labels)] # first row of labels
+    pardicts_observers = []
     for kp,pardict in enumerate(pardicts[:n_columns]):
+        callback = addkwarg(observe,kp)
+        pardicts_observers.append(callback)
         if 'positive_parity' not in pardict: pardict['positive_parity']=False
-        left_column.append(glob2widgets(kp,pardict,flags,keylen,observe))
+        left_column.append(glob2widgets(kp,pardict,flags,keylen,callback))
     for kp,pardict in enumerate(pardicts[n_columns:]):
+        callback = addkwarg(observe,kp)
+        pardicts_observers.append(callback)
         if 'positive_parity' not in pardict: pardict['positive_parity']=False
-        right_column.append(glob2widgets(kp+n_columns,pardict,flags,keylen,observe))
-    return [global_title,HBox([VBox(left_column),VBox(right_column)])]   
+        right_column.append(glob2widgets(kp+n_columns,pardict,flags,keylen,callback))
+    return [global_title,HBox([VBox(left_column),VBox(right_column)])], pardicts_observers   
 
-def glob2widgets(kp,pardict,flags,keylen,observe):
+def glob2widgets(kp,pardict,flags,keylen,callback):
     """
     unwraps pardict in widgets
 
@@ -1580,10 +1586,9 @@ def glob2widgets(kp,pardict,flags,keylen,observe):
     """
 
     from ipywidgets.widgets import HBox, Label, Combobox, FloatText, Dropdown, Text, Checkbox, Layout
-    from functools import partial as addkwarg
     
     drop = Dropdown(value='+-',options = ['+-','add','del','0','1','2','3','4','5'],tooltip='del,add\nor subplot\npar {}'.format(kp),layout=Layout(width=keylen[6]))
-    drop.observe(addkwarg(observe,kp),names='value')
+    drop.observe(callback,names='value')
     return HBox([
     Label(value=str(kp),layout=Layout(width=keylen[0])), 
     Combobox(options=['α','λ','σ','φ','Δ','β','θ','δ','ν','τ'], #placeholder='ty+sel',
