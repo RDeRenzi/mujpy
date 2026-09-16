@@ -2817,7 +2817,7 @@ def fetch_PSI_data(year,area,run_start,run_stop,datapath):
     with requests.get(musruser_url,params=form_data, stream=True) as r:
         with tarfile.open(fileobj=r.raw,mode="r|gz") as tar:
             tar.extractall(path=datapath)
-        return r.raise_for_status()i
+        return r.raise_for_status()
 
 def can_symlink() -> bool:
     """
@@ -2850,7 +2850,7 @@ def make_links(test):
     from mujpy import __file__ as MuJPyName
     from os import getcwd, symlink, access, W_OK, remove, mkdir, listdir, rmdir
     from os.path import join, dirname, isdir, islink, isfile
-    from mujpy.tools.tool import can_symlink
+    from mujpy.tools.tools import can_symlink
     from shutil import copyfile as cp
 
     startuppath = getcwd()
