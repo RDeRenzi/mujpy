@@ -2848,6 +2848,7 @@ def make_links(test):
             fit = "fit_gps" if test == 'GPS' else "fit_root" if test == 'LEM' else "fit_nexus"
             fit_dir = join(startuppath,"fit")
             mujpy_fit_dir = join(join(dirname(MuJPyName),"tests"),fit)
+            # on Windows data_dir isdir even when copying test data
             if not islink(data_dir) and isdir(data_dir): # a real data directory exists
                 return test,None,None
             else:
@@ -2865,7 +2866,13 @@ def make_links(test):
                             rmdir(pathfile)
                 else: 
                     mkdir(fit_dir)
-                    ln_cp(mujpy_data_dir,data_dir)# ln -s mujpy_data_dir in data_dir
+                if can_symlink():
+                    symlink(mujpy_data_dir,data_dir)# ln -s mujpy_data_dir in data_dir
+                else: 
+                    mkdir(data_dir)
+                    for file in listdir(mujpy_data_dir):
+                        cp(join(mujpy_data_dir,file),join(data_dir,file))
+
                 for file in listdir(mujpy_fit_dir):
                     pathfile = join(mujpy_fit_dir,file) 
                     if isfile(pathfile): ln_cp(pathfile,join(fit_dir,file)) # ln -s file in fit_dir
