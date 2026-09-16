@@ -2827,13 +2827,18 @@ def make_links(test):
     from mujpy import __file__ as MuJPyName
     from os import getcwd, symlink, access, W_OK, remove, mkdir, listdir, rmdir
     from os.path import join, dirname, isdir, islink, isfile
+    from test.support.os_helper import can_symlink
+    from shutil import copyfile as cp
 
     startuppath = getcwd()
-    writeable = access(startuppath, W_OK) 
+    writeable = access(startuppath, W_OK)
+    ln_cp = symlink if can_symlink() else cp
     if writeable:
         # duplicate grp locally
         grp_dir = join(startuppath,"groups")
-        if not isdir(grp_dir): symlink(join(join(dirname(MuJPyName),"tests"),"groups"),grp_dir) 
+        src_dir = join(join(dirname(MuJPyName),"tests"),"groups")
+        if not isdir(grp_dir): 
+            ln_cp(src_dir,grp_dir)
 
         if test:
             test = test.upper()
@@ -2860,10 +2865,10 @@ def make_links(test):
                             rmdir(pathfile)
                 else: 
                     mkdir(fit_dir)
-                symlink(mujpy_data_dir,data_dir)# ln -s mujpy_data_dir in data_dir
+                    ln_cp(mujpy_data_dir,data_dir)# ln -s mujpy_data_dir in data_dir
                 for file in listdir(mujpy_fit_dir):
                     pathfile = join(mujpy_fit_dir,file) 
-                    if isfile(pathfile): symlink(pathfile,join(fit_dir,file)) # ln -s file in fit_dir
+                    if isfile(pathfile): ln_cp(pathfile,join(fit_dir,file)) # ln -s file in fit_dir
     else:
         data_dir = True # test True, False means abort 
     return test,data_dir,writeable # allow check writeable
@@ -2933,14 +2938,18 @@ def savetests():
 
     from os import getcwd, symlink, listdir
     from os.path import join, isfile, dirname
+    from test.support.os_helper import can_symlink
+    from shutil import copyfile as cp
     from mujpy import __file__ as MuJPyName
+
+    ln_cp = symlink if can_symlink() else cp
     here = getcwd()
     test = join(dirname(MuJPyName),'tests')
     for fil in listdir(test):
         file = join(test,fil)
         print('file {}'.format(file))
         if isfile(file) and fil[-3:]=='.py': 
-            symlink(file,join(here,fil))
+            ln_cp(file,join(here,fil))
             print('ln -s {} ./'.format(file))
 
 
