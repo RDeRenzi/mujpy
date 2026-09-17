@@ -15,17 +15,16 @@ class dashed(object):
 ##########################
 # INIT
 ##########################
-    def __init__(self,facility='PSI',sidecar=False,test=None):
+    def __init__(self,facility='PSI',test=None):
         '''
             Launches the simple gui, that requires only an instance of mujpy.musuite suite 
         '''
  
         from mujpy._version import __version__
-        from mujpy.tools.tools import make_links
+        from mujpy.tools.tools import make_copy
 
         self.__version__ = __version__
         self.facility = facility
-        self.sidecar = sidecar
         self.mudashed_width = '900px'   
         self.output_width = '900px'
         self.textheight = '23px'
@@ -43,11 +42,11 @@ class dashed(object):
         self.root = None # initialize for tkinter
         self.fig_fit = None
         self.fig_fft = None
-        self.test, self.data_dir, writeable_folder  = make_links(test) # links groups, plus data and fit if test
-        if writeable_folder and self.data_dir: # normal and test mode
+        writeable_folder = make_copy(test) # if test returns data_dir(acting also as True)
+        if writeable_folder: # normal and test mode
+            self.test = test # needed in self.board
+            if test: self.data_dir = writeable_folder # if test make_copy returns data_dir
             self.board()
-        elif not Self.data_dir: # test attempt on a folder with a permanent data dir
-            print('please start test or demos from an empty folder, e.g. tmp')
         else: # start outside %HOME
             print('please start from a writeable folder')
 
@@ -875,7 +874,6 @@ class dashed(object):
         from mujpy._version import __version_tuple__ as version_tup
         from mujpy.tools.tools import _available_components_
         from datetime import datetime
-        from sidecar import Sidecar
         import os
 
         ##################################################################################################
@@ -1034,28 +1032,28 @@ class dashed(object):
         self.suite_box = VBox([suite_info,suite_groups,suite_runs],layout=Layout(width=self.mudashed_width,border='1.5px solid DarkGoldenrod'))
         
         custom_css = """
-        <style>
-            .jp-OutputArea-output pre { white-space: pre !important; }
-            .container { width:100% !important; }
-            /* background and text color for unselected ToggleButtons */
-            .widget-toggle-button {
-                background-color: #b5d6d0;
-                color: #888888 ;
-            }
+                        
+                        .jp-OutputArea-output pre { white-space: pre !important; }
+                        .container { width:100% !important; }
+                        /* background and text color for unselected ToggleButtons */
+                        .widget-toggle-button {
+                            background-color: #b5d6d0;
+                            color: #888888 ;
+                        }
 
-            /* background and text color for SELECTED ToggleButtons (active) */
-            .widget-toggle-button.mod-active {
-                background-color: #97b3ae;
-                color: #000000;
-                border-color: #4b5957 ;
-            }
-            /* SD_ PD_ TL_ CM_ dropdown in nsuite_info */
-            .custom-grey-dropdown select option {
-                color: grey !important;
-            }
-        </style>
+                        /* background and text color for SELECTED ToggleButtons (active) */
+                        .widget-toggle-button.mod-active {
+                            background-color: #97b3ae;
+                            color: #000000;
+                            border-color: #4b5957 ;
+                        }           
+                        /* SD_ PD_ TL_ CM_ dropdown in nsuite_info */
+                        .custom-grey-dropdown select option {
+                            color: grey !important;
+                        } 
+                    </style>
 
-        """
+                    """
         
         # 2. Inietta il CSS nel notebook tramite un widget HTML
         css_widget = HTML(value=custom_css)
@@ -1112,6 +1110,7 @@ class dashed(object):
                      self.model_box],
                     layout={'width':'100%','border':self.model_button_color}) # 'width':board_width
         #panels = HBox([dash,VBox([self.figure_box,self.board_box])],layout={'width':'100%'})
+        dash.add_class("inter-font-container")
         #now = datetime.now()
         #dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
         areas = ['LEM','GPS','LTF','VMS','Dolly','GPD','HAL','FLAME']
@@ -1165,15 +1164,9 @@ class dashed(object):
             disabled=True, # Prevents users from editing the text
             layout=Layout(width='786px',height='160px')           #,height='250px' # Height constraint triggers the scrollbar
             )],layout=Layout(width='900px'))       
-        if self.sidecar:
-            display(css_widget,dash)
-            SC = Sidecar(title='Mudashed log: {}'.format(datetime.now().strftime("%d/%m/%Y %H:%M")))
-            with SC:
-                display(self.board_box)
-        else: 
-            self.tab = Tab([dash,self.fetch_box,self.board_box,help_box,about],layout=Layout(width='940px'))
-            self.tab.titles = ['Fit','Fetch data','Log','Help','About']
-            self.tab.selected_index = 0
-            display(css_widget,self.tab)
+        self.tab = Tab([dash,self.fetch_box,self.board_box,help_box,about],layout=Layout(width='940px'))
+        self.tab.titles = ['Fit','Fetch data','Log','Help','About']
+        self.tab.selected_index = 0
+        display(css_widget,self.tab)
         # Button( icon = 'fa-trash' #, <i class="fa-thin fa-trash"></i>
         #https://stackoverflow.com/questions/60116974/what-is-the-icon-argument-for-ipywidgets-button

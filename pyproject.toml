@@ -30,7 +30,6 @@ dependencies = [
 		'ipywidgets',
 		'fonttools',
 		'voila',
-		'sidecar',
 		'pyqt5',
 		'sphinx-rtd-theme'
 		]
@@ -48,3 +47,20 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
 version_file = "mujpy/_version.py"
+
+[tool.setuptool.package.find]
+include = ["mujpy","mujpy.tests"]
+
+[tool.setuptools.package-data]
+"mujpy.tetst" = []
+
+[tool.setuptools.package-data]
+"mujpy.tests" = [
+	"fit_gps.*",
+	"fit_root.*",
+	"fit_nexus.*",
+	"data_gps.*",
+	"data_root.*"
+	"data_nexus.*",
+	"groups.*"
+]

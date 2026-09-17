@@ -2821,6 +2821,7 @@ def fetch_PSI_data(year,area,run_start,run_stop,datapath):
 
 def can_symlink() -> bool:
     """
+    deprecated
     replicates test.support.os_helper, that is not distributed to Windows (where we need it!)
     """
     import os
@@ -2841,9 +2842,66 @@ def can_symlink() -> bool:
         except (OSError, NotImplementedError, AttributeError):
             return False
     
+def make_copy(test):
+    """
+    copy groups and, in case, the test data that
+    """
+
+    from importlib import resources
+    from os import getcwd, access, W_OK, listdir, mkdir, remove
+    from os.path import join, isdir, islink, isfile
+    from shutil import copyfile as cp
+
+    # copy grp files
+    startup_path = getcwd()
+    writeable = access(startup_path, W_OK)
+    grp_dir = join(startup_path,"groups")
+    if writeable:
+        if not isdir(grp_dir): mkdir(grp_dir)
+        for file in listdir(resources.files("mujpy.tests").joinpath("groups")):
+            srcfile = resources.files("mujpy.tests").joinpath("groups").joinpath(file)
+            destfile = join(grp_dir,file)
+            if not isfile(destfile): cp(srcfile,destfile)
+
+        # copy      return True
+        if test:
+            fit = "fit_"+test.lower()
+            fit_dir = join(startup_path,"fit")
+            if islink(fit_dir): remove(fit_dir)
+            if isdir(fit_dir): # clean it up
+                for file in listdir(fit_dir):
+                    pathfil = join(fit_dir,file) 
+                    remove(pathfil)
+            else: # make it  
+                mkdir(fit_dir)
+            for file in listdir(resources.files("mujpy.tests").joinpath(fit)):
+                srcfile = resources.files("mujpy.tests").joinpath(fit).joinpath(file)
+                destfile = join(fit_dir,file)
+                cp(srcfile,destfile)
+
+   #         copy data files
+            data = "data_"+test.lower()
+            data_dir = join(startup_path,"data")
+            if islink(data_dir): remove(data_dir)
+            if isdir(data_dir):  # clean it up
+                for file in listdir(data_dir):
+                    pathfil = join(data_dir,file) 
+                    remove(pathfil)
+            else: # make it
+                mkdir(data_dir)
+            for file in listdir(resources.files("mujpy.tests").joinpath(data)):
+                srcfile = resources.files("mujpy.tests").joinpath(data).joinpath(file)
+                destfile = join(data_dir,file)
+                cp(srcfile,destfile)
+            return data_dir
+        else:
+            return True
+    else:
+        return False
 
 def make_links(test):
     """
+    deprecated
     if getcwd() is writeable, ln -a groups to tests/group and, if test, generate data, fit directories, 
     """
 
@@ -2963,7 +3021,10 @@ def group_syntax(text,root=None):
 
 def savetests():
     """
+    deprecated
     save tests (tests.py, almgml.822.3-4.1_fit.py etc.) to local path
+
+    who invokes this?
     """
 
     from os import getcwd, symlink, listdir
