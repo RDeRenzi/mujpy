@@ -57,7 +57,7 @@ include = ["mujpy","mujpy.tests"]
 	"fit_root.*",
 	"fit_nexus.*",
 	"data_gps.*",
-	"data_root.*"
+	"data_root.*",
 	"data_nexus.*",
 	"groups.*"
 ]
