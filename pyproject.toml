@@ -31,7 +31,8 @@ dependencies = [
 		'fonttools',
 		'voila',
 		'pyqt5',
-		'sphinx-rtd-theme'
+		'sphinx-rtd-theme',
+		'sphinx-copybutton'
 		]
 
 

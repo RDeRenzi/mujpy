@@ -27,51 +27,11 @@ details. Main technical features:
 
 (for the time being linux-only, Windows coming soon). Any linux has python (or has it?), you only need to:  [#1]_
 create a venv ``python -m venv ~/.mujpy-env``, activate it ``source ~/.mujpy-env/bin/activate``, and invoke ``pip install mujpy``
+Now try your freshly installed ``mujpy`` from command line to demonstrate its capabilities  (16 fully automatic casesin order of growing complexity). Just type ``python -m mujpy.tests.tests``. Kill each graphic window after inspection, see ReadTheDocs `Tutorial https://mujpy.readthedocs.io/latest/Tutorial.html<>`_ for more info.
 
-Now try your freshly installed ``mujpy`` from command line to demonstrate its capabilities  (fully automatic). Just type ``python -m unittest mujpy.tests/test``, e.g. from ``/tmp``.
-
-
-.. code-block::
-
-     %matplotlib qt  
-
-and
-
-.. code-block::
-
-        from mujpy.mudashed import dashed as mudash
-        the_dash = mudash()
-
-Otherwise, download ```Mudashed.ipynb``` and ```Mudashed-demos.ipynb``` from the ```tests/``` folder of this repository and 
-test the gui: 
-
-   a. create project directory and cd to it
-   b. copy ``Mudashed-demos.ipynb`` into it
-   d. type ``voila Mudashed-demos.ipynb`` in a terminal (``voila`` comes with ``mujpy``) [#2]_
-   e. Group0 already reads ``3-4`` (Up-Down in GPS), leave it
-   f. press DL and choose the first datafile (e.g. a transverse field run, ``822``)
-   g. insert the run number in run list and hit ``Enter`` (or press RL)
-   h. press LF and double-click on ```almgml.822.3-4.1_fit.json``` in teh pop-up
-   i. press Fit, check the result
-   j. change run list to ``822,834`` or ``822,827:834:-1`` and press LF again, check the result
-
-For more complex fits see the Introduction 
-in `ReadTheDocs <http://mujpy.readthedocs.io/en/latest/>`_
-For a first demo try out [#3]_ the script ``test.py``: choose an empty folder, edit a file ``savetests.py`` and copy-paste the following code:
-
-.. code-block::
-
-   from mujpy.tools.tools import savetests
-   savetests()
-
-Execute ``python savetests.py``. This allows you to run ``python test.py``, to get a look and feel of the 16 different types of fit that mujpy provides. 
-
-Modify the script for your purposes. The clumsy part here is to modify by
-hand the models in the ``fit/… .json`` files. Use the gui instead.
+This is the command line demos. There is also a GUI and its demos, coming instructions on ReaTheDocs.
 
 
 .. rubric:: Footnotes
 
 .. [#1]  in principle ``mujpy`` works on all OS, but for the moment it is tested only on linux
-.. [#2]  snap-installed firefox has a known bug with ``voila``, follow ` <https://github.com/voila-dashboards/voila/issues/1508>`_ for a simple workaround
-.. [#3]  if ``pip install mujpy`` was successful
