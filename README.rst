@@ -25,12 +25,11 @@ details. Main technical features:
 
 **Try mujpy!** 
 
-You only need to:  [#1]_
+(for the time being linux-only, Windows coming soon). Any linux has python (or has it?), you only need to:  [#1]_
+create a venv ``python -m venv ~/.mujpy-env``, activate it ``source ~/.mujpy-env/bin/activate``, and invoke ``pip install mujpy``
 
-  1. Install the latest Python from the Miscrosoft Store app (search Python download windows)
-  2. invoke ``pip install mujpy``
+Now try your freshly installed ``mujpy`` from command line to demonstrate its capabilities  (fully automatic). Just type ``python -m unittest mujpy.tests/test``, e.g. from ``/tmp``.
 
-This repository includes ```Mudashed.ipynb```, a static notebook. Type its two cells yourself in jupyterlab:
 
 .. code-block::
 

@@ -30,10 +30,11 @@ Windows
 
 As of 09/26, from `i <https://www.python.org/downloads/windows>`_ click on the link``Latest Python install manager`` and then on the link ``using the Microsoft Store app``. Install it. You now have ``pip``, check by opening ``Start PowerShell`` (not ``Start cmd``!!) and type  ``py -m pip --version``. 
 
-Always using PowerShell, create a virtual environment with ``py -m venv .pip-mujpy``, and in the same folder run ``.pip-mujpy/Script/activate``. Your PowerShell terminal now has (.git-mujpy) prepended to the prompt. It means that you are in the venv.  Now run ``pip install mujpy``. 
+Always using PowerShell, create a virtual environment with ``py -m venv .pip-mujpy``, and in the same folder run ``.pip-mujpy/Script/activate``. Your PowerShell terminal now has `(.git-mujpy)` prepended to the prompt. It guarantees that you are inside the venv.  Now run ``pip install mujpy``. 
 
-To check your mujpy installation ``cp 
-Or ``cp .git-mujpy\lib\site-packages\mujpy\test\Mudashed-demos.ipynb .`` and launch ``voila Mudashed-d
+To check your mujpy installation ``cp .pip-mujpy\lib\site-packages\mujpy\test\Mudashed-demos.ipynb .`` and launch ``jupyterlab``, click on ``Mudashed-demos.ipynb`` to run the demos.
+
+
 Macos
 -----
 
