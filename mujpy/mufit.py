@@ -71,7 +71,7 @@ class mufit(object):
 
         try: # is dashboard_file readable?  
             self.log('Reading fit guess from: '+short_path(dashboard_file,self.suite.__startuppath__))
-            with open(dashboard_file,"r") as f:
+            with open(str(dashboard_file),"r",encoding='utf-8') as f:
                 self.dashboard = json.load(f)
                 self.nodash = False                
         except Exception as e:
@@ -353,7 +353,7 @@ class mufit(object):
         if wa=='w' and os.path.isfile(file_log): # create prev version 
             os.rename(file_log,file_log+'~')
         # A1 A20 B1 B20 always 'w' 
-        with open(file_log,wa) as f:
+        with open(file_log,wa,encoding='utf-8') as f:
             f.write(' '+85*'_'+'\n')
             self.log('|'+77*'-'+'|') 
             f.write('| Run {}: {}       group: {} - {}      offs = {}  α = {:.3f}'.format(nrun,
@@ -458,7 +458,7 @@ class mufit(object):
         if wa=='w' and os.path.isfile(file_log): # create prev version 
             os.rename(file_log,file_log+'~')
         # A21 B21 C1 C2 always 'w' 
-        with open(file_log,wa) as f:
+        with open(file_log,wa,encoding='utf-8') as f:
             if wa=='w' or (B21 and kgroup==0):  
             # write Run chi2 header
                 f.write(' '+96*'_'+'\n')
@@ -576,7 +576,7 @@ class mufit(object):
  #               file = self.suite.__cachepath__+'U_'+modelname+'.'+strun+strgrp+version+'.log'
  #               if os.path.isfile(file_log): # create prev version 
  #                   os.rename(file_log,file_log+'~')
- #               with open(file,'w') as ff:
+ #               with open(file,'w',encoding='utf-8') as ff:
  #                   ff.write(' '+96*'_'+'\n')
  #                   nch = sumlength - 2
  #                   string = '| Run {}: {}    Global fit of {}'.format(nrun,title,dt_string)
@@ -660,7 +660,7 @@ class mufit(object):
         self.dashboard["grp_calib"] = self.suite.groups
         if os.path.isfile(file_json): 
             os.rename(file_json,file_json+'~')
-        with open(file_json,"w") as f:
+        with open(str(file_json),"w",encoding='utf-8') as f:
             json.dump(self.dashboard,f, indent=2,ensure_ascii=False) # ,object_pairs_hook=OrderedDict)
         short_json = file_json.replace(self.suite.__startuppath__,'.')              
         self.log('{}  saved.  '.format(short_json))
@@ -720,7 +720,7 @@ class mufit(object):
         self.dashboard["chi2"] = self.lastfit.fval /self.number_dof
         if os.path.isfile(file_json): 
             os.rename(file_json,file_json+'~')
-        with open(file_json,"w") as f:
+        with open(str(file_json),"w",encoding='utf-8') as f:
             json.dump(self.dashboard,f, indent=2,ensure_ascii=False)
         string = '{} saved'.format(file_json)
 #        print('mufit save_fit_multigroup debug, string_in:\n{}'.format(string_in))

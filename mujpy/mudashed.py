@@ -198,7 +198,7 @@ class dashed(object):
         if dashbd and OK: # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
             #self.log('debug mudashed._on_Fit pardicts with # {}'.format(any([True for pardict in self.dashboard['globpardicts_guess'] if pardict['flag']=='#']))) 
-            with open(dashboard_file,'w') as f:
+            with open(str(dashboard_file),'w',encoding='utf-8') as f:
                 json.dump(self.dashboard,f) # mufit wants to read this from a file
             self.board_box.clear_output()
             the_fit = mufit(self.suite,dashboard_file,dash_log = self.log) # writes text to board_box
@@ -232,7 +232,7 @@ class dashed(object):
         if self.build_dashed(): # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
             #self.log('debug mudashed._on_Plot: dumping {}'.format(dashboard_file))
-            with open(dashboard_file,'w') as f:
+            with open(str(dashboard_file),'w',encoding='utf-8') as f:
                 json.dump(self.dashboard,f) # mufit wants to read this from a file
             guess = self.command_1.children[6].value=='Guess'
             self.the_fit = mufit(self.suite,dashboard_file,no_fit = guess, dash_log = self.log) # writes text to board_box
@@ -497,7 +497,7 @@ class dashed(object):
 
         file_json = self.suite.__fitpath__+'dashed.json'
         if os.path.isfile(file_json):
-            with open(file_json,'r') as f:
+            with open(str(file_json),'r',encoding='utf-8') as f:
                 self.dashboard = json.load(f) # copies json dict to self.dashboard
             ck = check_dashboard_json(self.dashboard)
             if ck:
@@ -526,7 +526,7 @@ class dashed(object):
         # self.log('Trying to load {} ...'.format(file_json))
         if os.path.isfile(file_json):
             if file_json[-4:]=='json':
-                with open(file_json,'r') as f:
+                with open(str(file_json),'r',encoding='utf-8') as f:
                     self.dashboard = json.load(f) # copies json dict to self.dashboard
             ck = check_dashboard_json(self.dashboard)
             if ck:
@@ -733,7 +733,7 @@ class dashed(object):
         if os.path.exists(grouppath):
             groupfile,self.root = path_file_dialog(grouppath,'grp', root=self.root)
             if groupfile:
-                with open(groupfile,"r") as f:
+                with open(str(groupfile),"r") as f:
                     grp_calib = f.readline()
                 groupshnd1 = None
                 for kg, group in enumerate(eval(grp_calib)):
@@ -875,6 +875,7 @@ class dashed(object):
         from mujpy.tools.tools import _available_components_
         from datetime import datetime
         import os
+        from importlib import resources
 
         ##################################################################################################
         # Use from scratch
@@ -1144,8 +1145,8 @@ class dashed(object):
         for c in _available_components_():
             help_text += '\n{}: {}'.format(c['name'],c['tip'].replace('\n    ',' ',2)) 
         help_box.value = help_text
-        logo_file = open(os.path.join(os.path.join(os.path.dirname(MuJPyName),"logo"),"logo.png"), "rb")
-        logo_image = logo_file.read()
+        logo_file = resources.files('mujpy.logo').joinpath("logo.png")
+        logo_image = logo_file.read_bytes()
         logo = Box([Image(value=logo_image)],layout=Layout(width='114px',height='100px'))
         about_text = "mujpy        "+'v'+'.'.join([str(version_tup[k]) for k in range(3)])
         about_text += "\npython μSR data analysis"

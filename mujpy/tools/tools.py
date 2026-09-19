@@ -2221,7 +2221,7 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
     if os.path.isfile(file_csv):
         try: # the file exists
             lineout = [] # is equivalent to False
-            with open(file_csv,'r') as f_in:
+            with open(file_csv,'r',encoding='utf-8') as f_in:
                 notexistent = True # assume row yet non-existent fit
                 for nline,line in enumerate(f_in.readlines()):
                     if nline==0:
@@ -2251,7 +2251,7 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
                 if notexistent:
                     lineout.append(row) # append at the end
                     notexistent = False
-            with open(file_csv,'w') as f_out:                 
+            with open(file_csv,'w',encoding='utf-8') as f_out:                 
                 for line in lineout:
                     f_out.write(line)
             file_csv = file_csv[file_csv.rfind('/')+1:]
@@ -2263,7 +2263,7 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
         except Exception as exc: # incompatible headers, save backup and write a new file
             #print('write_csv excetption: {}'.format(exc))
             os.rename(file_csv,file_csv+'~')
-            with open(file_csv,'w') as f:
+            with open(file_csv,'w',encoding='utf-8') as f:
                 f.write(header)
                 f.write(row)
             file_csv = file_csv[file_csv.rfind('/')+1:]
@@ -2274,7 +2274,7 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
             
     else: # csv does not exist
         #print('file {} not found'.format(file_csv))
-        with open(file_csv,'w') as f:
+        with open(file_csv,'w',encoding='utf-8') as f:
             f.write(header)
             f.write(row)
         file_csv = file_csv[file_csv.rfind('/')+1:]
