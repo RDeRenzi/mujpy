@@ -726,6 +726,7 @@ class dashed(object):
         """
 
         import os
+        from ast import literal_eval as aeval
         from mujpy.tools.tools import path_file_dialog, tk_error
 
         startpath = os.getcwd()
@@ -736,7 +737,7 @@ class dashed(object):
                 with open(str(groupfile),"r") as f:
                     grp_calib = f.readline()
                 groupshnd1 = None
-                for kg, group in enumerate(eval(grp_calib)):
+                for kg, group in enumerate(aeval(grp_calib)):
                     alpha = str(group['alpha'])
                     groupshnd = group['forward']+'-'+group['backward']
                     if kg == 0:

@@ -295,7 +295,8 @@ def _available_components_():
         pars = describe(mumodel.__dict__[name])[2:]            #  [12:] because the first two arguments are self, x
         _pars = [] 
         # print('pars are {}'.format(pars))
-        tip = eval('mumodel.'+name+'.__doc__')
+        attrib = getattr(mumodel,name)
+        tip = attrib.__doc__
         positive_defined = ['α','β','Λ','ν']
         positive_parity = ['Δ','σ']
         for parname in pars:
@@ -377,6 +378,7 @@ def check_function(dashboard,groups):
         each string is executable
         called in mufit._dash_load_
     """
+
 
     from numpy import linspace, cos, sin, tan, sinh, cosh, tanh, log, pi, exp, sqrt, real, abs, arctan
     model = dashboard["model_guess"]
@@ -1511,6 +1513,7 @@ def widg2pardicts(global_box):
     transforms global_box widgets into dashboard["globpardicts_guess"]
     """
     from mujpy.tools.tools import invalid_err_lim, limits
+    from ast import literal_eval as aeval
 
     pardicts = []
     #                    kid[0]             kid[1]     kidd0  kiddd0...n   Kidd1 kiddd0...m
@@ -1524,7 +1527,7 @@ def widg2pardicts(global_box):
         if k: # skips k=0 labels
             value = parwidgs.children[2].value # string, can be '1.2' or '[1.2,3.2]'
             if value:
-                values = eval(value) if value[0]=='[' else [float(value)]
+                values = aeval(value) if value[0]=='[' else [float(value)]
             else:
                 values = [0]
             for value in values:
@@ -1555,7 +1558,7 @@ def widg2pardicts(global_box):
         if k: # skips k=0 labels
             value = parwidgs.children[2].value # string, can be '1.2' or '[1.2,3.2]'
             if value:
-                values = eval(value) if value[0]=='[' else [float(value)]
+                values = aeval(value) if value[0]=='[' else [float(value)]
             else:
                 values = [0]
             for value in values:
@@ -2635,6 +2638,7 @@ def value_error(value,error):
         used in mufit
     """
     from numpy import floor, log10, seterr
+    from ast import literal_eval as aeval
     eps = 1e-10 # minimum error
     if error>eps: # normal error
         exponent = int(floor(log10(error)))  
@@ -2643,15 +2647,17 @@ def value_error(value,error):
             exponent += 1
             most_significant=1
         exponent = -exponent if exponent<0 else 0
-        form = '"{:.'
+        form = '{:.'
         form += '{}'.format(exponent)
-        form += 'f}({})".format(value,most_significant)'
+        form += 'f}({})'
+        string = form.format(value,most_significant)
     else:
         if abs(value)<eps:
-            form = '"(0(0)"' # too small both
+            string = '(0(0)' # too small both
         else:
-            form = '"{}(0)".format(value)' # too small error
-    return eval(form)
+            form = '{}(0)'
+            string = form.format(value) # too small error
+    return string
     
 def value_error_csv(value,error):
     """
@@ -2660,6 +2666,7 @@ def value_error_csv(value,error):
         used in tools.print_csv_components, used in mufit
     """
     from numpy import floor, log10, seterr
+    from ast import literal_eval as aeval
     eps = 1e-10 # minimum error
     if error>eps: # normal error
         exponent = int(floor(log10(error)))  
@@ -2668,17 +2675,18 @@ def value_error_csv(value,error):
             exponent += 1
             most_significant=1
         exponent = -exponent if exponent<0 else 0
-        form = '"{:.'
+        form = '{:.'
         form += '{}'.format(exponent)
         form += 'f},{:.'
         form += '{}'.format(exponent)
-        form += 'f},".format(value,error)'
+        form += 'f},'
+        string = form.format(value,error)
     else:
         if abs(value)<eps:
-            form = '"0,0,"' # too small both
+            string = '0,0,' # too small both
         else:
-            form = '"{},0,".format(value)' # too small error
-    return eval(form)
+            string = '{},0,'.format(value) # too small error
+    return string
 
 def version_flag(mufit_method):
     """
