@@ -734,7 +734,7 @@ class dashed(object):
         if os.path.exists(grouppath):
             groupfile,self.root = path_file_dialog(grouppath,'grp', root=self.root)
             if groupfile:
-                with open(str(groupfile),"r") as f:
+                with open(str(groupfile),"r",encoding='utf-8') as f:
                     grp_calib = f.readline()
                 groupshnd1 = None
                 for kg, group in enumerate(aeval(grp_calib)):
