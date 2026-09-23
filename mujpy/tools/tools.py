@@ -2088,30 +2088,27 @@ def get_grouping(groupcsv):
         
     return grouping
 
-def check_multigroup(grp,alph):
+def check_multigroup(group,alpha):
     """
-    check shorthand in grp and alph for further groups and returns grp_cal dict 
+    check shorthand in single group and alpha for Groups ...
+
+    returns grp_cal dict if ok
+            error message if not ok
     """
 
     from mujpy.tools.tools import get_grouping
     try:
-        groups,alphas = grp.split(';'),alph.split(';')
-        for group,alpha in zip(groups,alphas):
-            forward, backward = group.split('-')
-            if all(get_grouping(forward)>=0) and all(get_grouping(backward)>=0):
-                grp_cal = ({'forward':forward, 
+        forward, backward = group.split('-')
+        fg, bg = get_grouping(forward), get_grouping(backward)
+        if all(fg>=0) and fg.dtype == int and all(bg>=0) and bg.dtype == int: # get_grouping is an np.array
+            grp_cal = {'forward':forward, 
                       'backward':backward, 
-                       'alpha':float(alpha)})
-                return grp_cal
+                       'alpha':float(alpha)}
+            return grp_cal
     except ValueError as e:
-        f,b = get_grouping(forward), get_grouping(backward)
-        if isinstance(f,str):
-            e = f
-            if isinstance(b,str): e += ';'+b
-        elif isinstance(b,str): e = b
         text = 'Exception {}'.format(e)
-        text += '\nGroups ... syntax error: {}'.format(grp)
-        return
+        text += '\nGroups ... syntax error:\ncheck Groups... = {} and α = {}'.format(group,alpha)
+        return text
 
 def init_csv_row(filespec, the_run, group = False):
     """
@@ -2366,40 +2363,235 @@ def muzeropad(runs,nzeros=4):
     elif len(runs)==len(zeros):
         return runs
 
-def path_file_dialog(path,spec,root=None):
+
+import os
+from ipywidgets import VBox, HBox, Layout, Button, HTML, Text, Select, Label
+from traitlets import Any
+
+class ValueButton(Button):
+    """defines an ipywidget Button with a .value attached"""
+
+    def __init__(self, value=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Add a custom value traitlet
+        self.add_traits(value=Any(value))
+
+def create_overlay_layout(start='none'):
+    """Crea lo stile CSS per lo sfondo oscurato del popup"""
+    return Layout(
+        position='absolute', left='0', top='0',#, right='0', bottom='0',
+        background_color='rgba(0, 0, 0, 0.5)', justify_content='center', align_items='flex-start',
+        display=start, z_index='9999')
+
+def create_dialog_box_layout():
+    """Crea lo stile per la finestra di dialogo interna"""
+    return Layout(
+        padding='20px', border='1px solid #ccc', box_shadow='0px 4px 15px rgba(0,0,0,0.3)',
+        border_radius='4px', width='560px', background_color='white')
+
+def show_hide_tab(overlay,display_change,tabs):
+    """ shows overlay in toggling tabs on display toggle"""
+
+    overlay.layout.observe(display_change,names='display')
+    setattr(overlay.layout, 'display', 'flex')
+    kiddos = list(tabs.children)
+    kids = list(kiddos[3].children)
+    kids[3] = overlay
+    kiddos[3].children = kids
+    tabs.children = kiddos
+    return tabs
+
+def ipyw_yes_no_dialog(title="Check!",message=""):
+    """ 
+    ask yes or no 
+
+    return  overlay to be shown in tab and observe its layout.display to toggle tabs
+            yes_btn.value True/False 
     """
-    launch tkinter filedialog in path, spec is filename after dot
-        used in mudashed
+
+    title_html = HTML(f"<h3>{title}</h3>") #⚠️
+    message_html = HTML(f"<p>{message}</p>", layout=Layout(margin='10px 0px 20px 0px'))
+    yes_btn = ValueButton(description="Yes", layout=Layout(width='100px', align_self='center'))
+    yes_btn.style.button_color = '#c0b1ab'
+    no_btn = Button(description="No", layout=Layout(width='100px', align_self='center'))
+    no_btn.style.button_color = '#c0c0c0'
+    # Contenitore del dialogo
+    dialog_box = VBox([title_html, message_html,HBox([yes_btn,no_btn])], layout=create_dialog_box_layout())
+    overlay = VBox([dialog_box], layout=create_overlay_layout())
+    
+    yes_btn.on_click(lambda b: [setattr(yes_btn,'value',True), setattr(overlay.layout, 'display', 'none')])
+    no_btn.on_click(lambda b: [setattr(yes_btn,'value',False), setattr(overlay.layout, 'display', 'none')])
+    return overlay, yes_btn 
+
+def ipyw_warning_dial(title="Warning", message=""):
     """
+    Warning in dialog with OK button.
 
-    #from ipywidgets.widgets import FileUpload
-    from tkinter import filedialog, Tk
-    import os
+    rerurns overlay to display it in an Tab, Output, ...
+            ok_btn to 1) observe(overlay.layout,names='display') e.g. to toggle tab.selected_index
+                      2) setattr(overlay.layout, 'display', 'flex')
+    """
+    # Elementi dell'interfaccia
+    title_html = HTML(f"<h3>{title}</h3>") #⚠️
+    message_html = HTML(f"<p>{message}</p>", layout=Layout(margin='10px 0px 20px 0px'))
+    ok_btn = Button(description="OK", layout=Layout(width='100px', align_self='center'))
+    ok_btn.style.button_color = '#c0b1ab'
+    # Contenitore del dialogo
+    dialog_box = VBox([title_html, message_html, ok_btn], layout=create_dialog_box_layout())
+    overlay = VBox([dialog_box], layout=create_overlay_layout())
+    
+    ok_btn.on_click(lambda b: setattr(overlay.layout, 'display', 'none'))
+    return overlay
 
+def ipyw_radio_dial(options, title="<b>Select one option:</b>"):
+    """
+    Display a range of Radiobutton and store the choice 
 
-    # out Output in tab dialogs 
-    # observe is 
-    # def on_file_upload(c):
-    #     with out;
-    #     out.clear_output()
-    #     if not uploader.value:
-    #         return
-    #     uploaded_file = uploader.value[0]
-    #     file_name = uploaded_file['name']
-    #     file_content = uploaded_file['content']
+    returns overlay, radio 
+    use options = ['text0','text1','text2'] to get selected string in radio.value
+    use options = [('text0',0),('text1',1)] to get also selected index in radio.index
+    observe(overlay.layout,names='display') e.g. to toggle tab.selected_index for a tabbed output
+    """
+    #options_list = list(options) if options else []
+    
+    title_html = HTML(value=f"<h3>{title}</h3>")
+    
+    radio = RadioButtons(
+        options=options,
+        layout=Layout(width='100%', margin='10px 0px')
+    )
+    
+    cancel_btn = Button(description="Cancel", layout=Layout(margin='0 5px 0 0'))
+    ok_btn = widgets.Button(description="OK", layout=Layout(margin='0 0 0 5px'))
+    ok_btn.style.button_color = '#c0b1ab'
+    buttons_hbox = HBox([cancel_btn, ok_btn], layout=Layout(justify_content='flex-end', margin='10px 0 0 0'))
+    
+    dialog_box = VBox([title_html, radio, buttons_hbox], layout=create_dialog_box_layout())
+    overlay = VBox([dialog_box], layout=create_overlay_layout())
+    
+    confirm_btn.on_click(lambda b: setattr(overlay.layout, 'display', 'flex'))
+    cancel_btn.on_click(lambda b: setattr(overlay.layout, 'display', 'none'))
+    return overlay, radio
 
-    # uploader = FileUpload(accept=spec, multiple=False) # in tools to be able to select different specs
-    #
-    try:
-        root.deiconify()
-    except:
-        root = Tk() # Close the root window
-        root.geometry("+400+10")
-    spc, spcdef = '.'+spec,'*.'+spec
-    in_path = filedialog.askopenfilename(initialdir = path, filetypes=((spc,spcdef),('all','*.*')))
-    in_path = '' if in_path == () else in_path
-    root.withdraw()
-    return in_path,root
+def ipyw_path_file_dial(target_button, callback, path=None, filter_pattern=None, title="<b>1-click select:</b>"):
+    """
+    Builds an ipywidget native File Browser in an overlay.
+    
+    just 2 clicks to load a path, exploiting instantaneous 'value' of ValueButton target_button.
+    Actions flow:
+    1. click target_button -> opens modal_overlay.
+    2. single click on a file (📄) -> instantly writes path string in target_button.value and closes modal_overlay.
+    * Note: a single click on a folder (📁) navigates inside it.
+    """
+    if path is None:
+        current_dir = os.getcwd()
+    else:
+        current_dir = os.path.abspath(path)
+        
+    if filter_pattern: # if not None make sure it is a list
+        if not isinstance(filter_pattern,list): filter_pattern = [filter_pattern]
+    #if not os.path.exists(current_dir):
+    #    os.makedirs(current_dir, exist_ok=True)
+
+    # Widget di selezione nativo
+    file_list_widget = Select(
+        options=[],
+        layout=Layout(width='100%', height='250px', font_family='monospace') # height='250px'
+    )
+    
+    title_html = HTML(value='')#,layout=Layout(height='16pt'))
+    warn_html = HTML(value=f'{title} &nbsp;')
+    hspacer = Label(' ',layout={'width':'25%','height':'16pt'})
+    close_btn = Button(description="Cancel", layout=Layout(align_self='flex-end', margin='10px 0 0 0'))
+    close_btn.style.button_color = '#c0b1ab'
+    
+    modal_content = VBox([title_html,file_list_widget,HBox([warn_html,hspacer,close_btn])], layout=create_dialog_box_layout())
+    #                     Layout(
+    #    padding='20px', border='1px solid #ccc', box_shadow='0px 4px 15px rgba(0,0,0,0.3)',
+    #    border_radius='4px', width='560px', background_color='white'
+    #))
+    
+    modal_overlay = VBox([modal_content], layout=create_overlay_layout())
+    #                     Layout(
+    #    position='absolute', left='0', top='0',#, right='0', bottom='0',
+    #    background_color='rgba(0, 0, 0, 0.5)', justify_content='center', align_items='flex-start',
+    #    display='none', z_index='9999'
+    #))
+    
+    #open_button = Button(description="Load", button_style='primary')
+    
+    state = {
+        'current_dir': current_dir,
+        'ignore_observe': False  # Flag per evitare loop durante il ripopolamento della lista
+    }
+
+    def populate_list():
+        state['ignore_observe'] = True
+        try:
+            items = os.listdir(state['current_dir'])
+        except Exception:
+            items = []
+            
+        directories = []
+        files = []
+        
+        if os.path.dirname(state['current_dir']) != state['current_dir']:
+            directories.append('📁 ..')
+            
+        for item in sorted(items):
+            full_path = os.path.join(state['current_dir'], item)
+            if os.path.isdir(full_path):
+                directories.append(f"📁 {item}")
+            elif os.path.isfile(full_path):
+                if filter_pattern:
+                    # if not isinstance(filter_pattern,list): filter_pattern = list(filter_pattern)
+                    for pattern in filter_pattern:
+                        ext = pattern.replace('*', '')
+                        if item.endswith(ext):
+                            files.append(f"📄 {item}")
+                else:
+                    files.append(f"📄 {item}")
+                    
+        # Reset della selezione a None prima di cambiare le opzioni per forzare l'evento al prossimo clic
+        file_list_widget.value = None
+        file_list_widget.options = directories + files
+        title_html.value = f"<small>Path: <b style='color:#2196F3;'>{state['current_dir']}</b></small>"
+        state['ignore_observe'] = False
+
+    def handle_selection_change(change):
+        """Loads or selects folder on single click"""
+        if state['ignore_observe']:
+            return
+            
+        selected_raw = change['new']
+        if not selected_raw:
+            return
+            
+        clean_name = selected_raw[2:]
+        
+        if selected_raw.startswith('📁'):
+            # NAVIGAZIONE IMMEDIATA: Entra nella cartella al singolo clic
+            if clean_name.startswith('..'):
+                state['current_dir'] = os.path.dirname(state['current_dir'])
+            else:
+                state['current_dir'] = os.path.join(state['current_dir'], clean_name)
+            populate_list()
+            index=3
+            
+        elif selected_raw.startswith('📄'):
+            # SELEZIONE IMMEDIATA: Un solo clic sul file scrive e chiude il modale (Ottimo a 2 azioni)
+            target_button.value = os.path.join(state['current_dir'], clean_name)
+            callback(None)
+            index = 0
+            modal_overlay.layout.display = 'none'
+
+    # Sfrutta l'observe sul valore nativo, incredibilmente robusto ed esente da latenze JavaScript
+    file_list_widget.observe(handle_selection_change, names='value')
+    
+    target_button.on_click(lambda b: [populate_list(), setattr(modal_overlay.layout, 'display', 'flex')])
+    close_btn.on_click(lambda b: [callback(b), setattr(modal_overlay.layout, 'display', 'none')])
+    
+    return modal_overlay, target_button
 
 def rebin(x,y,strstp,pack,e=None):
     """
@@ -2907,151 +3099,6 @@ def make_copy(test):
     else:
         return False
 
-def make_links(test):
-    """
-    deprecated
-    if getcwd() is writeable, ln -a groups to tests/group and, if test, generate data, fit directories, 
-    """
-
-    from mujpy import __file__ as MuJPyName
-    from os import getcwd, symlink, access, W_OK, remove, mkdir, listdir, rmdir
-    from os.path import join, dirname, isdir, islink, isfile
-    from mujpy.tools.tools import can_symlink
-    from shutil import copyfile as cp
-
-    startuppath = getcwd()
-    writeable = access(startuppath, W_OK)
-    ln_cp = symlink if can_symlink() else cp
-    if writeable:
-        # duplicate grp locally
-        grp_dir = join(startuppath,"groups")
-        src_dir = join(join(dirname(MuJPyName),"tests"),"groups")
-        if not isdir(grp_dir): 
-            ln_cp(src_dir,grp_dir)
-
-        if test:
-            test = test.upper()
-            data_dir = join(startuppath,"data")
-            data = "data_gps" if test == 'GPS' else "data_root" if test == 'LEM' else "data_nexus"
-            mujpy_data_dir = join(join(dirname(MuJPyName),"tests"),data)
-            fit = "fit_gps" if test == 'GPS' else "fit_root" if test == 'LEM' else "fit_nexus"
-            fit_dir = join(startuppath,"fit")
-            mujpy_fit_dir = join(join(dirname(MuJPyName),"tests"),fit)
-            # on Windows data_dir isdir even when copying test data
-            if not islink(data_dir) and isdir(data_dir): # a real data directory exists
-                return test,None,None
-            else:
-                if islink(data_dir): 
-                    remove(data_dir) # stale link, remove
-                if isdir(fit_dir): 
-                    for file in listdir(fit_dir):
-                        pathfile = join(fit_dir,file)
-                        if islink(pathfile) or isfile(pathfile): 
-                            remove(pathfile) # stale jsons
-                        elif isdir(pathfile):
-                            for fil in listdir(pathfile):
-                                pathfil = join(pathfile,fil) 
-                                remove(pathfil)
-                            rmdir(pathfile)
-                else: 
-                    mkdir(fit_dir)
-                if can_symlink():
-                    symlink(mujpy_data_dir,data_dir)# ln -s mujpy_data_dir in data_dir
-                else: 
-                    mkdir(data_dir)
-                    for file in listdir(mujpy_data_dir):
-                        cp(join(mujpy_data_dir,file),join(data_dir,file))
-
-                for file in listdir(mujpy_fit_dir):
-                    pathfile = join(mujpy_fit_dir,file) 
-                    if isfile(pathfile): ln_cp(pathfile,join(fit_dir,file)) # ln -s file in fit_dir
-    else:
-        data_dir = True # test True, False means abort 
-    return test,data_dir,writeable # allow check writeable
-
-def tk_choose(text,title,options,root=None):
-    from tkinter import Tk, Label, Button, Radiobutton, IntVar
-    #    ^ Use capital T here if using Python 2.7
-    try:
-        root.deiconify()
-    except:
-        root = Tk() # Close the root window
-        root.geometry("+400+10")
-    root.title(title)
-    Label(root, text=text).pack()
-    Button(text="Submit", command=root.destroy).pack()
-    v = IntVar()
-    for i, option in enumerate(options):
-        Radiobutton(root, text=option, variable=v, value=i, command=root.destroy).pack(anchor="w")
-    root.mainloop()
-    if v.get() == 0: return None
-    return options[v.get()]
-
-def tk_error(text,title,root=None):
-    """
-    popup warning for generic typo
-    """
-
-    from tkinter import Tk, Label, Button #messagebox as mb
-    try:
-        root.deiconify()
-    except:
-        root = Tk() # Close the root window
-        root.geometry("+400+10")
-    root.title(title)
-    label = Label(root, text = text)
-    label.pack()
-    button = Button(root, text='OK', width=25, command=root.destroy)
-    button.pack()
-    root.geometry('600x100+400+10')
-    root.mainloop()
-    return root
-
-def group_syntax(text,root=None):
-    """
-    popup warning for group syntax
-    """
-
-    from tkinter import Tk, Label, Button #messagebox as mb
-    try:
-        root.deiconify()
-    except:
-        root = Tk() # Close the root window
-        root.geometry("+400+10") 
-    root.title("Watch the group syntax")
-    label = Label(root, text = text)
-    label.pack()
-    button = Button(root, text='OK', width=25, command=root.destroy)
-    button.pack()
-    root.geometry('400x100+400+0')
-    root.mainloop()
-    return root
-
-def savetests():
-    """
-    deprecated
-    save tests (tests.py, almgml.822.3-4.1_fit.py etc.) to local path
-
-    who invokes this?
-    """
-
-    from os import getcwd, symlink, listdir
-    from os.path import join, isfile, dirname
-    from test.support.os_helper import can_symlink
-    from shutil import copyfile as cp
-    from mujpy import __file__ as MuJPyName
-
-    ln_cp = symlink if can_symlink() else cp
-    here = getcwd()
-    test = join(dirname(MuJPyName),'tests')
-    for fil in listdir(test):
-        file = join(test,fil)
-        print('file {}'.format(file))
-        if isfile(file) and fil[-3:]=='.py': 
-            ln_cp(file,join(here,fil))
-            print('ln -s {} ./'.format(file))
-
-       
 """
  REMEMBER: TOOLS METHODS DO NOT NEED TO IMPORT OTHER TOOLS METHODS!
      MAY REMOVE ALL from tools.tools import ... some are already

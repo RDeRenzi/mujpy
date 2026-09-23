@@ -22,7 +22,9 @@ class dashed(object):
  
         from mujpy._version import __version__
         from mujpy.tools.tools import make_copy
+        from os import getcwd
 
+        self.startuppath = getcwd()
         self.__version__ = __version__
         self.facility = facility
         self.mudashed_width = '900px'   
@@ -39,7 +41,7 @@ class dashed(object):
 
         # initialize dashboard, a dictionary
         # self.log = self.suite.console
-        self.root = None # initialize for tkinter
+        #self.root = None # initialize for tkinter
         self.fig_fit = None
         self.fig_fft = None
         writeable_folder = make_copy(test) # if test returns data_dir(acting also as True)
@@ -176,7 +178,7 @@ class dashed(object):
         import json
         from mujpy.mufit import mufit
         from mujpy.mufitplot import mufitplot
-        from mujpy.tools.tools import tk_error
+        from mujpy.tools.tools import ipyw_warning_dial, show_hide_tab
 
         OK = False if self._global() else True
         if not OK:
@@ -185,15 +187,16 @@ class dashed(object):
             if self._AB21() or self._C2():
                 if not self._multigroup():
                     msg = 'Groups ...: are empty and a multi group fit was selected\n(some model function contains ;-separated values)'
-                    self.root = tk_error(msg,title,root=self.root)
                 elif self._AB21(): OK = True
             if self._C12():
                 OK = True
                 if not self._multirun:
                     msg = 'Single run in run list submitting multi run fit\n(#-flags in global parameters)'
-                    self.root = tk_error(msg,title,root=self.root)
                     OK = False
-        self.tab.selected_index = 2
+            if not OK: # still False after the above changes
+                overlay = ipyw_warning_dial(title = title,
+                                            message = msg)
+                show_hide_tab(overlay,self.on_modal_display_change,self.tab)
         dashbd = self.build_dashed()
         if dashbd and OK: # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
@@ -210,7 +213,8 @@ class dashed(object):
             the_plot = mufitplot(plot_range, the_fit, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box, fig_fit = self.fig_fit) # plots in self.figure_box
             self.fig_fit = the_plot.fig
         else: 
-            self.log('build dashboard was unsuccessful, no fit')
+            self.log('Build dashboard was unsuccessful, no fit')
+        self.tab.selected_index = 2
 
     def _on_Plot(self,b):
         """
@@ -258,7 +262,7 @@ class dashed(object):
 
         """
 
-        from ipywidgets.widgets import Layout, Button, Label, Text, Dropdown, FloatText, HTML
+        from ipywidgets.widgets import Layout, Button, Label, Text, Dropdown, FloatText
         command1_width = ['10%','5%','10%','5%','6%','12%','10%','5%','16%','10%','8%','5%','8%','10%']
         fit_range = self.dashboard['fit_range'] if 'dashboard' in self.__dir__() else '0,20000,40' if self.suite._the_facility_ == 'PSI' else '0,1000,1'
         version = self.dashboard['version'] if 'dashboard' in self.__dir__() else '1'
@@ -518,12 +522,11 @@ class dashed(object):
         Choose fit model to load from ./fit/ folder
         '''
 
-        from mujpy.tools.tools import path_file_dialog, check_dashboard_json 
+        from mujpy.tools.tools import check_dashboard_json 
         import json
         import os
 
-        file_json, self.root = path_file_dialog(self.suite.__fitpath__,'json',root = self.root)
-        # self.log('Trying to load {} ...'.format(file_json))
+        file_json = self.LF_button.value
         if os.path.isfile(file_json):
             if file_json[-4:]=='json':
                 with open(str(file_json),'r',encoding='utf-8') as f:
@@ -552,8 +555,7 @@ class dashed(object):
         from json import loads as str2lst
         from ipywidgets import Text, IntText, Layout, Button, HBox,  \
                                VBox, ToggleButtons, Label, FloatText
-        from tkinter.messagebox import askyesno, showerror
-        from mujpy.tools.tools import tk_choose
+        from mujpy.tools.tools import ipyw_radio_dial, ipyw_warning_dial, show_hide_tab
         #self.log('change["new"] is {}'.format(change['new']))
 
         if change['type'] == 'change' and change['name'] == 'value':
@@ -562,35 +564,46 @@ class dashed(object):
             model = change['new'].strip() # removes accidental lead & trail blanks
             #self.log('debug mudashed._on_MN change["new"] {}'.format(model))
             if not validmodel(model):
-                showerror(title='Wrong model syntax',message='{} not made of valid components!'.format(model))
+                overlay = ipyw_warning_dial(title = 'Wrong model syntax',
+                                            message = '{} not made of valid components!'.format(model))
                 self.MN_text.unobserve(self._on_MN,names='value')
                 self.MN_text.value = ''
                 self.MN_text.observe(self._on_MN,names='value') # observe again
+                show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+                go = False
             if self.NG_int.value==1: # tarting route, butuspicious! forgot to set?
-                go = not askyesno(title='Check!', message="only NG=1 global parameter\ndon't you need more?")
- 
-            else: # includes also starting route!
+                set.tab.children[3].children[3], widg = ipyw_yes_no_dial(title = 'Check!',
+                                                                         message = "only NG=1 global parameter\ndon't you need more?")
+                go = not widg.value # widg.value is yes I do need more, no need can continue
+                self.tab.children[3].children[3].layout.observe(self.on_modal_display_change,names='display')
+                setattr(self.tab.children[3].children[3].layout, 'display', 'flex')
+            else: # includes also starting stage!
                 oldmodel = change['old']
-                indices = find_model_difference(oldmodel,model)
+                indices = find_model_difference(oldmodel,model) # returns 0 also if old is empty (initial stage) and new is 2 or more components!
 
-                if len(indices)==0: # includes also starting route!
-                    if len(self.model_box.children)==0: # startin route only               
-                        go = askyesno(title='{} will be a NEW EMPTY model'.format(model),message='Is this OK?\n(NO keeps the old model)')
+                if len(indices)==0: # new model in the starting stage (no old model)!
+                    if len(self.model_box.children)==0: go = True # starting stage only               
                 if oldmodel != '' and model and go: # edit the dash
                     k = indices[0]
                     indices = [abs(j)-1 for j in indices] if k<0 else indices
-                    action = 'add after' if k>0 else 'remove'
+                    action = 'Add after, in' if k>0 else 'Remove from'
                     m_c = model if k>0 else oldmodel
                     cc = [m_c[i:i+2] for i in range(0, len(m_c), 2)]
                     #self.log('debug mudashed._on_MN cc {}'.format(cc))
-                    components = [cc[i] for i in indices] # indices are 
+                    components = [(cc[i],i) for i in indices] # indices are 
                     if len(indices)>1: #decide which
-                        ki = tk_choose('model {}: {}'.format(model,action),'Choose which',components,root = self.root)
+                        set.tab.children[3].children[3], widg = ipyw_radio_dial(components,title='{} model {}'.format(action,model))
+                        ki = widg.index
+                        self.tab.children[3].children[3].layout.observe(self.on_modal_display_change,names='display')
+                        setattr(self.tab.children[3].children[3].layout, 'display', 'flex')
                     elif len(indices)==1: # single component
                         ki = abs(k)
                     else: # complez
-                        yes = askyesno(title='{} is a NEW EMPTY model'.format(model),message='Is this OK? NO keeps the old model.')
-
+                        set.tab.children[3].children[3], widg = ipyw_yes_no_dial(title = '{} NEW EMPTY model'.format(model),
+                                                                                 message = 'Is this OK?\n(NO keeps the old model)')
+                        go = not widg.value # widg.value is yes I do need more, no need can continue
+                        self.tab.children[3].children[3].layout.observe(self.on_modal_display_change,names='display')
+                        setattr(self.tab.children[3].children[3].layout, 'display', 'flex')
                     if k<0: # remove component  len(indices)==1 an
                         del self.dashboard['model_guess'][ki]
                     else: # add component
@@ -622,7 +635,8 @@ class dashed(object):
         import os
         from mujpy.musuite import suite
         from mujpy.tools.tools import derun, get_title, get_gtotals, get_grouping 
-        from mujpy.tools.tools import group_syntax, tk_error, check_multigroup
+        from mujpy.tools.tools import check_multigroup
+        from mujpy.tools.tools import ipyw_warning_dial, ipyw_path_file_dial, show_hide_tab
         from numpy import all
 
 
@@ -641,17 +655,11 @@ class dashed(object):
                 else:
                     raise NameError('No Group0')
             except ValueError as e:
-                f,b = get_grouping(forward), get_grouping(backward)
-                if isinstance(f,str):
-                    e = f
-                    if isinstance(b,str): e += ';'+b
-                elif isinstance(b,str): e = b
-                #self.log('Exception {}'.format(e))
-                #self.log('group syntax error: {}'.format(grp))
                 text = 'Exception {}'.format(e)
                 text += '\nGroup0 syntax error: {}'.format(grp)
-                self.root = group_syntax(text,root=self.root)
-                #self.log('Group0 group_syntax return a self.root = {}'.format(self.root))
+                overlay = ipyw_warning_dial(title = "Watch Group0 syntax",
+                                            message = text)
+                show_hide_tab(overlay,self.on_modal_display_change,self.tab)
                 return
             grp = self.suite_box.children[1].children[4].value
             alph = self.suite_box.children[1].children[5].value 
@@ -659,17 +667,20 @@ class dashed(object):
                 # these are potentially a ;-separated multigroup strings
                 groups = grp.split(';')
                 alphas = alph.split(';')
+                #for group, alpha in zip(groups,alphas):
                 for group, alpha in zip(groups,alphas):
                     grp_c = check_multigroup(group,alpha)
                     if isinstance(grp_c, str):
-                        self.root = group_syntax(grp_c, root=self.root)
+                        overlay = ipyw_warning_dial(title = "Watch Groups ... syntax",
+                                                    message = grp_c)
+                        show_hide_tab(overlay,self.on_modal_display_change,self.tab)
                         return
                     grp_calib.append(grp_c)
 
             offset = self.suite_box.children[1].children[8].value
             if os.path.isfile(datafile):
                 if runlist:
-                    self.suite = suite(datafile , runlist , grp_calib , offset , 'CettoLaqualunque',console=self.log) #startuppath is set in suite
+                    self.suite = suite(datafile , runlist , grp_calib , offset , 'input setuppath not used' ,console=self.log) #startuppath is set in suite
                     # self.log info
                     if self.suite.loadfirst: # suite loaded the data
                         starttime_options = [' '.join(self.suite._the_runs_[k][0].get_timeStart_vector()) for k in range(self.suite.nruns)]
@@ -706,11 +717,21 @@ class dashed(object):
                                 goptions.append(run+'.'+str(k)+counts)
                             toptions.append(run+': '+totalcount[0])
                         
+                        self.log('suite __fitpath__ is {}'.format(self.suite.__fitpath__))
                         self.suite_box.children[1].children[6].options = goptions
                         self.suite_box.children[1].children[7].options = toptions
                         self.command_box.children[0].children = self.command_0.children
+                        #self.LF_modal, self.LF_button =  ipyw_path_file_dial(
+                        #        self.LF_button,self._on_LF,
+                        #        path = self.suite.__fitpath__,
+                        #        filter_pattern = ['*.json'],
+                        #        title = '<b>1-click select</b>')
+                        #self.LF_modal.layout.observe(self.on_modal_display_change, names = 'display')
+
                     else:
-                        self.root = tk_error('No runs loaded, runlist {}?'.format(runlist),'suite error',root=self.root)
+                        overlay = ipyw_warning_dial(title = 'Suite error',
+                                                    message = 'No runs loaded, runlist {}?'.format(runlist))
+                        show_hide_tab(overlay,self.on_modal_display_change,self.tab)
                 else:
                     self.log('Please specify runlist')
             else:
@@ -721,48 +742,47 @@ class dashed(object):
 
     def _on_LG(self,b):
         """
-        group dict file load, by tkinter filedialog
+        group dict file load 
 
         """
 
         import os
         from ast import literal_eval as aeval
-        from mujpy.tools.tools import path_file_dialog, tk_error
 
-        startpath = os.getcwd()
-        grouppath = startpath+os.path.sep+'groups'+os.path.sep
-        if os.path.exists(grouppath):
-            groupfile,self.root = path_file_dialog(grouppath,'grp', root=self.root)
-            if groupfile:
-                with open(str(groupfile),"r",encoding='utf-8') as f:
-                    grp_calib = f.readline()
-                groupshnd1 = None
-                for kg, group in enumerate(aeval(grp_calib)):
-                    alpha = str(group['alpha'])
-                    groupshnd = group['forward']+'-'+group['backward']
-                    if kg == 0:
-                        self.suite_box.children[1].children[1].value = groupshnd
-                        self.suite_box.children[1].children[2].value = alpha
-                    elif kg == 1:
-                        alpha1 = alpha
-                        groupshnd1 = groupshnd
-                    else:
-                        alpha1 += ';'+alpha
-                        groupshnd1 += ';'+groupshnd
-                if groupshnd1:
-                    grp_txt = self.suite_box.children[1].children[4]
-                    alpha_txt = self.suite_box.children[1].children[5]
-                    grp_txt.unobserve(self._on_multigroup,names='value')
-                    alpha_txt.unobserve(self._on_multigroup,names='value')
-                    grp_txt.value = groupshnd1
-                    alpha_txt.value = alpha1
-                    grp_txt.observe(self._on_multigroup,names='value')
-                    alpha_txt.observe(self._on_multigroup,names='value')
-                #text = 'PRESS RL! to load new group data'
-                #self.root = tk_error(text,'REMEMBER!',root=self.root)
-        else:
-            self.root = tk_error('Folder {} does not exist'.format(datapath),'Load groups error', root=self.root)
- 
+        groupfile = self.LG_button.value
+        if groupfile:
+            with open(str(groupfile),"r",encoding='utf-8') as f:
+                grp_calib = f.readline()
+            groupshnd1 = None
+            for kg, group in enumerate(aeval(grp_calib)):
+                alpha = str(group['alpha'])
+                groupshnd = group['forward']+'-'+group['backward']
+                if kg == 0:
+                    self.suite_box.children[1].children[1].value = groupshnd
+                    self.suite_box.children[1].children[2].value = alpha
+                elif kg == 1:
+                    alpha1 = alpha
+                    groupshnd1 = groupshnd
+                else:
+                    alpha1 += ';'+alpha
+                    groupshnd1 += ';'+groupshnd
+            if groupshnd1:
+                grp_txt = self.suite_box.children[1].children[4]
+                alpha_txt = self.suite_box.children[1].children[5]
+                grp_txt.unobserve(self._on_multigroup,names='value')
+                alpha_txt.unobserve(self._on_multigroup,names='value')
+                grp_txt.value = groupshnd1
+                alpha_txt.value = alpha1
+                grp_txt.observe(self._on_multigroup,names='value')
+                alpha_txt.observe(self._on_multigroup,names='value')
+
+    def on_modal_display_change(self,change):
+        """switch tabs when change['new'] toggles 'flex' or 'none' """
+        if change['new'] == 'flex':
+            self.tab.selected_index = 3  # Passa alla scheda del modal
+        elif change['new'] == 'none':
+            self.tab.selected_index = 0  # Torna alla scheda principale
+
     def _on_RL_button(self,b):
         """
         simulate RL text change
@@ -773,19 +793,11 @@ class dashed(object):
         self.suite_box.children[2].children[5].value = runlist 
 
     def _on_DL(self,b):
-        """
-        data file load, tkinter 
-        """
+        """prototype data file written in path widget"""
 
         import os
-        from mujpy.tools.tools import path_file_dialog
 
-        startpath = os.getcwd()
-        datapath = startpath+os.path.sep+'data'+os.path.sep
-        if os.path.exists(datapath):
-            datafile, self.root = path_file_dialog(datapath,'*', root=self.root)
-        else:
-            self.log('Folder {} does not exist'.format(datapath))
+        datafile = self.DL_button.value
         if datafile:
             self.suite_box.children[2].children[2].value = datafile 
 
@@ -794,7 +806,7 @@ class dashed(object):
         inserted further goups, check syntax and check that RL is pressed (again?)
         """
 
-        from mujpy.tools.tools import check_multigroup, tk_error
+        from mujpy.tools.tools import check_multigroup, ipyw_warning_dial, show_hide_tab
         if change['owner'].tooltip[0] == 'f':
             remind = True
             grp = change['new']
@@ -808,9 +820,13 @@ class dashed(object):
         if grp and run_list and OK:
             grp_c = check_multigroup(grp,alph) # simply a syntax pre check 
             if isinstance(grp_c, str) and remind:
-                self.root = group_syntax(grp_c, root=self.root)
+                overlay = ipyw_warning_dial(title = 'Warning, group syntax',
+                                            message = grp_c)
+                show_hide_tab(overlay,self.on_modal_display_change,self.tab)
                 return
-            self.root = tk_error('Press RL to load new group data!','REMEMBER!',root=self.root)
+            overlay = ipyw_warning_dial(title = 'REMEMBER!',
+                                        message = 'RL to reload data!')
+            show_hide_tab(overlay,self.on_modal_display_change,self.tab)
 
     def _on_fetch(self,change):
         """
@@ -873,7 +889,7 @@ class dashed(object):
         from mujpy.musuite import suite
         from mujpy import __file__ as MuJPyName
         from mujpy._version import __version_tuple__ as version_tup
-        from mujpy.tools.tools import _available_components_
+        from mujpy.tools.tools import _available_components_, ipyw_path_file_dial, ValueButton
         from datetime import datetime
         import os
         from importlib import resources
@@ -986,16 +1002,32 @@ class dashed(object):
                             ])
  
         runs_width = ['7%','4%','54%','5%','16%']
-        LG_button = Button(description='LG',
+        grouppath = self.startuppath+os.path.sep+'groups'+os.path.sep
+        self.LG_button = ValueButton(description='LG',
                            tooltip = 'Groups file selection',
                            layout = Layout(width=runs_width[0]))
-        LG_button.on_click(self._on_LG)
-        LG_button.style.button_color = self.suite_button_color
-        DL_button = Button(description='DL',
+        LG_modal, self.LG_button = ipyw_path_file_dial(
+                self.LG_button,self._on_LG,
+                path = grouppath,
+                filter_pattern = '*.grp',
+                title = '<b>1-click select</b>')
+        LG_modal.layout.observe(self.on_modal_display_change, names = 'display')
+        LG_modal.layout.width='100%'
+
+        self.LG_button.style.button_color = self.suite_button_color
+        
+        path_value = self.data_dir if self.test else os.path.join(self.startuppath,'data') if 'suite' not in self.__dir__() else self.suite.__datapath__
+        self.DL_button = ValueButton(description='DL',
                            tooltip = 'Data file selection',
                            layout = Layout(width=runs_width[0]))
-        DL_button.on_click(self._on_DL)
-        DL_button.style.button_color = self.suite_button_color
+        DL_modal, self.DL_button =  ipyw_path_file_dial(
+                self.DL_button,self._on_DL,
+                path = path_value,
+                filter_pattern = ['*.bin','*.root','*.mdu','*.nxs'],
+                title = '<b>(1-click select</b>')
+        DL_modal.layout.observe(self.on_modal_display_change, names = 'display')
+        
+
         #if self.test:
         #    RL_value = '822' if self.test=='GPS' else '3561' if self.test=='LEM' else '126645'
         #else:
@@ -1012,17 +1044,16 @@ class dashed(object):
         RL_button.on_click(self._on_RL_button)
         RL_button.style.button_color = self.suite_button_color
 
-        path_value = self.data_dir if self.test else ''
         suite_runs = HBox([
-                        LG_button,
+                        self.LG_button,
                         Label(value='path',
                             layout=Layout(width=runs_width[1])),
                         Text(value = path_value,
-                             placeholder = 'to proto-data-file (enables DL)', 
+                            placeholder = 'to proto-data-file (enables DL)', 
                             tooltip = 'path to proto-run/n(from start path\nor absolute',
                             layout = Layout(width=runs_width[2]),
                             continuous_update = False),
-                        DL_button,
+                        self.DL_button,
                         Label(value='run list',
                               layout=Layout(width=runs_width[3])),
                         RL_text,
@@ -1034,7 +1065,7 @@ class dashed(object):
         self.suite_box = VBox([suite_info,suite_groups,suite_runs],layout=Layout(width=self.mudashed_width,border='1.5px solid DarkGoldenrod'))
         
         custom_css = """
-                        
+                      <style>  
                         .jp-OutputArea-output pre { white-space: pre !important; }
                         .container { width:100% !important; }
                         /* background and text color for unselected ToggleButtons */
@@ -1057,8 +1088,9 @@ class dashed(object):
 
                     """
         
-        # 2. Inietta il CSS nel notebook tramite un widget HTML
+        # 2. Inietta il CSS nel notebook tramite un widget HTMLi
         css_widget = HTML(value=custom_css)
+        display(css_widget)
         command_width = ['38%','21%','11%','14%','8%','8%']
         self.figure_box = Output(layout=Layout(width='100%',height='410px'))# width='900px'
         self.board_box = Output(layout=Layout(width='100%',height='650px',overflow_y='auto'))
@@ -1086,19 +1118,25 @@ class dashed(object):
         LL_button = Button(description = 'LL',
                            tooltip = 'Load last model\nif exists',
                            layout = Layout(width=command_width[4]))
-        LL_button.on_click(self._on_LL)
         LL_button.style.button_color = self.command_button_color
+        LL_button.on_click(self._on_LL)
         
-        LF_button = Button(description = 'LF',
+        fit_path = os.path.join(self.startuppath,'fit') if 'suite' not in self.__dir__() else self.suite.__fitpath__
+        self.LF_button = ValueButton(description = 'LF',
                            tooltip = 'Load fit file',
                            layout = Layout(width=command_width[5]))
-        LF_button.on_click(self._on_LF)
-        LF_button.style.button_color = self.command_button_color
+        self.LF_button.style.button_color = self.command_button_color
+        self.LF_modal, self.LF_button =  ipyw_path_file_dial(
+                self.LF_button,self._on_LF,
+                path = fit_path,
+                filter_pattern = ['*.json'],
+                title = '<b>1-click select</b>')
+        self.LF_modal.layout.observe(self.on_modal_display_change, names = 'display')
 
         layout = Layout(width=self.mudashed_width,border='1px solid CadetBlue')
         board_width='930px'
         command_0 = HBox([])
-        self.command_0 = HBox([fit_type,self.NG_int,MN_label,self.MN_text,LL_button,LF_button],layout={'width':self.mudashed_width})
+        self.command_0 = HBox([fit_type,self.NG_int,MN_label,self.MN_text,LL_button,self.LF_button],layout={'width':self.mudashed_width})
         self.command_1 = HBox([],layout={'width':self.mudashed_width})
         self.command_box = VBox([command_0,self.command_1],layout=layout)
         #self.command_box.add_class("command_box_style",layout=layout)
@@ -1165,10 +1203,12 @@ class dashed(object):
             value = about_text,
             disabled=True, # Prevents users from editing the text
             layout=Layout(width='786px',height='160px')           #,height='250px' # Height constraint triggers the scrollbar
-            )],layout=Layout(width='900px'))       
-        self.tab = Tab([dash,self.fetch_box,self.board_box,help_box,about],layout=Layout(width='940px'))
-        self.tab.titles = ['Fit','Fetch data','Log','Help','About']
+            )],layout=Layout(width='900px'))
+        dialog = VBox([LG_modal,DL_modal,self.LF_modal,HBox([])],layout=Layout(width='786px',height='100%'))
+        self.tab = Tab([dash,self.fetch_box,self.board_box,dialog,help_box,about],layout=Layout(width='940px'))
+        self.tab.add_class(custom_css)
+        self.tab.titles = ['Fit','Fetch data','Log','Dialogs','Help','About']
         self.tab.selected_index = 0
-        display(css_widget,self.tab)
+        display(self.tab)
         # Button( icon = 'fa-trash' #, <i class="fa-thin fa-trash"></i>
         #https://stackoverflow.com/questions/60116974/what-is-the-icon-argument-for-ipywidgets-button

@@ -116,6 +116,7 @@ class suite(object):
         self.nruns = len(self.runs) # vanished on 23 July 2026 at 17:00 ?!??!  reinserted here
         if os.path.isfile(datafile):
             self.datafile = datafile
+            self.__datapath__ = os.path.dirname(os.path.abspath(datafile))
             if self.datafile[-4:]=='root':
                 self.thermo = 0 # sample thermometer is always a single value list
             elif self.datafile[-3:]=='bin': 
@@ -132,11 +133,8 @@ class suite(object):
             return None  # with console error message
         self.__startuppath__ = os.getcwd()
         # implement new folder policy, see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy.Dashboard
-        self.__path__ = os.path.dirname(MuJPyName) # mujpy path
+
         # REMEMBER! ../ does not work if it points outside the directory where jupyterlab is launched from
-        pre_mujpy_path = os.path.dirname(MuJPyName)[:os.path.dirname(MuJPyName).rfind(os.sep)]
-        self.__grppath__ = pre_mujpy_path+os.sep+'groups'+os.sep
-        self.__templatepath__ = pre_mujpy_path+os.sep+'templates'+os.sep
         if not os.path.exists(self.__startuppath__+os.sep+'fit'+os.sep):
             os.mkdir(self.__startuppath__+os.sep+'fit'+os.sep)
         self.__fitpath__ = self.__startuppath__+os.sep+'fit'+os.sep

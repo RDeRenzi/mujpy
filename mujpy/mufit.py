@@ -456,6 +456,7 @@ class mufit(object):
         sumlength = 100
         wa = 'w' if (krun,kgroup)==(0,0) else 'a' # appends if Krun or kgroup > 0  
         if wa=='w' and os.path.isfile(file_log): # create prev version 
+            if os.path.isfile(file_log+'~'): os.remove(file_log+'~')
             os.rename(file_log,file_log+'~')
         # A21 B21 C1 C2 always 'w' 
         with open(file_log,wa,encoding='utf-8') as f:
