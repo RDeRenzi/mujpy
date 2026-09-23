@@ -81,7 +81,7 @@
         "pardicts": [
 	{
 	  "name": "α",
-	  "fla": "=",
+	  "flag": "=",
 	  "function": "p[0]"
 	}
 	]

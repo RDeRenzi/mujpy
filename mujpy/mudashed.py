@@ -623,7 +623,22 @@ class dashed(object):
                 self.json2dash()  # always, if model and OK
 
     def _on_RL(self,change):
+        """Traps the text widget's 'Enter' press safely."""
+
+        if isinstance(change, dict) and isinstance(change.get('new'), dict):
+            return
+        runlist = change['new'] if isinstance(change, dict) else change
+        if not runlist:
+            return
+            
+        # Call the core worker function directly
+        self.execute_suite_processing(runlist)
+
+    def execute_suite_processing(self,runlist):
         """
+        _on_RL and _on_button_RL real callback, decoupled to avoid sudden cascade of nested GUI updates that kill Windowsi
+
+        
         start suite from run list input, checks path file exists
 
         beware: as of ipywidgets v. 8.1.5 this continuous_update=False is a bit of a mess
@@ -631,7 +646,7 @@ class dashed(object):
                 and Enter triggers a double call.
                 proceeds only id change['new'] is not a dict
         """
-
+        
         import os
         from mujpy.musuite import suite
         from mujpy.tools.tools import derun, get_title, get_gtotals, get_grouping 
@@ -640,49 +655,51 @@ class dashed(object):
         from numpy import all
 
 
-        runlist  = change['new']
-        if not isinstance(runlist,dict):
-            datafile = self.suite_box.children[2].children[2].value  # path Text value
-            #self.log('runlist = {}'.format(runlist))
 
-            try:
-                grp = self.suite_box.children[1].children[1].value
-                forward, backward = grp.split('-')
-                if all(get_grouping(forward)>=0) and all(get_grouping(backward)>=0):
-                    grp_calib = [{'forward':forward, 
-                              'backward':backward, 
-                              'alpha':float(self.suite_box.children[1].children[2].value)}]
-                else:
-                    raise NameError('No Group0')
-            except ValueError as e:
-                text = 'Exception {}'.format(e)
-                text += '\nGroup0 syntax error: {}'.format(grp)
-                overlay = ipyw_warning_dial(title = "Watch Group0 syntax",
-                                            message = text)
-                show_hide_tab(overlay,self.on_modal_display_change,self.tab)
-                return
-            grp = self.suite_box.children[1].children[4].value
-            alph = self.suite_box.children[1].children[5].value 
-            if grp:
-                # these are potentially a ;-separated multigroup strings
-                groups = grp.split(';')
-                alphas = alph.split(';')
-                #for group, alpha in zip(groups,alphas):
-                for group, alpha in zip(groups,alphas):
-                    grp_c = check_multigroup(group,alpha)
-                    if isinstance(grp_c, str):
-                        overlay = ipyw_warning_dial(title = "Watch Groups ... syntax",
-                                                    message = grp_c)
-                        show_hide_tab(overlay,self.on_modal_display_change,self.tab)
-                        return
-                    grp_calib.append(grp_c)
 
-            offset = self.suite_box.children[1].children[8].value
-            if os.path.isfile(datafile):
-                if runlist:
-                    self.suite = suite(datafile , runlist , grp_calib , offset , 'input setuppath not used' ,console=self.log) #startuppath is set in suite
-                    # self.log info
-                    if self.suite.loadfirst: # suite loaded the data
+        datafile = self.suite_box.children[2].children[2].value  # path Text value
+        #self.log('runlist = {}'.format(runlist))
+
+        try:
+            grp = self.suite_box.children[1].children[1].value
+            forward, backward = grp.split('-')
+            if all(get_grouping(forward)>=0) and all(get_grouping(backward)>=0):
+                grp_calib = [{'forward':forward, 
+                          'backward':backward, 
+                          'alpha':float(self.suite_box.children[1].children[2].value)}]
+            else:
+                raise NameError('No Group0')
+        except ValueError as e:
+            text = 'Exception {}'.format(e)
+            text += '\nGroup0 syntax error: {}'.format(grp)
+            overlay = ipyw_warning_dial(title = "Watch Group0 syntax",
+                                        message = text)
+            show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+            return
+        grp = self.suite_box.children[1].children[4].value
+        alph = self.suite_box.children[1].children[5].value 
+        if grp:
+            # these are potentially a ;-separated multigroup strings
+            groups = grp.split(';')
+            alphas = alph.split(';')
+            #for group, alpha in zip(groups,alphas):
+            for group, alpha in zip(groups,alphas):
+                grp_c = check_multigroup(group,alpha)
+                if isinstance(grp_c, str):
+                    overlay = ipyw_warning_dial(title = "Watch Groups ... syntax",
+                                                message = grp_c)
+                    show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+                    return
+                grp_calib.append(grp_c)
+
+        offset = self.suite_box.children[1].children[8].value
+        if os.path.isfile(datafile):
+            if runlist:
+                self.suite = suite(datafile , runlist , grp_calib , offset , 'input setuppath not used' ,console=self.log) #startuppath is set in suite
+                # self.log info
+                if self.suite.loadfirst: # suite loaded the data
+                    # inserted the hold_trait_notification to preserve Windows:
+                    with self.suite_box.hold_trait_notifications():
                         starttime_options = [' '.join(self.suite._the_runs_[k][0].get_timeStart_vector()) for k in range(self.suite.nruns)]
                         starttime_options.insert(0,'Run start times')
                         self.suite_box.children[0].children[0].options = starttime_options
@@ -728,17 +745,15 @@ class dashed(object):
                         #        title = '<b>1-click select</b>')
                         #self.LF_modal.layout.observe(self.on_modal_display_change, names = 'display')
 
-                    else:
-                        overlay = ipyw_warning_dial(title = 'Suite error',
-                                                    message = 'No runs loaded, runlist {}?'.format(runlist))
-                        show_hide_tab(overlay,self.on_modal_display_change,self.tab)
                 else:
-                    self.log('Please specify runlist')
+                    overlay = ipyw_warning_dial(title = 'Suite error',
+                                                message = 'No runs loaded, runlist {}?'.format(runlist))
+                    show_hide_tab(overlay,self.on_modal_display_change,self.tab)
             else:
-                self.log('File {} not found'.format(datafile))
-                self.log('paths must be either in startup path and below or absolute')
+                self.log('Please specify runlist')
         else:
-            self.log('debug, _on_RL, change["new"] was still a dict instead of the new text value')
+            self.log('File {} not found'.format(datafile))
+            self.log('paths must be either in startup path and below or absolute')
 
     def _on_LG(self,b):
         """
@@ -784,13 +799,13 @@ class dashed(object):
             self.tab.selected_index = 0  # Torna alla scheda principale
 
     def _on_RL_button(self,b):
-        """
-        simulate RL text change
-        """
-        
+        """Directly triggers execution without resetting the widget text."""
+
+        # Directly read the current value
         runlist = self.suite_box.children[2].children[5].value
-        self.suite_box.children[2].children[5].value =  ''
-        self.suite_box.children[2].children[5].value = runlist 
+        
+        # Call the core worker function directly instead of mutating the widget value
+        self.execute_suite_processing(runlist)
 
     def _on_DL(self,b):
         """prototype data file written in path widget"""
