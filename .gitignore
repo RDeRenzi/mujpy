@@ -73,3 +73,6 @@ wheelhouse*/
 tags
 TAGS
 MANIFEST
+
+# dynamic versioning
+mujpy/_version.py
