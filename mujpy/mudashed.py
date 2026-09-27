@@ -5,7 +5,7 @@ class dashed(object):
     a GUI interface
     ::
         1. insert the data path, press DL and choose the first run
-        2. edit Group0 [Groups ... for multi group] or load a standard groupomg with LG 
+        2. edit Group0 [Groups ... for multi group] or load a standard grouping with LG 
         2. insert the run # in the run list; Enter of press RL
         3. insert [NG (number of globals)], the MN model acronym + Enter, or LL load last, or LF load a fit model  
         4. Press Fit or Plot guess.
@@ -17,15 +17,13 @@ class dashed(object):
 ##########################
     def __init__(self,facility='PSI',test=None):
         '''
-            Launches the simple gui, that requires only an instance of mujpy.musuite suite 
+            Launches the gui
         '''
  
-        from mujpy._version import __version__
         from mujpy.tools.tools import make_copy
         from os import getcwd
 
         self.startuppath = getcwd()
-        self.__version__ = __version__
         self.facility = facility
         self.mudashed_width = '900px'   
         self.output_width = '900px'
@@ -123,7 +121,7 @@ class dashed(object):
         True if self.suite.nruns>1
         """
 
-        return self.suite.nruins>1
+        return self.suite.nruns>1
 
     def _on_add_del_plot(self,kp,change):
         """
@@ -205,11 +203,11 @@ class dashed(object):
                 json.dump(self.dashboard,f) # mufit wants to read this from a file
             self.board_box.clear_output()
             the_fit = mufit(self.suite,dashboard_file,dash_log = self.log) # writes text to board_box
-            #self.figure_box.clear_output()
             plot_range = self.command_1.children[8].value
             rotfreq = self.command_1.children[9].value
             fft_range = self.command_1.children[12].value # not yet in use 
             lb = self.command_1.children[13].value # not yet in use 
+            self.figure_box.clear_output()
             the_plot = mufitplot(plot_range, the_fit, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box, fig_fit = self.fig_fit) # plots in self.figure_box
             self.fig_fit = the_plot.fig
         else: 
@@ -222,7 +220,7 @@ class dashed(object):
 
         .. code::
 
-            the_plot = mufitplot(plot_range,self.the_fit,rotating_frame_frequencyMHz=rotfreq,plot_out=self.figure_box,fig_fit=self.fig_fit)
+            the_plot = mufitplot(plot_range,the_fit,rotating_frame_frequencyMHz=rotfreq,plot_out=self.figure_box,fig_fit=self.fig_fit)
         """
         
         # read dashed widget values (including guess, rotfreq
@@ -239,12 +237,13 @@ class dashed(object):
             with open(str(dashboard_file),'w',encoding='utf-8') as f:
                 json.dump(self.dashboard,f) # mufit wants to read this from a file
             guess = self.command_1.children[6].value=='Guess'
-            self.the_fit = mufit(self.suite,dashboard_file,no_fit = guess, dash_log = self.log) # writes text to board_box
+            the_fit = mufit(self.suite,dashboard_file,no_fit = guess, dash_log = self.log) # writes text to board_box
             #self.figure_box.clear_output()
             plot_range = self.command_1.children[8].value
             rotfreq = self.command_1.children[9].value
+            self.figure_box.clear_output()
             the_plot = mufitplot(plot_range, 
-                                 self.the_fit, 
+                                 the_fit, 
                                  rotating_frame_frequencyMHz = rotfreq, 
                                  plot_out = self.figure_box, 
                                  fig_fit = self.fig_fit) # plots in self.figure_box
@@ -480,13 +479,10 @@ class dashed(object):
 
         '''
 
-        #value = change['value']
         if change['new'] == 'sequential fit':
             self.NG_int.value = 0
             self.NG_int.disabled = True
         else:
-            #with self.board_box:
-            #    self.log('fit_type global fit')
             self.NG_int.value = 1
             self.NG_int.disabled = False
 
@@ -503,7 +499,7 @@ class dashed(object):
         if os.path.isfile(file_json):
             with open(str(file_json),'r',encoding='utf-8') as f:
                 self.dashboard = json.load(f) # copies json dict to self.dashboard
-            ck = check_dashboard_json(self.dashboard)
+            ck = check_dashboard_json(self.dashboard) # returns '' if OK else error message string
             if ck:
                 del self.dashboard
                 self.log(ck+' typo in '+file_json)
@@ -732,7 +728,7 @@ class dashed(object):
                             for k,gc in enumerate(groupcount):
                                 counts = ': '+gc
                                 goptions.append(run+'.'+str(k)+counts)
-                            toptions.append(run+': '+totalcount[0])
+                            toptions.append(run+': '+totalcount)#[0])
                         
                         self.log('suite __fitpath__ is {}'.format(self.suite.__fitpath__))
                         self.suite_box.children[1].children[6].options = goptions
@@ -902,7 +898,6 @@ class dashed(object):
         from ipywidgets.widgets import Dropdown, FloatText, HBox, VBox, HTML, Box, Image, Textarea
         from ipywidgets.widgets import Tab
         from mujpy.musuite import suite
-        from mujpy import __file__ as MuJPyName
         from mujpy._version import __version_tuple__ as version_tup
         from mujpy.tools.tools import _available_components_, ipyw_path_file_dial, ValueButton
         from datetime import datetime
@@ -1095,7 +1090,7 @@ class dashed(object):
                             color: #000000;
                             border-color: #4b5957 ;
                         }           
-                        /* SD_ PD_ TL_ CM_ dropdown in nsuite_info */
+                        /* SD_ PD_ TL_ CM_ dropdown in suite_info */
                         .custom-grey-dropdown select option {
                             color: grey !important;
                         } 
@@ -1109,6 +1104,7 @@ class dashed(object):
         command_width = ['38%','21%','11%','14%','8%','8%']
         self.figure_box = Output(layout=Layout(width='100%',height='410px'))# width='900px'
         self.board_box = Output(layout=Layout(width='100%',height='650px',overflow_y='auto'))
+        self.logtab_box = HBox([self.board_box,self.figure_box])
         fit_type = ToggleButtons(options = ['sequential fit','global fit'],
                                  value = 'sequential fit',
                                  tooltips = ['A1 A20 B1 B20\nsingle asymmetry fit','A21 B21 C1 C2\nmulti asymmetries fit'],
@@ -1220,7 +1216,7 @@ class dashed(object):
             layout=Layout(width='786px',height='160px')           #,height='250px' # Height constraint triggers the scrollbar
             )],layout=Layout(width='900px'))
         dialog = VBox([LG_modal,DL_modal,self.LF_modal,HBox([])],layout=Layout(width='786px',height='100%'))
-        self.tab = Tab([dash,self.fetch_box,self.board_box,dialog,help_box,about],layout=Layout(width='940px'))
+        self.tab = Tab([dash,self.fetch_box,self.logtab_box,dialog,help_box,about],layout=Layout(width='940px'))
         self.tab.add_class(custom_css)
         self.tab.titles = ['Fit','Fetch data','Log','Dialogs','Help','About']
         self.tab.selected_index = 0

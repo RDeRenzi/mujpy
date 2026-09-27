@@ -12,7 +12,7 @@ Linux
 
 Python comes with all distributions, but ``pip`` does not. Check typing ``pip --version``.  If you get `pip: command not found` run ``python3 -m pip install --upgrade pip``. 
 It is best to create a virtual environment: run ``python3 -m venv ~/.mujpy-venv`` (see the `official notes <https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/>`_ for more details) and lauch it by ``source ~/.mujpy-venv/bin/activate`` (``deactivate`` will exit venv). 
-The terminal prompt has now ``(.mujpy-venv)`` prepended. Install ``mujpy`` once 
+The terminal prompt has now ``(.mujpy-venv)`` prepended. Install ``mujpy`` once. Normally, after ``activate``, ``cd`` to a suitable directory and use command line ``python -m mujpy.tests.tests`` to see a full demo, or ``jupyter lab`` to start the GUI interface by luaunching a new python3 notebook with either ``%matplotlib qt`` (popup plots) or ``%matplotlib widget`` (notebook plots) in the first cell, and ``from mujpy.mudashed import dashed``, ``the_dash=dasehd(test='GPS')`` in the second cell. Run it all.
 
 .. code::
 
@@ -29,10 +29,7 @@ To upgrade to the newest distribution, ``python3 -m install mujpy --upgrade``. I
 Windows
 -------
 
-As of 09/26, `mujpy` is still broken on Windows. Just in case from `link <https://www.python.org/downloads/windows>`_ click on the link ``Latest Python install manager`` and then on the link ``using the Microsoft Store app``. Install it. You now have also ``pip``, check by opening ``Start PowerShell`` (not ``Start cmd``!!) and type  ``py -m pip --version``. 
-
-Always using PowerShell, create a virtual environment with e.g. ``py -m venv .pip-mujpy``, and in the same folder run ``.pip-mujpy/Script/activate``. Your PowerShell terminal now has `(.git-mujpy)` prepended to the prompt. It guarantees that you are inside the venv.  Now run ``pip install mujpy``. 
-
+As of 09/26, `ipywidgets` breaks on Windows. If you can afford 10 GB to install Ubuntu (`wsl --install -d Ubuntu` in cmd) you can then run it in an Ubuntu WSL2 window, install `mujpy` as in linux. Command line works and notebook works with ``%matplotlib widget`` first cell (plot to the right of log) (does it?). After `sudo apt update && sudo apt upgrade -y && sudo apt install python3.14-venv`, follow linux instructions, replacing ``python3`` for ``python`` and chooseing ``widget`` plots.
 
 Macos
 -----

@@ -11,7 +11,7 @@ classifiers = [
   "# SPDX-License-Identifier: GPL-3.0-or-later",
   "Programming Language :: Python :: 3",
   "Framework :: Jupyter :: Jupyterlab",
-  "Operating System :: OS Independent",
+  "Operating System :: Linux",
   "Topic :: Scientific/Engineering :: Physics"]
 requires-python = ">=3.8"
 dependencies = [
@@ -26,7 +26,6 @@ dependencies = [
 		'sympy',
 		'iminuit',
 		'jupyterlab',
-		'ipympl',
 		'ipywidgets',
 		'fonttools',
 		'voila',

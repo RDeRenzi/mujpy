@@ -322,6 +322,8 @@ def _available_components_():
 def check_dashboard_json(dashboard):
     """
     checks for typos against list of allowed keys
+
+    returns error message if not OK, or '' if OK
     """
 
     allowed_keys = ["version",
@@ -471,21 +473,19 @@ def get_gtotals(suite):
     for k,runs in enumerate(suite._the_runs_):
         tsum = 0
         ggs = []
-        gts = []
         for j,group in enumerate(grc):
+            gsum = 0
             for counter in group:
-                gsum = 0
                 for j,run in enumerate(runs): # add values for runs to add
                     if suite.datafile[-3:]=='bin' or suite.datafile[-3:]=='mdu' or suite.datafile[-4:]=='root':
                         n1 = suite.offset+suite.nt0[counter] 
-                    histo = array(run.get_histo_vector(counter,1)).sum() 
+                    histo = array(run.get_histo_vector(counter,1))[n1:].sum() 
                     gsum += histo
                     tsum += histo
             gggs = '{:.2f}'.format(gsum/1e6)+'Mev'
             ggs.append(gggs)
-            gts.append('{:.2f}'.format(tsum/1e6)+'Mev')
         gs.append(ggs)
-        ts.append(gts)
+        ts.append('{:.2f}'.format(tsum/1e6)+'Mev')
     return ts, gs, '{:.3}'.format(suite._the_runs_[0][0].get_binWidth_ns()), str(suite.histoLength)
    
 ###############################################################################
@@ -2409,6 +2409,7 @@ def ipyw_yes_no_dialog(title="Check!",message=""):
             yes_btn.value True/False 
     """
 
+    from mujpy.tools.tools import create_overlay_layout, create_dialog_box_layout
     title_html = HTML(f"<h3>{title}</h3>") #⚠️
     message_html = HTML(f"<p>{message}</p>", layout=Layout(margin='10px 0px 20px 0px'))
     yes_btn = ValueButton(description="Yes", layout=Layout(width='100px', align_self='center'))
@@ -2431,7 +2432,8 @@ def ipyw_warning_dial(title="Warning", message=""):
             ok_btn to 1) observe(overlay.layout,names='display') e.g. to toggle tab.selected_index
                       2) setattr(overlay.layout, 'display', 'flex')
     """
-    # Elementi dell'interfaccia
+    
+    from mujpy.tools.tools import create_overlay_layout, create_dialog_box_layout
     title_html = HTML(f"<h3>{title}</h3>") #⚠️
     message_html = HTML(f"<p>{message}</p>", layout=Layout(margin='10px 0px 20px 0px'))
     ok_btn = Button(description="OK", layout=Layout(width='100px', align_self='center'))
@@ -2452,8 +2454,8 @@ def ipyw_radio_dial(options, title="<b>Select one option:</b>"):
     use options = [('text0',0),('text1',1)] to get also selected index in radio.index
     observe(overlay.layout,names='display') e.g. to toggle tab.selected_index for a tabbed output
     """
-    #options_list = list(options) if options else []
     
+    from mujpy.tools.tools import create_overlay_layout, create_dialog_box_layout
     title_html = HTML(value=f"<h3>{title}</h3>")
     
     radio = RadioButtons(
@@ -2483,6 +2485,8 @@ def ipyw_path_file_dial(target_button, callback, path=None, filter_pattern=None,
     2. single click on a file (📄) -> instantly writes path string in target_button.value and closes modal_overlay.
     * Note: a single click on a folder (📁) navigates inside it.
     """
+
+    from mujpy.tools.tools import create_overlay_layout, create_dialog_box_layout
     if path is None:
         current_dir = os.getcwd()
     else:

@@ -1,0 +1,61 @@
+EMU126710.nxs hdf5 
+EMU126710.nxs_v1 hdf4
+emu = nxload(path+'EMU126710.nxs')
+---- emu.file_name str
+        .file_time str
+        .Nexus_Version str
+        .HDF5_Version str
+        .raw_data1---- .beamline str 'EMU'  *
+                       .collection_time int 
+                       .collection_time.units str 'second'
+                       .definition str 'pulsedTD'
+                       .detector_1---.alpha float 1.0
+                                     .corrected_time array floats *
+                                     .corrected_time.units str 'microseconds'
+                                     .counts array int size [0,96,2048] *
+                                     .counts.axes str 'period_index,spectrum_index,raw_time' period is RedGreen modes, spectrum index is detector 
+                                     .counts.first_good_bin int *
+                                     .counts.last_good_bin int *
+                                     .counts.long_name str 'positron_counts'
+                                     .counts.offset float 8000.0 (?)  
+                                     .counts.signal int 1 (?)
+                                     .counts.t0_bin int *
+                                     .counts.target str '/raw_data_1/instrument/detector_1/counts'
+                                     .counts.units str 'counts'
+                                     .dead_time array float size 96 (one per detector) ?
+                                     .dead_time.units str 'microseconds' (!)
+                                     .grouping array int size 96 first 48 are 1 second 48 are 2 longitudinal
+                                     .period_index int 1 (how many  RedGreen, i.e. non RedGreen) *
+                                     .raw_time array floats this or corrected?
+                                     .raw_time.units str 'microsecond' (!)
+                                     .spectrum_index array int [1, ...,96] * trivial
+                                     .time_zero float *
+                                     .time_zero units 'microseconds' (!)
+                       .duration float 
+                       .duration units 'second'
+                       .end_time string *
+                       .experiment_identifier int  RB number ?
+                       .frames int
+                       .IDF_version int
+                       .instrument.dae----. many things period_index not working
+                       .instrument.name str 'EMU'  **
+                       .instrument.detector_1. many things including angles, resolution (ps), orientation ('L')
+                       . measurement ... monitor ...
+                       .notes str 'slit 20'
+                       .periods----. many things
+                       .run_cycle str '24_2'
+                       .run_number int 126710
+                       .runlog---.count_rate.time .value [units] + many things
+                       .sample---.magnetic_field float *
+                                 .magnetic_field.units str 'Gauss'
+                                 .name str  *
+                                 .shape str 'Powders'
+                                 .temperature float *
+                                 .temperature.units str 'Kelvin'
+                                 .temperature_log not working others empty
+                       .selog, many things
+                       .start_time string *
+                       .title str 'RbV3Sb5_T=75_F=0' *
+                       . some others
+                       .user_1.name str
+                       -user_1.affiliation str
