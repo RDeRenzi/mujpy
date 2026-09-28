@@ -16,6 +16,7 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = [
 		'matplotlib',
+		'ipympl',
 		'requests',
 		'setuptools<66.0',
 		'numpy',

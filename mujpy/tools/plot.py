@@ -477,12 +477,8 @@ def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_
         return line, ye, fline, res, linesp, linesm, line2sp, line2sm, vertf, text1
 
 
-    #global paused
-     #global anim_fit,ax_0
 
 ## set_sequence_fit begins here
-    #now = datetime.now()
-    #dt_string = now.strftime("%d/%m/%Y %H:%M:%S")             
     font = {'family':family,'size':10}
     P.rc('font', **font)
     prop_cycle = P.rcParams['axes.prop_cycle']
@@ -616,11 +612,12 @@ def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_
     supti = P.suptitle(run_title[0]) # 'large','small'
     # print('set_sequence plot debug: next launcing animations')
     anim = display_anim(animate_fit,run_title,init_animate_fit, anim_delay, out, fig)
-
     if rrf:
         stringrrf = r'$\nu_R=$'+'{:.1f}MHz   '.format(rrf)
         supti = P.suptitle(stringrrf+run_title[0])#,x=-0.125,ha='right')    
-    #P.show()
+
+    fig._my_anim = anim
+    
     return fig
 
 def set_figure_fft(out,fig,model_name,ylabel,f,ap,apf,ep,group,run_title):
@@ -731,23 +728,14 @@ def set_figure_fft(out,fig,model_name,ylabel,f,ap,apf,ep,group,run_title):
 #    ydat = 1.01*yM
 #    ax_early.text(,ydat,dt_string,fontsize='small')
     if len(ap.shape)>1:
-        with out:
-            anim_fft = animation.FuncAnimation(self.fig_fft, animate_fft, 
+        anim_fft = animation.FuncAnimation(self.fig_fft, animate_fft, 
                                                 frames=range(len(run_title)),
                                                 init_func=init_animate_fft,
                                                 interval=anim_delay,
                                                 repeat=True,
                                                 blit=False)
-            fig_fft.canvas.mpl_connect('button_press_event', toggle_pause_fft)
+        fig_fft.canvas.mpl_connect('button_press_event', toggle_pause_fft)
 
-#        # print('f.shape = {}, ap.shape = {}'.format(f.shape,ap.shape))  
-#        ax_fft.plot(f[k],ap[k],'o',ms=2,alpha=0.5,color=color[k]) # f, ap, apf are     plotiled!
-#        ax_fft.plot(f[k],apf[k],'-',lw=1,alpha=0.5,color=color[k])
-#        ax_fft.fill_between([f[0,0],f[0,-1]],[k*yoffset,k*yoffset],[k*yoffset+fft_e[k],k*yoffset+fft_e[k]],facecolor=color[k],alpha=0.2)
-        ###################
-        # errors, alpha_version for single
-        ################### 
-#                    if _single_: 
 
     ax_fft.set_ylabel(ylabel)
 
@@ -1077,47 +1065,44 @@ def set_bar(n,b):
     xlim = [left[0], right[-1]]
     return verts, codes, bottom, xlim
 
-def display_anim(anima,run_title,init_anima, delay, out, fig):
-    """
-    display inside Output widget out and P.draw()
-    """
-    
-    import matplotlib.pyplot as P
+
+def display_anim(anima, run_title, init_anima, delay, out, fig):
     import matplotlib.animation as animation
-    #global paused
-    #global anim
+    from IPython.display import display
+
     paused = False
-    if out:
-        with out: # animated, stoppable, inside of the box
-            anim = animation.FuncAnimation(fig,anima, 
-                                                frames=range(len(run_title)),
-                                                init_func=init_anima,
-                                                interval=delay,
-                                                repeat=True,
-                                                blit=False)
-            P.show()# must be inside with out:
-    else: # animated figure window, unstoppable
-        anim = animation.FuncAnimation(fig,anima, 
-                                            frames=range(len(run_title)),
-                                            init_func=init_anima,
-                                            interval=delay,
-                                            repeat=True,
-                                            blit=False)
-        P.draw() # must be inside
+
+    anim = animation.FuncAnimation(
+        fig, anima,
+        frames=range(len(run_title)),
+        init_func=init_anima,
+        interval=delay,
+        repeat=True,
+        blit=False,
+    )
+
+    fig._my_anim = anim
+
     fig.canvas.toolbar_visible = False
     fig.canvas.header_visible = False
     fig.canvas.footer_visible = False
-    def toggle_pause(event):
-        #global paused
-        #global anim
-        nonlocal paused,anim
-        if paused:
-            anim.event_source.start() # matplotlib.__version__ >= 3.4 
-            # animation.event_source.start()
-        else:
-            anim.event_source.stop() # if matplotlib.__version__ >= 3.4 
-            # animation.event_source.stop()
-        paused = not paused    
 
-    fig.canvas.mpl_connect('button_press_event',toggle_pause)
+    def toggle_pause(event):
+        nonlocal paused
+        if paused:
+            anim.event_source.start()
+        else:
+            anim.event_source.stop()
+        paused = not paused
+        fig.canvas.draw_idle()
+
+    fig.canvas.mpl_connect('button_press_event', toggle_pause)
+
+    if out is not None:
+        with out:
+            display(fig.canvas)
+    #else:
+    #    P.show(block=False)
+
     return anim
+

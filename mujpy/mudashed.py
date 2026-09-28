@@ -174,6 +174,9 @@ class dashed(object):
         """
 
         import json
+        from matplotlib import get_backend 
+        from matplotlib.pyplot import ioff
+        from contextlib import nullcontext
         from mujpy.mufit import mufit
         from mujpy.mufitplot import mufitplot
         from mujpy.tools.tools import ipyw_warning_dial, show_hide_tab
@@ -198,7 +201,6 @@ class dashed(object):
         dashbd = self.build_dashed()
         if dashbd and OK: # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
-            #self.log('debug mudashed._on_Fit pardicts with # {}'.format(any([True for pardict in self.dashboard['globpardicts_guess'] if pardict['flag']=='#']))) 
             with open(str(dashboard_file),'w',encoding='utf-8') as f:
                 json.dump(self.dashboard,f) # mufit wants to read this from a file
             self.board_box.clear_output()
@@ -207,9 +209,19 @@ class dashed(object):
             rotfreq = self.command_1.children[9].value
             fft_range = self.command_1.children[12].value # not yet in use 
             lb = self.command_1.children[13].value # not yet in use 
+
+            is_ipympl = "ipympl" in get_backend() or get_backend() == 'widget'
+
             self.figure_box.clear_output()
-            the_plot = mufitplot(plot_range, the_fit, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box, fig_fit = self.fig_fit) # plots in self.figure_box
-            self.fig_fit = the_plot.fig
+            with ioff() if is_ipympl else nullcontext():
+                the_plot = mufitplot(
+                        plot_range,
+                        the_fit,
+                        rotating_frame_frequencyMHz=rotfreq,
+                        plot_out=self.figure_box if is_ipympl else None,
+                        fig_fit=self.fig_fit,
+                    )
+                self.fig_fit = the_plot.fig
         else: 
             self.log('Build dashboard was unsuccessful, no fit')
         self.tab.selected_index = 2
@@ -223,31 +235,31 @@ class dashed(object):
             the_plot = mufitplot(plot_range,the_fit,rotating_frame_frequencyMHz=rotfreq,plot_out=self.figure_box,fig_fit=self.fig_fit)
         """
         
-        # read dashed widget values (including guess, rotfreq
-        # json.dump again
-        # self.figure_box.clear_output()
-        # if guess: mufit(plot_range,dashboard_file, no_fit = not guess,out=self.figure_box)
-        # mufitplot(plot_range, guess = guess, rotating_frame_frequencyMHz = rotfreq, plot_out = self.figure_box)
         import json
+        from matplotlib import get_backend 
+        from matplotlib.pyplot import ioff
+        from contextlib import nullcontext
         from mujpy.mufit import mufit
         from mujpy.mufitplot import mufitplot
         if self.build_dashed(): # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
-            #self.log('debug mudashed._on_Plot: dumping {}'.format(dashboard_file))
             with open(str(dashboard_file),'w',encoding='utf-8') as f:
                 json.dump(self.dashboard,f) # mufit wants to read this from a file
             guess = self.command_1.children[6].value=='Guess'
             the_fit = mufit(self.suite,dashboard_file,no_fit = guess, dash_log = self.log) # writes text to board_box
-            #self.figure_box.clear_output()
             plot_range = self.command_1.children[8].value
             rotfreq = self.command_1.children[9].value
             self.figure_box.clear_output()
-            the_plot = mufitplot(plot_range, 
+
+            is_ipympl = "ipympl" in get_backend() or get_backend() == 'widget'
+
+            with ioff() if is_ipympl else nullcontexti():
+                the_plot = mufitplot(plot_range, 
                                  the_fit, 
                                  rotating_frame_frequencyMHz = rotfreq, 
-                                 plot_out = self.figure_box, 
+                                 plot_out = self.figure_box if is_ipympl else None, 
                                  fig_fit = self.fig_fit) # plots in self.figure_box
-            self.fig_fit = the_plot.fig
+                self.fig_fit = the_plot.fig
 
 
     def _on_FFT(self,b):
@@ -505,6 +517,10 @@ class dashed(object):
                 self.log(ck+' typo in '+file_json)
                 self.tab.selected_index = 2
                 return
+            if 'globpardicts_guess' not in self.dashboard and self.NG_int.value>0:
+            # loaded a sequential fit, in case get rid of self.global_box
+                self.NG_int.value = 0
+                self.global_box.children = []
             self.log('Loaded model from {}'.format(file_json))
             if not self.command_1.children: 
                 self.command2dash()
@@ -534,6 +550,10 @@ class dashed(object):
                 self.tab.selected_index = 2
                 return
             self.log('Loaded model from {}'.format(file_json))
+            if 'globpardicts_guess' not in self.dashboard and self.NG_int.value>0:
+            # loaded a sequential fit, in case get rid of self.global_box
+                self.NG_int.value = 0
+                self.global_box.children = []
             if not self.command_1.children: self.command2dash()
             self.json2dash() # builds widgets for this model
         else:
