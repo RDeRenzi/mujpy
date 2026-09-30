@@ -22,7 +22,6 @@ permissions:
 
 jobs:
   build:
-  build:
     if: ${{ inputs.destination == 'testpypi' }}
     runs-on: ubuntu-latest
     steps:
