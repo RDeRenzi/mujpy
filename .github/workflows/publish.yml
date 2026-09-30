@@ -1,4 +1,4 @@
-name: Publish to TestPyPI
+name: Publish mujpy 
 
 on:
   workflow_dispatch:
@@ -8,12 +8,22 @@ on:
         required: true
         default: v3.1
         type: string
+      destination:
+        description: Where to publish
+        required: true
+        default: testpypi
+        type: choice
+        options:
+          - testpypi
+          - pypi
 
 permissions:
   contents: read
 
 jobs:
   build:
+  build:
+    if: ${{ inputs.destination == 'testpypi' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,3 +65,26 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    if: ${{ inputs.destination == 'pypi' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/mujpy
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - name: Download tested distributions
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '11099840471'
+          run-id: '36721247971'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          merge-multiple: true
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
