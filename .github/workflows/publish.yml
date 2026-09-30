@@ -1,12 +1,14 @@
 name: Publish mujpy 
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
         description: Existing release tag to publish
         required: true
-        default: v3.1
         type: string
       destination:
         description: Where to publish
@@ -22,12 +24,12 @@ permissions:
 
 jobs:
   build:
-    if: ${{ inputs.destination == 'testpypi' }}
+    if: ${{ github.event_name == 'push' || inputs.destination == 'testpypi' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: refs/tags/${{ inputs.tag }}
+          ref: ${{ github.event_name == 'push' && github.ref || format('refs/tags/{0}', inputs.tag) }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@v5
