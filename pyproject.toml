@@ -8,17 +8,16 @@ readme = "README.rst"
 license = "GPL-3.0-or-later" 
 classifiers = [
   "Intended Audience :: Science/Research",
-  "# SPDX-License-Identifier: GPL-3.0-or-later",
   "Programming Language :: Python :: 3",
   "Framework :: Jupyter :: Jupyterlab",
   "Operating System :: Linux",
   "Topic :: Scientific/Engineering :: Physics"]
-requires-python = ">=3.8"
+requires-python = ">=3.12"
 dependencies = [
 		'matplotlib',
 		'ipympl',
 		'requests',
-		'setuptools<66.0',
+		'setuptools',
 		'numpy',
 		'nexusformat',
 		'uproot',
@@ -50,7 +49,7 @@ build-backend = "setuptools.build_meta"
 version_file = "mujpy/_version.py"
 
 [tool.setuptool.package.find]
-include = ["mujpy","mujpy.tests"]
+include = ["mujpy","mujpy.*"]
 
 [tool.setuptools.package-data]
 "mujpy.tests" = [
