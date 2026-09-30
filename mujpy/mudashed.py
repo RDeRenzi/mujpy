@@ -179,31 +179,50 @@ class dashed(object):
         from contextlib import nullcontext
         from mujpy.mufit import mufit
         from mujpy.mufitplot import mufitplot
-        from mujpy.tools.tools import ipyw_warning_dial, show_hide_tab
+        from mujpy.tools.tools import check_function, ipyw_warning_dial, show_hide_tab
 
-        OK = False if self._global() else True
-        if not OK:
+        dashbd = self.build_dashboard_from_widgets()
+        kc, kp, kgroup, errmsg = check_function(self.dashboard,self.suite.groups) # minimal model syntax check
+        self.log('{}, {}, {}: {}'.format(kc,kp,kgroup,errmsg))
+        if self._global() and len(self.suite.groups)>1:
+            if not any(['function_multi' in pardict.keys() for component in self.dashboard['model_guess'] for pardict in component['pardicts']]):
+                errmsg += ('++++ Check global parameters or grouping: multi group imply ";" in some function') 
+        if errmsg:
+            title = 'Check syntax!'
+            if kc >= 0 and kp >= 0: # failed json dashboard syntax check
+                errmsg += '++++ Check model parameters: component {}, parameter {}, group {}'.format(kc, kp, kgroup)
+            elif kc < 0 and kp > 0:
+                errmsg += ('++++ Check global parameters: no function allowed in parameter {}'.format(kp))
+            overlay = ipyw_warning_dial(title = title,
+                                        message = errmsg)
+            show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+            return False
+
+        OK = True
+        if self._global():
             title = 'Suite & global fit model mismatch'
             # global fit, check that groups and run list agree with dashboard
             if self._AB21() or self._C2():
                 if not self._multigroup():
-                    msg = 'Groups ...: are empty and a multi group fit was selected\n(some model function contains ;-separated values)'
-                elif self._AB21(): OK = True
+                    msg = 'Correct either the suite or the model. This is a C2 or A/B21 fit (model functions contain ";"), but Groups ...: is empty (single group).' 
+                    OK = False
             if self._C12():
-                OK = True
                 if not self._multirun:
-                    msg = 'Single run in run list submitting multi run fit\n(#-flags in global parameters)'
+                    msg = 'Correct either the suite or the model. This is a C1/2 fit ("#" in global parameters), but a single run list.'
+                    OK = False
+                elif self._C1() and self._multigroup():
+                    msg = 'Correct either the suite or the model. This is a C1 fit (no model function has ";" for multigroup fits), but Groups ...: exist.'
                     OK = False
             if not OK: # still False after the above changes
                 overlay = ipyw_warning_dial(title = title,
                                             message = msg)
                 show_hide_tab(overlay,self.on_modal_display_change,self.tab)
-        dashbd = self.build_dashed()
+                return
         if dashbd and OK: # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
             with open(str(dashboard_file),'w',encoding='utf-8') as f:
                 json.dump(self.dashboard,f) # mufit wants to read this from a file
-            self.board_box.clear_output()
+            #self.board_box.clear_output()
             the_fit = mufit(self.suite,dashboard_file,dash_log = self.log) # writes text to board_box
             plot_range = self.command_1.children[8].value
             rotfreq = self.command_1.children[9].value
@@ -241,7 +260,7 @@ class dashed(object):
         from contextlib import nullcontext
         from mujpy.mufit import mufit
         from mujpy.mufitplot import mufitplot
-        if self.build_dashed(): # creates self.dashboard and returns True if no validation raise occurred
+        if self.build_dashboard_from_widgets(): # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
             with open(str(dashboard_file),'w',encoding='utf-8') as f:
                 json.dump(self.dashboard,f) # mufit wants to read this from a file
@@ -267,9 +286,9 @@ class dashed(object):
         self.log('Nothing yet!')
 
 
-    def command2dash(self):
+    def build_or_rebuild_commad_2ndrow(self):
         """
-        activates second row self.command_1 of mudashed command_box
+        builds or rebuilds second row self.command_1 of mudashed command_box
 
         """
 
@@ -313,17 +332,17 @@ class dashed(object):
                    LB_float 
                     ]
 #        with self.board_box:
-#            self.log('command2dash self.command_1.children {}'.format(widgets))
+#            self.log('build_or_rebuild_commad_2ndrow self.command_1.children {}'.format(widgets))
  
         self.command_1.children = widgets
            
-    def json2dash(self):
+    def build_model_editor_widgets(self):
         '''
-        builds second stage widgets & value from self.dashboard - LD and LF - or from NG_int.value and self.MN_text_value
+        builds [glob] model empty widgets, from NG_int, MN_text, or filled, from self.dashboard (LF)
 
         assumes 
         ::
-                - either self.dashboard is already loaded and valid before calling json2dash, tnen displays it in widgets
+                - either self.dashboard is already loaded and valid before calling build_model_editor_widgets, tnen displays it in widgets
                 - or builds empty widgets according to NG and MN acronym
         adds rows for ['model_guess'] and ['globpardicts_guess']
         '''
@@ -403,7 +422,7 @@ class dashed(object):
                 if j==0: # first parameter, self.log labels
                     column.append(labels)
                 kp += 1
-                #self.log('json2dash pardict["flag"] = {}'.format(pardict['flag']))
+                #self.log('build_model_editor_widgets pardict["flag"] = {}'.format(pardict['flag']))
                 column.append(par2widgets(pardict,kp-1,glob=glob)) # returns am HBox of parameter widgets
 
         layout_column = Layout(width='50%')
@@ -411,7 +430,7 @@ class dashed(object):
 
         self.model_box.children = columns
 
-    def build_dashed(self):
+    def build_dashboard_from_widgets(self):
         """
         reads dashed widget values and builds self.dashboard
 
@@ -436,7 +455,7 @@ class dashed(object):
             if error: 
                 self.log('widg2pardicts error?: {} '+error)
                 return False
-            #self.log('debug mudashed.build_dashed pardicts with # {}'.format(any([True for pardict in pardicts if pardict['flag']=='#']))) 
+            #self.log('debug mudashed.build_dashboard_from_widgets pardicts with # {}'.format(any([True for pardict in pardicts if pardict['flag']=='#']))) 
             self.dashboard['globpardicts_guess'] = pardicts
         model = []
         components = [self.MN_text.value[i:i + 2] for i in range(0, len(self.MN_text.value), 2)]
@@ -453,7 +472,7 @@ class dashed(object):
             compdict = {'name':components[kc],'label':str(kc)}
             pardicts = [] # list of pardict
             if kc%2: # odd, right
-                # see json2dash, component widgets:
+                # see build_model_editor_widgets, component widgets:
                 rowright += 2 # component and legend rows  
                 for kp in range(npar):
                     kmax = kmax if glob else ki
@@ -523,8 +542,8 @@ class dashed(object):
                 self.global_box.children = []
             self.log('Loaded model from {}'.format(file_json))
             if not self.command_1.children: 
-                self.command2dash()
-            self.json2dash() # builds widgets for this model
+                self.build_or_rebuild_commad_2ndrow()
+            self.build_model_editor_widgets() # builds widgets for this model
         else:
             self.tab.selected_index = 2
             self.log('>>>>>>>>>>>>>>>> file dashed.json not found')
@@ -545,17 +564,19 @@ class dashed(object):
                     self.dashboard = json.load(f) # copies json dict to self.dashboard
             ck = check_dashboard_json(self.dashboard)
             if ck:
-                del self.dashboard
+                self.log(self.dashboard)
                 self.log(ck+' typo in '+file_json)
                 self.tab.selected_index = 2
+                del self.dashboard
                 return
             self.log('Loaded model from {}'.format(file_json))
             if 'globpardicts_guess' not in self.dashboard and self.NG_int.value>0:
             # loaded a sequential fit, in case get rid of self.global_box
                 self.NG_int.value = 0
                 self.global_box.children = []
-            if not self.command_1.children: self.command2dash()
-            self.json2dash() # builds widgets for this model
+            if not self.command_1.children:
+                self.build_or_rebuild_commad_2ndrow()
+            self.build_model_editor_widgets() # builds widgets for this model
         else:
             self.tab.selected_index = 2
             self.log('no valid json file was selected {}'.format(file_json))
@@ -576,9 +597,10 @@ class dashed(object):
 
         if change['type'] == 'change' and change['name'] == 'value':
 
-            go = True
+            go = True # go = False returns without model editor
             model = change['new'].strip() # removes accidental lead & trail blanks
-            #self.log('debug mudashed._on_MN change["new"] {}'.format(model))
+
+            # preliminarly stop if model invalid, or is NG                 if len(indices)==0: # new model in the starting stage (no old model)!
             if not validmodel(model):
                 overlay = ipyw_warning_dial(title = 'Wrong model syntax',
                                             message = '{} not made of valid components!'.format(model))
@@ -586,20 +608,18 @@ class dashed(object):
                 self.MN_text.value = ''
                 self.MN_text.observe(self._on_MN,names='value') # observe again
                 show_hide_tab(overlay,self.on_modal_display_change,self.tab)
-                go = False
-            if self.NG_int.value==1: # tarting route, butuspicious! forgot to set?
+                go = False # stop
+            elif self.NG_int.value==1: # valid model, starting route, but forgot to set NG?
                 set.tab.children[3].children[3], widg = ipyw_yes_no_dial(title = 'Check!',
                                                                          message = "only NG=1 global parameter\ndon't you need more?")
-                go = not widg.value # widg.value is yes I do need more, no need can continue
+                go = not widg.value # widg.value is yes I do need more, no need go on, need stop
                 self.tab.children[3].children[3].layout.observe(self.on_modal_display_change,names='display')
                 setattr(self.tab.children[3].children[3].layout, 'display', 'flex')
             else: # includes also starting stage!
                 oldmodel = change['old']
-                indices = find_model_difference(oldmodel,model) # returns 0 also if old is empty (initial stage) and new is 2 or more components!
+                indices = find_model_difference(oldmodel,model) # returns [] as False, not a valid condition for statup (eg new = 'mg'
 
-                if len(indices)==0: # new model in the starting stage (no old model)!
-                    if len(self.model_box.children)==0: go = True # starting stage only               
-                if oldmodel != '' and model and go: # edit the dash
+                if oldmodel != '' and model and go and indices: # edit the dash, skips startup (oldmodel = '')
                     k = indices[0]
                     indices = [abs(j)-1 for j in indices] if k<0 else indices
                     action = 'Add after, in' if k>0 else 'Remove from'
@@ -614,12 +634,6 @@ class dashed(object):
                         setattr(self.tab.children[3].children[3].layout, 'display', 'flex')
                     elif len(indices)==1: # single component
                         ki = abs(k)
-                    else: # complez
-                        set.tab.children[3].children[3], widg = ipyw_yes_no_dial(title = '{} NEW EMPTY model'.format(model),
-                                                                                 message = 'Is this OK?\n(NO keeps the old model)')
-                        go = not widg.value # widg.value is yes I do need more, no need can continue
-                        self.tab.children[3].children[3].layout.observe(self.on_modal_display_change,names='display')
-                        setattr(self.tab.children[3].children[3].layout, 'display', 'flex')
                     if k<0: # remove component  len(indices)==1 an
                         del self.dashboard['model_guess'][ki]
                     else: # add component
@@ -631,12 +645,18 @@ class dashed(object):
                         #self.log('debug mudashed._on_MN component {}'.format(component))
                         self.dashboard['model_guess'].insert(ki,component)
                         self.log('{}: inserted empty component {} in position {}'.format(m_c,cc[k],k))
-                elif len(self.model_box.children)==0: # starting route
-                    # rebuilds self.dashboard from widgets
-                    if self.build_dashed():
-                        self.command2dash() # create command_box from scratch
+                elif oldmodel != '' and model and go: # indices = [], this is not startup and model adjustment is not possible 
+                    set.tab.children[3].children[3], widg = ipyw_yes_no_dial(title = '{} NEW EMPTY model'.format(model),
+                                                                    message = 'Is this OK?\n(NO keeps the old model)')
+                    go = not widg.value # widg.value is yes I do need more, no need can continue
+                    self.tab.children[3].children[3].layout.observe(self.on_modal_display_change,names='display')
+                    setattr(self.tab.children[3].children[3].layout, 'display', 'flex')
+            
+            if go:
+                if len(self.model_box.children)==0: # startup
+                    self.build_or_rebuild_commad_2ndrow() # create command_box from scratch
                 # a complex new model edit with a yes askyesno answer jumps here 
-                self.json2dash()  # always, if model and OK
+                self.build_model_editor_widgets()  # always, if model and OK
 
     def _on_RL(self,change):
         """Traps the text widget's 'Enter' press safely."""
@@ -750,7 +770,6 @@ class dashed(object):
                                 goptions.append(run+'.'+str(k)+counts)
                             toptions.append(run+': '+totalcount)#[0])
                         
-                        self.log('suite __fitpath__ is {}'.format(self.suite.__fitpath__))
                         self.suite_box.children[1].children[6].options = goptions
                         self.suite_box.children[1].children[7].options = toptions
                         self.command_box.children[0].children = self.command_0.children
@@ -934,7 +953,7 @@ class dashed(object):
         #   - ToggleButton.on_click toggles NG=1, disable=False
         # MN_text select model acronym [press Enter], LL load last fit/dashed.json, LF selects fit/*.json  
         #   - MN, LL, LF triggers third where
-        #     self.command2dash() self.json2dash() build model_box, global_box children for all three cases
+        #     self.build_or_rebuild_commad_2ndrow() self.build_model_editor_widgets() build model_box, global_box children for all three cases
         # [widgets with tooltips, some actions preceeded by two letter label]
         ###################################################################################################
    
@@ -1127,7 +1146,7 @@ class dashed(object):
         self.logtab_box = HBox([self.board_box,self.figure_box])
         fit_type = ToggleButtons(options = ['sequential fit','global fit'],
                                  value = 'sequential fit',
-                                 tooltips = ['A1 A20 B1 B20\nsingle asymmetry fit','A21 B21 C1 C2\nmulti asymmetries fit'],
+                                 tooltips = ['A1 A20 B1 B20\nsingle asymmetry fit','A21 B21 C1 C2\nmulti-asymmetry fit'],
                                  layout = Layout(width=command_width[0]))
         fit_type.observe(self._on_fit_type,names='value')
         fit_type.style.description_width='0%'
@@ -1140,8 +1159,8 @@ class dashed(object):
 
         MN_label = Label(value='model acronym',layout=Layout(width=command_width[2]))
         self.MN_text = Text(value = '',
-                            placeholder = 'xx, Enter to lauch',
-                            tooltip = 'e.g. mg\n   almgml',
+                            placeholder = 'e.g. almg[Enter]',
+                            tooltip ='Enter activates model',
                             layout = Layout(width=command_width[3],height=self.textheight),
                             continuous_update=False) # requires CR
         self.MN_text.observe(self._on_MN,names='value')

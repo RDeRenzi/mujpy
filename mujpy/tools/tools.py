@@ -344,12 +344,13 @@ def check_dashboard_json(dashboard):
                     "function",
                     "function_multi",
                     "std",
-                    "chi2"
+                    "chi2",
+                    "grp_calib"
                     ]
     #print(len(allowed_keys))
     for key in dashboard.keys():
-        allowed = [allowed_keys[i] for i in [0,1,2,3,4,5,6,18]]
-        if key not in allowed: return 'dashboard keys'
+        allowed = [allowed_keys[i] for i in [0,1,2,3,4,5,6,18,19]]
+        if key not in allowed: return 'dashboard key {} not allowed'.format(key)
     if allowed_keys[3] in dashboard.keys(): # globpardicts
         allowed = [allowed_keys[i] for i in range(7,13)]
         for pardict in dashboard[allowed_keys[3]]:
@@ -401,44 +402,64 @@ def check_function(dashboard,groups):
         for kc, component in enumerate(model):
             for kp,pardict in enumerate(component['pardicts']):
                 if pardict['flag'] != '=':
-                    print('++++ Wrong json syntax, only '+"'='"+' flag allowed in '+"'model_guess'")
-                    return kc, kp, 0
+                    error ='++++ Wrong json syntax, only '+"'='"+' flag allowed in '+"'model_guess'"
+                    return kc, kp, 0, error
                 if 'function' in pardict.keys() and len(pardict['function']):
                     kgroup = 0 # default
                     if 'function_multi' in pardict.keys() and len(pardict['function_multi'][0]):
-                        print("++++ Wrong json syntax, 'function','function_multi' mutually exclusive in 'model_guess'")
-                        return kc, kp, kgroup
+                        error = "++++ Wrong json syntax, 'function','function_multi' mutually exclusive in 'model_guess'"
+                        return kc, kp, kgroup, error
                     if 'function_multi' in pardict.keys(): # zero len
                         pardict.pop('function_multi')
                     string = pardict['function']
-                    # print('user function {}, kc,kp,kg={},{},{}'.format(string, kc,kp,kgroup))
-                    eval(string)
+                    try: 
+                        if 'p[' in string:
+                            eval(string)
+                        else: 
+                            raise ValueError("missing 'p['")
+                    except Exception as e:
+                        return kc,kp, kgroup, "{}: '{}' is not a correct function syntax".format(e,string)
+
                 elif 'function_multi' in pardict.keys() and len(pardict['function_multi'][0]):
                     if 'function' in pardict.keys(): # zero len
                         pardict.pop('function')
                     if len(pardict['function_multi']) != len(groups):
-                        print("++++ Wrong json syntax, need as many 'function_multi' strings as groups in 'model_guess'")
-                        return kc, kp, len(groups)
+                        error = "++++ Wrong json syntax, need as many 'function_multi' strings as groups in 'model_guess'"
+                        return kc, kp, len(groups), error
                     for kgroup in range(len(groups)): # loop groups
                         string = pardict['function_multi'][kgroup]
                         # print('function multi {}, kc,kp,kg={},{},{}'.format(string, kc,kp,kgroup)) 
-                        eval(string)
+                        try:
+                            if 'p[' in string: 
+                                eval(string)
+                            else:
+                                raise ValueError("missing 'p['")
+                        except Exception as e:
+                            return kc,kp, kgroup, "{}: '{}' is not a correct function syntax".format(e,string)
+
+
                 else:
-                    print("++++ Wrong json syntax, missing 'function' or 'function_multi' strings in 'model_guess'")
-                    return kc, kp, 0
+                    error = "++++ Wrong json syntax, missing 'function' or 'function_multi' strings in 'model_guess'"
+                    return kc, kp, 0, error
 
     else: # local fit
         kgroup = 0 # default
         for kc,component in enumerate(model):
             for kp,pardict in enumerate(component['pardicts']):
-                if pardict['flag'] == '=':
-                    if 'function' in pardict.keys() and len(pardict['function']):
-                   # print('function {}, kc,kp,kg={},{},{}'.format(string, kc,kp,kgroup))
-                        eval(pardict['function'])
-                    else:
-                        print("++++ Wrong json syntax, missing or empty 'function' in 'model_guess'")
-                        return kc, kp, 0
-    return -1,-1,-1 # none has failed the syntax check
+                #if pardict['flag'] == '=':
+                if 'function' in pardict.keys() and len(pardict['function']):
+                    string = pardict['function']
+                    try:
+                        if 'p[' in string: 
+                            eval(string)
+                        else:
+                            raise ValueError("missing 'p['")
+                    except Exception as e:
+                        return kc,kp, kgroup, "{}: '{}' is not a correct function syntax".format(e,string)
+                elif pardict['flag'] == '=':
+                    error = "++++ Wrong json syntax, missing or empty 'function' in 'model_guess'"
+                    return kc, kp, kgroup, error
+    return -1,-1,-1, "" # none has failed the syntax check
 
 def get_gtotals(suite):
     """
@@ -1835,7 +1856,7 @@ def find_model_difference(oldmodel,model):
         oldmodel string
         model string
     return 
-        [k] k is one-based index of added component, its negative for subtracted, zero for complex
+        [k] k is one-based index of added component, its negative for subtracted, empty list (False) for complex
         if the added/removed component is repeated, all possibilities are listed [k,j,...]
         no checks on syntax, model names have already been verified
     """
@@ -1846,13 +1867,13 @@ def find_model_difference(oldmodel,model):
     sys2 = [model[i:i+2] for i in range(0, len(model), 2)]
 
     out = []
+    # Case 1: Second string is the first plus a syllable
     if len(sys2) == len(sys1) + 1:
         for i in range(len(sys2)):
             if sys1[:i] + [sys2[i]] + sys1[i:] == sys2:
                 out.append(i)
                 
-    # Case 2: First string is the second plus a syllable
-    # (i.e., Removing a single syllable from sys1 at index i creates sys2)
+    # Case 2: Second string is the first minus a syllable
     elif len(sys1) == len(sys2) + 1:
         for i in range(len(sys1)):
             if sys1[:i] + sys1[i+1:] == sys2:

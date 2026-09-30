@@ -75,26 +75,28 @@ class mufit(object):
                 self.dashboard = json.load(f)
                 self.nodash = False                
         except Exception as e:
-            print('Log file {}'.format(dashboard_file))  
-            #self.log(getattr(e, 'message', repr(e)))
+            self.log('Log file {}'.format(dashboard_file))  
             self.log(getattr(e, 'message', str(e)))
              
             self.log('******* log file not found or corrupted')
             self.log('* {}'.format(e))
+            return False
 
-        kc, kp, kgroup = check_function(self.dashboard,self.suite.groups) # minimal model syntax check
-        if kc >= 0 and kp > 0: # failed json dashboard syntax check
-            self.log('++++ Check file {} model_guess: wrong syntax in component {}, parameter {}, group {}'.format(dashboard_file, kc, kp, kgroup))
-            return False
-        elif kc < 0 and kp > 0:
-            self.log('++++ Check file {} globpardicts_guess: no function/function_multi allowed in parameter {}'.format(dashboard_file, kp))
-            return False
-        elif self.global_fit() and len(self.suite.groups)>1:
-            # check if multigroup global have at least one 'function_multi' parameter key
-            # at present int2_global_method_key and mufitplot relie on this feature for multigroup recognition
+        # for command line operations of homemade dashboard (this check is already performed in mudashed)
+        kc, kp, kgroup, errmsg = check_function(self.dashboard,self.suite.groups) # minimal model syntax check
+        if self.global_fit() and len(self.suite.groups)>1:
             if not any(['function_multi' in pardict.keys() for component in self.dashboard['model_guess'] for pardict in component['pardicts']]):
-                self.log('++++ Check file {} globpardicts_guess or grouping: no function_multi while more groups') 
-                return False
+                errmsg += ('++++ Check file {} globpardicts_guess or grouping: no function_multi with multi groups') 
+        if errmsg:
+            if kc >= 0 and kp > 0: # failed json dashboard syntax check
+                errmsg += '++++ Check file {} model_guess: wrong syntax in component {}, parameter {}, group {}'.format(dashboard_file, kc, kp, kgroup)
+            elif kc < 0 and kp > 0:
+                arrmsg += ('++++ Check file {} globpardicts_guess: no function/function_multi allowed in parameter {}'.format(dashboard_file, kp))
+            overlay = ipyw_warning_dial(title = title,
+                                        message = msg)
+            show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+            return False
+
         return True
 
     def dofit_(self,returntup):
