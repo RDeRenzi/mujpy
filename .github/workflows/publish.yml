@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag to publish
-        required: true
+        description: Existing tag (only for manual TestPyPI publishing)
+        required: false
         type: string
       destination:
         description: Where to publish
@@ -18,6 +18,10 @@ on:
         options:
           - testpypi
           - pypi
+      run_id:
+        description: Successful TestPyPI run ID (required for PyPI)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -78,13 +82,21 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Require TestPyPI run ID
+        env:
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          if [[ ! "$RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::Enter the successful TestPyPI run ID."
+            exit 1
+          fi
+
       - name: Download tested distributions
         uses: actions/download-artifact@v4
         with:
-          artifact-ids: '11099840471'
-          run-id: '36721247971'
+          name: release-distributions
+          run-id: ${{ inputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          merge-multiple: true
           path: dist/
 
       - name: Publish to PyPI
