@@ -4,86 +4,100 @@
 Reference
 +++++++++
 
-This is the mujpy Reference Manual, v. 2.7 (obsolete) 
-Any action can be lauched by a python script (see tests/*.py), using the following classes:
+This is the mujpy Reference Manual, v. 3.1 (WIP change from obsolete v2.7, still not really useful, be patient). 
+Any action can be lauched by a python script (see :ref:`demos`), using the following classes:
+See :doc:`Source Documentation <Source>` for the docstrings of each method.
 
 musuite
 -------
+.. code-block::
 
     from mujpy.musuite import suite
     the_suite = suite(datafile,runlist,grp_calib,offset,startuppath,**kwargs)
     
-where datafile is a string containing the path (see `Header`_), runlist is the list of run numbers in the suite of runs (see `suite`_), grp_calib list of dictionaries (see `groups`_), offset is a string containing an integer (see `offset`_), startuppath is a string containing the path where the log folders (named fit, csv, cache) will be written.
-This class performs the functions roughly described in `suite`_
+* datafile, the path, ``str``, to a prototype data file
+* runlist a list of M run numbers, ``str``; besides pure csv the shorthand allows: ``822,827:834`` and ``822,827:829:-1`` = ``822,828,828,827``. ``822+823,824`` the first two runs are added. 
+* grp_calib ``[{},[]]``, N dicts, one per group, each has e.g. ``{"forward":"2,3","backward":"1,4","alpha":1.12}``
+* offset ``str`` an integer
+* startuppath (``str``) unused.
+The class methods are described in `suite`_. N groups and M runs generate multidimensional vectors of MxN asymmetries. 
 
 mufit
 -----
-::
+.. code-block::
 
     from mujpy.mufit import mufit
-    the_fit = mufit(suite,dashboard,**kwargs)
+    the_fit = mufit(the_suite,dashboard,**kwargs)
     
-where suite is an instantiation of suite, e.g. the_suite in `musuite`_, dashboard is a string containing the full path to a dashbord json file (see `Dashboard json`_, and kwargs are
+* ``the_suite``, see `musuite`_  
+* dashboard ``str`` the path to a dashbord json file, and kwargs are
 
- * chain = False,  chain = True to use parameter values from previous run as guess for next  
- * dash = None, internal parameter, used by mudash to direct log output
- * initialize_only = False, if mufit is used just to load parameters for a guess plot 
- * grad = False, if True and the fit is global then gradients of the chi_square function are computed analytically. This option is not recommended, convergence is 1.5 times slower and it requires much closer guess to the minimum 
- * scan = None, tells mufit to order csv file in increasing order of run number, scan = 'T' increasing temperatures, 'B' increasing fields.
+  * chain = False,  chain = True to use parameter values from previous run as guess for next  
+  * dash_log = None, internal parameter, used by mudashed to direct log output
+  * initialize_only = False, if mufit is used just to load parameters for a guess plot 
+  * grad = False, a dead branch option
+  * scan = None, options are ['T','B','['], tells mufit to order csv file in increasing order of run number, temperatures, fields or angles, as extracted by `musuite`_ from the datafile headers.
+chain=True,dash_log=None,no_fit=False, grad=False, scan = None, verbose = False
 
-This class performs a single fit, a sequential multigroup or suite fit, a global multigroup or a global suite fit (see `fit`_). 
+The class performs any fit, single asymmetry, sequential or global on several asymmetries (see `fit`_). 
+Single and global fit minimize one chi square. Internally `mufit` distinguishes:
 
-A global fit minimizes a single chi square, that is the sum of the chi squares of all data sets. The class automatically identifies the type of fit on the basis of the dashboard json file:
+ * *A1*, single asymmetry
+ * *A20*, sequential fit of N asymmetries (N groups, 1 run)
+ * *A21*, global fit of N asymmetries (N groups, 1 run)
+ * *B1*, sequential fit of M asymmetries (1 group, M runs)
+ * *B20*, sequential fit of MxN asymmetries (N group, M runs )
+ * *B21*, run sequence of M global fits of N asymmetries each (N groups)
+ * *C1*, global fit of M asymmetries (1 group, M runs)
+ * *C2*, global fit of MxN asymmetries (N groups, M runs)
 
- * *A1*, single run, single group fit; switches automatically to calibration mode if the first component is 'al'  
- * *A20*, single run, sequential multi group fit; switches automatically to calibration mode if the first component is 'al'
- * *A21*, single run, global multi group fit; switches automatically to calibration mode if the first component is 'al'
- * *B1*, sequential multirun, single group fit
- * *B20*, sequential multirun, sequential multigroup fit
- * *B21*, sequential multirun, global multigroup fit
- * *C1*, multirun single group global fit
+json fit file
+-------------
 
-Dashboard json
---------------
-
-This json file contains the full description of any legal fit model. See templates for examples. The file name starts with the model name (see `fit_model`_) and its file spec is .json.
+Contains the full description of any legal fit model in a dict. Must agree with the MxN asymmetry vector provided by `musuite`. Contains  (see `fit_model`_) 
 It resembles a python dictionary, containing the following items:
 
- *  "version": "a string",  see `fit_model`_
- *  "fit_range": "0,20000,4", see `fit_model`_
- *  "offset": 20,  see `fit_model`_
- *  "userpardicts_guess": [],  see `fit dashboard`_
+ *  "version": "1", a label,  see `fit_model`_
+ *  "fit_range": "0,20000,40", see `fit_model`_
+ *  "offset": 20,  see `suite`_ and `fit_model`_ 
+ *  "globpardicts_guess": [],  see `fit dashboard`_
  *  "model_guess: [], see `fit dashboard`_
  
-Experienced users can write the json file from scratch and run the fits with few command line instructions, but this mode is error prone. Jupyterlab contains a json editor that facilitates the task. However, the `mudash`_ gui interface is provided to make this process more user friendly.
+The only reasonable way to edit a json file is by the `mudashed`_ GUI editor in either Jupyterlab or Voilà.
 
 mufitplot
 ---------
 ::
 
-    from mujpy.muplotfit import muplotfit
+    from mujpy.muplotfit_ import muplotfit
     the_plot = muplotfit(plot_range,the_fit,**kwargs)
     
-where plot_range obeys the rules described in `fit'_, the_fit is an instance of mufit, e.g. the_fit as in `mufit`_, and kwardgs are 
+* plot_range described  in `fit`_, the_fit is a `mufit`_ instance, and kwardgs are 
+
 
  * guess = False, if True plot the guess parameter values
- * rotating_frame_frequencyMHz = 0.0, to plot data in the rotating frame
+ * rotating_frame_frequencyMHz = 0.0, plots data in the rotating frame when not 0
+ * fig_fit=None, to pass the handle of an existing fit figure
+..
  * fft_range = None, to pass the frequency range for the FFT plot
  * real=True, to produce an amplitude FFT plot
- * fig_fit=None, to pass the handle of an existing fit figure
  * fig_fft=None, to pass the handle of an existing FFT figure
 
 This class produces the (animation) plots
 
-******
-mudash
-******
+********
+mudashed
+********
 
-This class produces the gui interface to mujpy.
-It is invoked from a jupyter notebook (just start one of the MuDash.ipynb templates).
+This class produces the Jupyter gui interface to mujpy.
+It is invoked from a jupyter notebook. 
 
 Here you find a not-so-quick reference for its widgets.
-Almost each of them has a tiptool:  additional instructions appear when hovering with the mouse over the descriptive text or the button.
+Almost each of them has a tiptool:  additional instructions appear when hovering with the mouse over the widget.
+
+
+obsolete v2.0 below
+~~~~~~~~~~~~~~~~~~~
 
 ------
 Output

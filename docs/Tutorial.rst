@@ -66,6 +66,8 @@ The gui switched to the log tab to show a printed log and a plot appeared. Notic
 
 .. [1] If you do not, the GUI creates the ``data`` subfolder in your `mujpy` root folder and it can directly download any PSI datafiles into it.
 
+.. _demos:
+
 Automatic demos
 ---------------
 If you want to explore further `mujpy` potentials open an Ubuntu terminal, activate the venv, move to a suitable empty folder (e.g. `cd /tmp`) and run

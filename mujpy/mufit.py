@@ -46,6 +46,7 @@ class mufit(object):
                                       self.dashboard["fit_range"],self.suite.histoLength,returntup[0],returntup[1]))
                     self.nodata = True # misuse to stop execution here below           self.the_model = mumodel()
             self.lastfits = [] # lastfit initialization: 
+            self.notconverged = False
             self.dofit_(returntup) # execute fit
         if self.nodata:# 
             self.log('     mufit stops here')
@@ -601,7 +602,7 @@ class mufit(object):
 
     def if_not_converged(self,f):
         """
-        prints varoious things if Minuit not converged 
+        prints various things if Minuit not converged 
         """
 
         if not self.lastfit.valid:
@@ -611,6 +612,7 @@ class mufit(object):
             f.write('')
             f.write(27*'*'+' Minuit did not converge! '+27*'*')
             f.write('')
+            self.notconverged = True
         # how many groups?
         if self.verbose and not self.lastfit.valid:
             strout = str(self.lastfit).split('\n')

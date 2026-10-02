@@ -29,8 +29,17 @@ In the future, to upgrade to the newest distribution, ``python3 -m install mujpy
 Windows
 -------
 
-Install Ubuntu undel WSL2 (`wsl --install -d Ubuntu` in cmd, it requires ~10 GB of disk space).
-Run `sudo apt update && sudo apt install -y python3-pip python3-venv` and then follow the linux instructions to install `mujpy` under a venv. 
+Install Ubuntu under WSL2 (`wsl --install -d Ubuntu` in cmd Admin, it requires ~10 GB of disk space).
+After restarting Windows, start an Ubuntu app (terminal), cut&paste the following:
+
+.. code::
+
+      sudo apt update
+      sudo apt install python3-pip python3-venv python-is-python3 \
+      libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
+      libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0  
+
+wait for completion and then follow the linux instructions to install `mujpy` under a venv. 
 
 Macos
 -----

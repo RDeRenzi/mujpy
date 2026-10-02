@@ -1,9 +1,11 @@
-.. _Source:
 .. |mSR| replace:: :math:`\mu`\ SR
+
+.. _Source:
 
 ====================
 Source documentation
 ====================
+
 -------
 musuite
 -------

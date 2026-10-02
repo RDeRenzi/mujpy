@@ -20,7 +20,7 @@ class dashed(object):
             Launches the gui
         '''
  
-        from mujpy.tools.tools import make_copy
+        from mujpy.tools.tools import make_copy, QtDispatcher
         from os import getcwd
 
         self.startuppath = getcwd()
@@ -46,6 +46,8 @@ class dashed(object):
         if writeable_folder: # normal and test mode
             self.test = test # needed in self.board
             if test: self.data_dir = writeable_folder # if test make_copy returns data_dir
+
+            self._qt_dispatcher = QtDispatcher() # needed if the backend is Qt
             self.board()
         else: # start outside %HOME
             print('please start from a writeable folder')
@@ -162,6 +164,19 @@ class dashed(object):
                     self.log('This will plot parameter {} vs. runs in subplot {}'.format(kp,int(value)))
                 except:
                     self.log('change["new"] = {} is not a string integer'.format(value))
+
+    def _draw_qt(self, plot_range, the_fit, rotfreq):
+        """required only for the Qt GUI thread"""
+
+        from mujpy.mufitplot import mufitplot
+        the_plot = mufitplot(
+            plot_range,
+            the_fit,
+            rotating_frame_frequencyMHz=rotfreq,
+            plot_out=None,
+            fig_fit=self.fig_fit,
+        )
+        self.fig_fit = the_plot.fig
             
     def _on_Fit(self,b):
         """
@@ -176,23 +191,23 @@ class dashed(object):
         import json
         from matplotlib import get_backend 
         from matplotlib.pyplot import ioff
-        from contextlib import nullcontext
         from mujpy.mufit import mufit
         from mujpy.mufitplot import mufitplot
         from mujpy.tools.tools import check_function, ipyw_warning_dial, show_hide_tab
+        from functools import partial
 
         dashbd = self.build_dashboard_from_widgets()
         kc, kp, kgroup, errmsg = check_function(self.dashboard,self.suite.groups) # minimal model syntax check
         self.log('{}, {}, {}: {}'.format(kc,kp,kgroup,errmsg))
         if self._global() and len(self.suite.groups)>1:
             if not any(['function_multi' in pardict.keys() for component in self.dashboard['model_guess'] for pardict in component['pardicts']]):
-                errmsg += ('++++ Check global parameters or grouping: multi group imply ";" in some function') 
+                errmsg += ('++++ Check global parameters or grouping:\nmulti group imply ";" in some function') 
         if errmsg:
             title = 'Check syntax!'
             if kc >= 0 and kp >= 0: # failed json dashboard syntax check
-                errmsg += '++++ Check model parameters: component {}, parameter {}, group {}'.format(kc, kp, kgroup)
+                errmsg += '++++ Check model parameters:\ncomponent {}, parameter {}, group {}'.format(kc, kp, kgroup)
             elif kc < 0 and kp > 0:
-                errmsg += ('++++ Check global parameters: no function allowed in parameter {}'.format(kp))
+                errmsg += ('++++ Check global parameters:\nno function allowed in parameter {}'.format(kp))
             overlay = ipyw_warning_dial(title = title,
                                         message = errmsg)
             show_hide_tab(overlay,self.on_modal_display_change,self.tab)
@@ -204,14 +219,14 @@ class dashed(object):
             # global fit, check that groups and run list agree with dashboard
             if self._AB21() or self._C2():
                 if not self._multigroup():
-                    msg = 'Correct either the suite or the model. This is a C2 or A/B21 fit (model functions contain ";"), but Groups ...: is empty (single group).' 
+                    msg = 'Correct either the suite or the model.\nThis is a C2 or A/B21 fit\n(model functions contain ";"),\nbut Groups ...: is empty.' 
                     OK = False
             if self._C12():
                 if not self._multirun:
-                    msg = 'Correct either the suite or the model. This is a C1/2 fit ("#" in global parameters), but a single run list.'
+                    msg = 'Correct either the suite or the model.\nThis is a C1/2 fit\n("#" in global parameters),\nbut with single-run list.'
                     OK = False
                 elif self._C1() and self._multigroup():
-                    msg = 'Correct either the suite or the model. This is a C1 fit (no model function has ";" for multigroup fits), but Groups ...: exist.'
+                    msg = 'Correct either the suite or the model.\nThis is a C1 fit\n (no model function has ";" for multigroup),\nbut Groups ...: exist.'
                     OK = False
             if not OK: # still False after the above changes
                 overlay = ipyw_warning_dial(title = title,
@@ -232,18 +247,31 @@ class dashed(object):
             is_ipympl = "ipympl" in get_backend() or get_backend() == 'widget'
 
             self.figure_box.clear_output()
-            with ioff() if is_ipympl else nullcontext():
-                the_plot = mufitplot(
-                        plot_range,
-                        the_fit,
-                        rotating_frame_frequencyMHz=rotfreq,
-                        plot_out=self.figure_box if is_ipympl else None,
-                        fig_fit=self.fig_fit,
-                    )
-                self.fig_fit = the_plot.fig
+            if is_ipympl:
+                with ioff():
+                    the_plot = mufitplot(
+                            plot_range,
+                            the_fit,
+                            rotating_frame_frequencyMHz=rotfreq,
+                            plot_out=self.figure_box,
+                            fig_fit=self.fig_fit,
+                            )
+                    self.fig_fit = the_plot.fig
+            else:
+                self._qt_dispatcher.submit(
+                            partial(self._draw_qt, plot_range, the_fit, rotfreq)
+                            )
+
         else: 
             self.log('Build dashboard was unsuccessful, no fit')
         self.tab.selected_index = 2
+        if the_fit.notconverged:
+            title = "Minuit did not converge"
+            message = "++++ some fit[s] did not converge\nCheck Log tab for correlations!"
+            overlay = ipyw_warning_dial(title = title,
+                                        message = message)
+            show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+
 
     def _on_Plot(self,b):
         """
@@ -257,9 +285,10 @@ class dashed(object):
         import json
         from matplotlib import get_backend 
         from matplotlib.pyplot import ioff
-        from contextlib import nullcontext
         from mujpy.mufit import mufit
         from mujpy.mufitplot import mufitplot
+        from functools import partial
+
         if self.build_dashboard_from_widgets(): # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
             with open(str(dashboard_file),'w',encoding='utf-8') as f:
@@ -272,13 +301,20 @@ class dashed(object):
 
             is_ipympl = "ipympl" in get_backend() or get_backend() == 'widget'
 
-            with ioff() if is_ipympl else nullcontexti():
-                the_plot = mufitplot(plot_range, 
-                                 the_fit, 
-                                 rotating_frame_frequencyMHz = rotfreq, 
-                                 plot_out = self.figure_box if is_ipympl else None, 
-                                 fig_fit = self.fig_fit) # plots in self.figure_box
-                self.fig_fit = the_plot.fig
+            if is_ipympl:
+                with ioff():
+                    the_plot = mufitplot(
+                            plot_range,
+                            the_fit,
+                            rotating_frame_frequencyMHz=rotfreq,
+                            plot_out=self.figure_box,
+                            fig_fit=self.fig_fit,
+                            )
+                    self.fig_fit = the_plot.fig
+            else:
+                self._qt_dispatcher.submit(
+                            partial(self._draw_qt, plot_range, the_fit, rotfreq)
+                            )
 
 
     def _on_FFT(self,b):
@@ -362,13 +398,14 @@ class dashed(object):
         mod_style = "<style>.mod_input input { background-color:#DDC1B0 !important; }</style>"
         modtitle.add_class('mod_input')
         model_title = HBox([hspacer,HTML(mod_style),modtitle,hspacer])
+        flags = ['~','!']
         if 'dashboard' in self.__dir__(): # 
             if 'globpardicts_guess' in self.dashboard:
                 pardicts = self.dashboard['globpardicts_guess']
                 self.command_0.children[0].value='global fit'
                 self.NG_int.value = len(pardicts)
                 hashed = '#' in [pardict['flag'] for pardict in pardicts]
-                flags = ['~','!','#'] if hashed or 'dashboard' not in self.__dir__() else ['~','!']
+                flags = ['~','!','#'] if hashed else flags 
             else:
                 self.command_0.children[0].value='sequential fit'
                 self.NG_int.value = 0
@@ -603,7 +640,7 @@ class dashed(object):
             # preliminarly stop if model invalid, or is NG                 if len(indices)==0: # new model in the starting stage (no old model)!
             if not validmodel(model):
                 overlay = ipyw_warning_dial(title = 'Wrong model syntax',
-                                            message = '{} not made of valid components!'.format(model))
+                                            message = '{} is not made of valid components!\nSee Help tab'.format(model))
                 self.MN_text.unobserve(self._on_MN,names='value')
                 self.MN_text.value = ''
                 self.MN_text.observe(self._on_MN,names='value') # observe again
@@ -647,7 +684,7 @@ class dashed(object):
                         self.log('{}: inserted empty component {} in position {}'.format(m_c,cc[k],k))
                 elif oldmodel != '' and model and go: # indices = [], this is not startup and model adjustment is not possible 
                     set.tab.children[3].children[3], widg = ipyw_yes_no_dial(title = '{} NEW EMPTY model'.format(model),
-                                                                    message = 'Is this OK?\n(NO keeps the old model)')
+                                                                    message = 'Is this OK?\n(answer NO to keep old model)')
                     go = not widg.value # widg.value is yes I do need more, no need can continue
                     self.tab.children[3].children[3].layout.observe(self.on_modal_display_change,names='display')
                     setattr(self.tab.children[3].children[3].layout, 'display', 'flex')
@@ -875,7 +912,7 @@ class dashed(object):
                 show_hide_tab(overlay,self.on_modal_display_change,self.tab)
                 return
             overlay = ipyw_warning_dial(title = 'REMEMBER!',
-                                        message = 'RL to reload data!')
+                                        message = 'press RL to reload data!')
             show_hide_tab(overlay,self.on_modal_display_change,self.tab)
 
     def _on_fetch(self,change):

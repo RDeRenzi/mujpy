@@ -1714,7 +1714,7 @@ def par2labels(pardict):
     '''
 
     from ipywidgets.widgets import HBox, Label,  Layout
-    width = ['5%','8%','15%','10%','30%'] # total 48%
+    width = ['5%','8%','25%','20%','30%'] # total 88%
     widgets = [Label(value='p[k]',layout=Layout(width=width[0])),
                Label(value='Name',layout=Layout(width=width[1])),
                Label(value='Value',layout=Layout(width=width[2])),
@@ -1735,7 +1735,7 @@ def par2widgets(pardict,k,glob=False):
     '''
 
     from ipywidgets.widgets import HBox, Text, FloatText, Label, Dropdown, Layout
-    width = ['5%','8%','15%','10%','30%'] # total 48%
+    width = ['5%','8%','25%','20%','30%'] # total 88%
     options = ['='] if glob else ['~','!','=']
     value = 0 if 'value' not in pardict else pardict['value']
     if 'function_multi' in pardict:
@@ -1744,9 +1744,10 @@ def par2widgets(pardict,k,glob=False):
         function = pardict['function']
     else:
         function = ''
-    drop = Dropdown(tooltip='~ free\n! fix,\n= Function',layout=Layout(width=width[3]))
+    dropdescript  = '--->' if glob else '<---'
+    drop = Dropdown(description= dropdescript ,tooltip='~ free\n! fix,\n= Function',layout=Layout(width=width[3]),style={'description_width': '40%'},)
     flag = pardict['flag'] if 'flag' in pardict else '=' if glob else '~'
-    drop.value = None
+    #drop.value = None
     drop.options = options
     #print('debug tools.par2widgets options {} flag {}'.format(options,flag))
     drop.value = flag
@@ -2432,7 +2433,10 @@ def ipyw_yes_no_dialog(title="Check!",message=""):
 
     from mujpy.tools.tools import create_overlay_layout, create_dialog_box_layout
     title_html = HTML(f"<h3>{title}</h3>") #⚠️
-    message_html = HTML(f"<p>{message}</p>", layout=Layout(margin='10px 0px 20px 0px'))
+    html_message = ""
+    for snip in message.split("\n"):
+        html_message += "<p>"+snip+"</p>"
+    message_html = HTML(html_message, layout=Layout(margin='10px 0px 20px 0px'))
     yes_btn = ValueButton(description="Yes", layout=Layout(width='100px', align_self='center'))
     yes_btn.style.button_color = '#c0b1ab'
     no_btn = Button(description="No", layout=Layout(width='100px', align_self='center'))
@@ -2456,7 +2460,10 @@ def ipyw_warning_dial(title="Warning", message=""):
     
     from mujpy.tools.tools import create_overlay_layout, create_dialog_box_layout
     title_html = HTML(f"<h3>{title}</h3>") #⚠️
-    message_html = HTML(f"<p>{message}</p>", layout=Layout(margin='10px 0px 20px 0px'))
+    html_message = ""
+    for snip in message.split("\n"):
+        html_message += "<p>"+snip+"</p>"
+    message_html = HTML(html_message, layout=Layout(margin='10px 0px 20px 0px'))
     ok_btn = Button(description="OK", layout=Layout(width='100px', align_self='center'))
     ok_btn.style.button_color = '#c0b1ab'
     # Contenitore del dialogo
@@ -3123,6 +3130,38 @@ def make_copy(test):
             return True
     else:
         return False
+
+from PyQt5 import QtCore, QtWidgets
+import traceback
+
+class QtDispatcher(QtCore.QObject):
+    """Run mudashed plotting operations on Qt's GUI thread."""
+
+    requested = QtCore.pyqtSignal(object)
+
+    def __init__(self):
+        super().__init__()
+
+        app = QtWidgets.QApplication.instance()
+        if app is None or self.thread() != app.thread():
+            raise RuntimeError(
+                "Create QtDispatcher on the GUI thread, after %matplotlib qt"
+            )
+
+        self.requested.connect(
+            self._execute,
+            QtCore.Qt.QueuedConnection,
+        )
+
+    @QtCore.pyqtSlot(object)
+    def _execute(self, callback):
+        try:
+            callback()
+        except Exception:
+            traceback.print_exc()
+
+    def submit(self, callback):
+        self.requested.emit(callback)
 
 """
  REMEMBER: TOOLS METHODS DO NOT NEED TO IMPORT OTHER TOOLS METHODS!
