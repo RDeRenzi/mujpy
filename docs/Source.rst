@@ -57,7 +57,7 @@ mufitplot
 tools
 -----
 .. automodule:: tools.tools
-   :nomembers:
+   :no-members:
 
 .. autodocgroups:: tools.tools
 
