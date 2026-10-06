@@ -14,12 +14,8 @@ Welcome to mujpy's documentation!
    Installation
    Tutorial
    Reference
-   Examples
    NutsNdBoltsMuSR
-   FAQ
-   Developer 
    Source
-
 
 Indices and tables
 ==================

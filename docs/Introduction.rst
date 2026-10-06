@@ -39,7 +39,7 @@ The ```.py``` templates have one BIG! drawback: the fit is defined in a json fil
 
 If you are a |mSR| beginner, :doc:`NutsNdBoltsMuSR` is not enough, please refer to a muon primer, such as [Blundell]_, also at `arXiv <https://arxiv.org/abs/cond-mat/0207699>`_ or to a textbook, like [BDLP]_, [Yaouanc]_ or [Amato]_ for this purpose.
 
-lease find details on the `mujpy` methods in the :ref:`Reference` (work in progress). 
+Please find more details in the :ref:`Reference`. 
 
 References
 ----------

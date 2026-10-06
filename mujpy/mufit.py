@@ -1,18 +1,43 @@
 class mufit(object):
     """
-    fit class, creates a mumodel from a json file, executes Minuit, produces logs and json files
+    fit class, creates a mumodel from a json file, executes Minuit, produces log, csv and json files
 
-    reads from a dashboard file
-        will be interfaced to a dash gui
+    __init__ input::
+
+        suite instance, initiated
+        dashboard_file, path and filename of json file 
+    
+    kwargs (defaults)::
+    
+        chain = True, 
+            sequential best fit paramenters as input of next fit
+        dash_log = None
+            log to stdout, mudashed invokes mufit(...,dash_log=self.log) 
+        no_fit = False, 
+            dry run, for ploting guess values 
+        grad = False,
+            dead branch for analytical gradients
+        scan = None, 
+            orders csv according to run number
+            other options 'T' temperature, 'B' field, '[' orient
+        verbose = False,
+            if True Minuit is verbose, prints correlation matrix, etc.
+
+    * json files are edited by mudashed.
+    * mufit methods, if not otherwise specified, deal with all fits. 
+    
+        * method whose name includes glob or global deal with global fits
+
+            * then the plain method deals with sequential fits
+
+        * methods whose name ends with calib deal with alpha calibration fits
+
+            * then the plain method name deals with fixes alpha fits 
     """
 
     def __init__(self,suite,dashboard_file,chain=True,dash_log=None,no_fit=False, grad=False, scan = None, verbose = False):
         """
-        accepts suite instance and dashboard file [options]
-
-        input
-            suite is the instance of the runs
-            dashboard_file is a JSON file of a dictionary structure
+        accepts suite instance, dashboard file,*kwargs
         """
 
         from mujpy._version import __version__
@@ -53,12 +78,14 @@ class mufit(object):
        
     def _dash_load_(self,dashboard_file):
         """
-        try load dashboard file
+        try loading dashboard file
         
-        input:
-            json dashboard_file produces a dict structure
+        input::
 
-        output:
+            dashboard_file produces a dict structure
+
+        output::
+
             True/False if dashboard checks
                 json syntax
                 tools check_function
@@ -102,11 +129,11 @@ class mufit(object):
 
     def dofit_(self,returntup):
         """
-        main method, auto invoked by _init_
+        main method, invoked by _init_, a switchyard for all autodetected fit types
 
-        returntup is a tuple of integers, start stop pack
-        switchyard for all fits
-        to be tested
+        input::
+
+            returntup is a tuple of integers: start,stop, pack (fit range in mudashed)
         """
 
         from mujpy.tools.tools import int2min, int2min_global, int2_method_key, int2_global_method_key 
@@ -123,6 +150,7 @@ class mufit(object):
         #######################
         # wrappers definition #
         #######################
+
         A1, A20, A21, B1, B20, B21, C1, C2 = self.fit_types()
         #mr, mg = (True, True) if C2 or B20 or B21 else (True, False) if C1 or B1 else (False, True) if A20 or A21 else (False, False)
         # whether suite is multirun (mr), multigroup (mg) 
@@ -254,13 +282,17 @@ class mufit(object):
 
     def execute_fit(self,limits,pospar):
         """
-        Minuit execution standard, auto invoked by dofit_
+        Minuit execution, invoked by dofit_
 
-        input: 
-            limits, pospar, see int2min
-        executes Minuit (twice for pospars) 
-        appends to lastfits
-        both plain and calib 
+        input::
+
+            limits, iminuit list of parameter limits
+            pospar, True for a positive defined parameter
+                e.g. Gaussian σ (maybe A)
+                see also tools.int2min
+
+        executes Minuit in self.lastfit (twice for pospars) 
+        appends self.lastfit results to self.lastfits 
         """
 
         # print('mr is multirun {}. mg is multigroup {}'.format(mr == multirun, mg == multigroup))
@@ -286,10 +318,17 @@ class mufit(object):
         """
         calculates model number of degrees of freedom
 
-        input:
+        input::
+
             switch = 'C2' or 'A21 or B21' or 'C1'
-            requires a completed self.lastfit
-        saves self.number_dof
+
+        requires:: 
+
+            a completed self.lastfit
+
+        saves:: 
+
+            self.number_dof
         """
 
         # required in summary and save_fit
@@ -302,16 +341,22 @@ class mufit(object):
 
     def summary(self,start, stop, krun, kgroup):
         """
-        single run, single group A1 A20 B1 B20 & calib results logged and saved (fit, csv)
+        logs and saves (fit, csv, cache) single asymmetry fit A1 A20 B1 B20 & their calib versions
 
-        input: 
-            krun index in runs
-            kgroup index in grouping
-        output:
-                  saved on cache/file.log 
-                  printed on self.log
-                  saved in csv/file.csv 
-                  saved in fit/file.json
+        input::
+    
+            start, fit start bin
+            stop, fit stop bin
+            krun, index in self.suite._the_runs_
+            kgroup, index in self.grouping
+
+        output::
+
+            saved on cache/file.log 
+            printed on self.log
+            saved in csv/file.csv 
+            saved in fit/file.json
+
         invoked by self.dofit_ inside a krun and/or kgroup loops
         """
 
@@ -398,21 +443,25 @@ class mufit(object):
 
     def summary_global(self,start,stop,krun,kgroup):
         """
-        global A21 B21 C1 C2 fits & calib results logged and saved (fit, csv)
+        logs and saves (fit, csv, cache) global asymmetries fits A21 B21 C1 C2 & their calib versions
 
-        input:
-            start, stop, fit bins
-            krun index in run
-            kgroup index in grouping
-        called
-            A21 ngroup times, C1 nrun times, B21, C2 nrun*ngroup times 
-            shows single fit, single group results      in self.log
-            adds them                to a unique cache/file_log.log
-            adds a row                 to a unique csv/file_csv.csv
-        if (krun,kgroup)==(0,0) 
-           C1,C2     print a unique Minuit cache/U_file_log.log
-           A21, B21 adds a Minuit row to a unique csv/U_file_csv.csv           
-        invoked by self.dofit_ 
+        input::
+
+            start, stop, fit start and stop bins
+            krun, index in self.suite._the_runs_
+            kgroup, index in self.grouping
+
+        called::
+
+            A21: ngroup times, C1: nrun times, B21 and C2: nrun*ngroup times 
+            shows extracted single fit, single group results in self.log
+                ln model format
+            adds  each to a unique cache/file.log
+            adds a row for each to a unique csv/file.csv
+            if (krun,kgroup)==(0,0) 
+                C1,C2     saves a unique Minuit parameters cache/U_file.log
+                A21, B21  adds a Minuit parameters row to a unique csv/U_file.csv
+                          in global parameter format
         """
 
         from mujpy.tools.tools import get_title, chi2std, stringify_groups, version_flag
@@ -602,7 +651,7 @@ class mufit(object):
 
     def if_not_converged(self,f):
         """
-        prints various things if Minuit not converged 
+        logs warnings if Minuit did not converge 
         """
 
         if not self.lastfit.valid:
@@ -621,16 +670,19 @@ class mufit(object):
     
     def save_fit(self,krun,kgroup):
         """
-        saves indiviudual A1, A20, B1, B20 results in new json .fit files, with fit type label
+        saves individual results in a fit/file_ft.json files, ft = 'A1','A20','B1' or 'B21'  
 
-        input:
-            krun is index in self.suite._the_runs_
-            kgroup is indek in self.suite.groups
-        saves a dashboard file adding the bestfit parameters as "model_result"
-        filename is __cachepath__ + modelname + nrun  + strgrp + version .json
-        nrun = runNumber, strgrp = shorthand for group
-        These saves are  for individual runs: A1, A20, B1
-            use "version" as additional label to qualify fit
+        input::
+
+            krun, index in self.suite._the_runs_
+            kgroup, index in self.suite.groups
+
+        saves:: 
+
+            guess dashboard file dict adding the bestfit parameters as "model_result"
+            filename is __cachepath__ + modelname + nrun  + strgrp + version .json
+                nrun = runNumber, strgrp = shorthand for group
+                version += 'A1' or 'A20' or 'B1' or 'B20'
         """
 
         from mujpy.tools.tools import min2int, version_flag
@@ -671,16 +723,19 @@ class mufit(object):
 
     def save_fit_global(self,krun,kgroup):
         """
-        saves A21, B21, C1, C2 results in json .fit files, with fit type label
+        saves global fit results in a fit/file._ft.json file, ft = 'A21','B21','C1' or 'C2'
 
-        input:
-            krun index in self.suite._the_runs_
-            kgroup is dummy for compatibility with save_fit
-        fit is global
-            saves one dashboard json adding the bestfit parameters as "globpardicts_result"
-        Use "version" as additional label to qualify fit (auto 'g_
-        filename is __cachepath__ + modelname + nrun  + srtgrp0 + strgrp...  + version .json
-        nrun = runNumber, strgrp0,1,... = shorthand for allgroups
+        input::
+
+            krun, index in self.suite._the_runs_
+            kgroup, dummy for compatibility with save_fit
+
+        saves:: 
+
+            guess dashboard json adding bestfit parameters as "globpardicts_result"
+            filename is __cachepath__ + modelname + nrun  + srtgrp0 + strgrp...  + version .json
+                version +=  'A21','B21','C1' or 'C2'
+                nrun = runNumber, strgrp0,1,... = shorthand for all groups
         """
 
         from mujpy.tools.tools import stringify_groups, version_flag, min2int_global
@@ -733,15 +788,20 @@ class mufit(object):
 
     def prepare_csv_row(self,par_err_str,krun = 0,kgroup=0):
         """
-        writes the same header row, model single row for all fit types
+        writes header row, model single row for all fit types
 
-        input: 
+        input::
+
             par_err_str text string containing csv of parameter values, std 
-            krun, kgroup are indices in self.suite._the_runs_[krun][0], self.suite.groups[kgroup]
-        output: 
-            header, the model specific csv header 
-                    to compare with that of the csv file
-            row, the line to be added to the csv file
+            krun, index in self.suite._the_runs_[krun][0]
+            kgroup, index in  self.suite.groups[kgroup]
+
+        output::
+
+            header, model-specific csv header 
+                    to compare with csv file
+            row, line to be added to the csv file
+
         prepares a csv-like row of best fit parameters 
         that can be imported to produce figures
         """
@@ -836,15 +896,19 @@ class mufit(object):
 
     def prepare_globcsv_row(self,names,par_err_str,krun):
         """
-        writes the same header row, Minuit paramenter row for B21,A21 fits
+        writes header row, Minuit paramenter row for B21, A21 fits
 
-        input: 
+        input::
+
             par_err_str text string containing csv of Minuit parameter values, std 
             krun index in run list
-        output: 
-            header, a globper specific csv header 
-                    with a string for all runs and a string for all groups
+        
+        output::
+
+            header, a globpar-specific csv header 
+                    with a run and a group column
             row, the line to be added to the csv file
+
         prepares a csv-like row of best fit parameters 
         that can be imported to produce figures
         """
@@ -922,22 +986,12 @@ class mufit(object):
         """
         return "globpardicts_guess" in self.dashboard.keys()
 
-    def tilde_in_component(self): # this dashboard has minuit parameters in the model components
-        """
-        Deprecated
-
-        see table at the bottom of https://musr-nmr.unipr.it/dispense/pmwiki.phpdd?n=Mujpy.GlobalSwitch
-        """
-
-        # empty list, no ~ flags, is equivalent to False, non empty list is True
-        return any([par['flag']=='~' for component in self.dashboard["model_guess"]  for par in component['pardicts']]) 
-
     def hash_in_component(self): # this dashboard has minuit parameters in the model components
         """
         True for C1 and C2 fits
 
-        global fits with 'flag':'#' in 'globpardicts_guess'
-        these parameters generate a labelled Minuit replica for each run in the suite 
+        identifies global fits with 'flag':'#' in 'globpardicts_guess',
+        which generate a local, labelled Minuit parameter replica for each run in the suite 
         """
 
         # empty list, no ~ flags, is equivalent to False, non empty list is True
@@ -946,16 +1000,12 @@ class mufit(object):
     def A1(self): # single run singlegroup 
         """
         True for A1 fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
         return self.suite.single() and not (self.calib() or self.suite.multi_groups() or self.globpar())
             
     def A1_calib(self): # single run calib singlegroup 
         """
         True for A1 calib fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
 
         return self.suite.single() and self.calib() and not (self.suite.multi_groups() or self.globpar())
@@ -963,8 +1013,6 @@ class mufit(object):
     def A20(self): # single run multigroup sequential 
         """
         True for A20 fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
 
         return self.suite.single() and self.suite.multi_groups() and not self.globpar() and not self.calib()
@@ -972,8 +1020,6 @@ class mufit(object):
     def A20_calib(self): # single run calib multigroup sequential 
         """
         True for A20 calib fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
 
         return self.suite.single() and self.suite.multi_groups() and not self.globpar() and self.calib()
@@ -981,8 +1027,6 @@ class mufit(object):
     def A21(self): # single run multigroup global 
         """
         True for A21 fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
 
         return self.suite.single() and self.suite.multi_groups() and self.globpar() and not self.calib()
@@ -990,8 +1034,6 @@ class mufit(object):
     def A21_calib(self): # single run calib multigroup global 
         """
         True for A21 calib fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
 
         return self.suite.single() and self.suite.multi_groups() and self.globpar() and self.calib()
@@ -999,8 +1041,6 @@ class mufit(object):
     def B1(self): # multirun sequential singlegroup 
         """
         True for B2 fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
 
         return not (self.suite.single() or self.suite.multi_groups() or self.globpar() or self.calib())
@@ -1008,8 +1048,6 @@ class mufit(object):
     def B1_calib(self): # multirun sequential singlegroup 
         """
         True for B1 calib fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
 
         return not (self.suite.single() or self.suite.multi_groups() or self.globpar()) and self.calib()
@@ -1017,8 +1055,6 @@ class mufit(object):
     def B20(self): # multirun sequential multigroup global
         """
         True for B20 fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
 
         return self.suite.multi_groups() and not (self.suite.single() or self.globpar() or self.calib())
@@ -1026,17 +1062,13 @@ class mufit(object):
     def B20_calib(self):
         """
         True for B20 calib fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
 
         return self.suite.multi_groups() and not (self.suite.single() or self.globpar()) and self.calib()
 
     def B21(self): # multirun sequential multigroup global
         """
-         True for B21 fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
+        True for B21 fit
         """
 
         return self.suite.multi_groups() and self.globpar() and not self.suite.single() and not self.hash_in_component() and not self.calib()
@@ -1044,8 +1076,6 @@ class mufit(object):
     def B21_calib(self):
         """
         True for B21 calib fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
 
         return self.suite.multi_groups() and self.globpar() and not self.suite.single() and not self.hash_in_component() and self.calib()
@@ -1053,16 +1083,12 @@ class mufit(object):
     def C1(self): # multirun global singlegroup
         """
         True for C1 fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
         return not self.suite.multi_groups() and not self.suite.single() and self.globpar() and self.hash_in_component() and not self.calib()
 
     def C1_calib(self): # multirun global singlegroup
         """
-         True for C1 calib fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
+        True for C1 calib fit
         """
 
         return not self.suite.multi_groups() and not self.suite.single() and self.globpar() and self.hash_in_component() and self.calib()
@@ -1070,8 +1096,6 @@ class mufit(object):
     def C2(self): # multirun global multigroup global
         """
         True for C2 fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
 
         return self.suite.multi_groups() and not self.suite.single() and self.globpar() and self.hash_in_component() and not self.calib()
@@ -1079,8 +1103,6 @@ class mufit(object):
     def C2_calib(self): # multirun global multigroup global
         """
         True for C2 calib fit
-
-        see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy
         """
 
         return self.suite.multi_groups() and not self.suite.single() and self.globpar() and self.hash_in_component() and self.calib()
@@ -1129,24 +1151,3 @@ class mufit(object):
 
         return "globpardicts_guess" in self.dashboard.keys()
 
-#    def which_true(self):
-#        """
-#        tell which fit it may be
-#        """
-#        string = ['A1','A1_calib',
-#                  'A20','A20_calib',
-#                  'A21','A21_calib',
-#                  'B1','B1_calib',
-#                  'B20','B20_calib',
-#                  'B21','B21_calib',
-#                  'C1','C1_calib',
-#                  'C2','C2_calib']
-#        fits = [self.A1(), self.A1_calib(),
-#                self.A20(), self.A20_calib(), 
-#                self.A21(), self.A21_calib(), 
-#                self.B20(), self.B20_calib(),
-#                self.B21(), self.B21_calib(),
-#                self.C1(), self.C1_calib(),
-#                self.C2(), self.C2_calib()]
-#        return [string[k] for k,fit in enumerate(fits) if fit]
- 

@@ -1,82 +1,67 @@
 class suite(object):
     """
     A suite class, file read through musr2py (bin, mdu), muroot2py (root, old and MusrRoot), muisis2py (nxs)
+
+    __init__ input::
+     
+        datafile path to a prototype datafile for present experiment
+        runlist, a string of runs in a shorthand notation
+            csv or csv + first:last [last:first:-1] when last<first
+            add run directive run1+run2+run3 can be used only in csv shorthand
+        grp_calib = list of dicts, keys 'forward', 'backward', 'alpha'
+            forward, backward are string in shorthand notation: 
+                csv or csv + first:last
+            alpha is float
+        offset string with integer, first good bin from t = t0 bin 
+        startuppath and mplot presently unused
+        console = print, default
+            mudashed invokes suite passing console = self.log to write on board output
+            tests.py invoke suite without console kwarg, to print on stdout
+
+    and calculates t = 0
+
+    * suite loads each data run as instance of musr2py, muroot2py, muisis2py 
+    * defines self._the_runs_ as a list of lists of class instances::
+
+        self._the_runs_[k]  is a list of class instances whose data must be added
+
+    * all classes provide equivalent methods (syntax of MuSR_td_PSI_bin)
+    * ISIS and root data are np.array
+    * from 2023 PSI has only root file type
+    * all classes provide T info and instrument identification
+    * different Instruments/Facilities require different methods for setting t0, specifically::
+
+        prompt peak for PSI bulk musr
+        muedge for ISIS
+        self identified for LEM
+        unknown for HIFI
+
+    suite methods::
     
-    musr2py muisis2py muroot2py provids equivalent methods, same syntax as MuSR_td_PSI_bin() (isis and root data are np.array)
-    ::
-      Different Instruments/Facilities require different methods for setting t0, specifically:
-           - HAL not known
-           - GPS, GPD, DOLLY, FLAME, LTF, determine a prompt position by identifying the count maximum
-                                         and fit a prompt peak over a given interval around the peak
-           - LEM trust the instrument tof calibration encoded in the header
-           - NXS fit the edge ISIS function, common to all instrument hence to the nxs file spec
-      Instrument identification as of 2024 is BY FILE SPEC: mdu ->   HAL (hifi), bin -> GPS, FLAME, GPD, DOLLY, nxs -> ISIS
-      However, from 2023 on root can be any instrument 
-      Instrument identification must be performed early in the method. Root contains it. Bin can be oly gps, gpd, flame, dolly, ltf so it's ok.
-      mdu is only hifi. nxs is also fine (and it may contain  
-    self._init_ reads input fixed variables
-        console, runlist, datafile 
-        grp_calib, offset 
-        (console(string) must print string somewhere)
-        t0 parameters are fixed depending on bin mdu root spec
-    
-    self.groups = grp.calib contains a list of dictionaries for forward, backward groups and their alpha values
-        where groups may be in shorthand notation
-        self.alpha value used for normal fit 
-        as opposed to calibration fits where alpha is a fit parameter
-    self.grouping is a list of dictionaries for forward, backward groups and their alpha values
-        where groups as np array of 0 based indices of detectors (tools get_grouping does the translation)
-    imports musr2py or muisis2py and loads it as instance for each data set
-    which can be an individual run or the sum of several runs
-
-    self._the_runs_ is a list of lists of musr2py instances
-    self._the_runs_[k]  is a list of musr2py instances to be added
-
-    invokes prompfit(self) calls and calculates t = 0 parameters. modify to accommodate root
-
-    self.timebase returns time, always 1d array
-    self.single_for_back_counts(runs,grouping) acts on runs
-            yforw, ybackw are sums, 
+        self.alpha value is used for normal fit, in calibration fits alpha is a fit parameter
+        self.grouping is a list of dictionaries for forward, backward groups and their alpha values
+            grouping forward and backward are np array of 0 based indices of detectors
+            tools get_grouping does the translation
+        self.timebase returns time, always a 1d np array
+        self.single_for_back_counts(runs,grouping) acts on runs to provide
+            yforw, ybackw sums over forward, backward detectors 
             background_forw, background_back their backgrounds (PSI) or zero (ISIS) 
-            yfm, ybm are <(yi -background_i)*exp(t/tau)> i = forw, backw (works also for ISIS)
-            allow on the fly asymmetry in Minuit, with alpha fit parameter
-    self.asymmetry_single calculates time, asymmetry and asymmetry error, 1d arrays,  with given alpha
-            invoking single_for_back_counts
-    self.asymmetry_multirun calculates time (1d), asymmetry  and asymmetry error, 2d arrays, with given alpha
-            invokes self.single_for_back_counts(runs,grouping) for runs in range(len(self._the_runs_))
-    self.etc methods for suite, multi suite,  global suite and global multi suite
-            to be done
-    Notes   NB mujpy is python3 only
-        Output ends up in notebook, below cell, and 
-        sys.__stdout__ is <_io.TextIOWrapper name='<stdout>' mode='w' encoding='utf-8'>
-        sys.__stderr__ is <_io.TextIOWrapper name='<stderr>' mode='w' encoding='utf-8'>
+            yfm, ybm are <(yi -background_i)*exp(t/tau)>,  
+                    i = [forw], [backw] (works also for ISIS)
+            allows mucomponents to compute on-the-fly asymmetry for Minuit alpha fit
+        self.asymmetry_single  time, asymm, asyme (std), 
+                    1d arrays, with self.grouping[k]['alpha']
+                    invokes single_for_back_counts
     """ 
 
-    def __init__(self, datafile , runlist , grp_calib , offset , startuppath, console = 'print',mplot=False):
+    def __init__(self, datafile , runlist , grp_calib , offset , startuppath, console = 'print', mplot = False):
                  
         """
-        __init__ for musuite class
+        __init__ for the suite class, 
 
-        * inputs: 
-            the suite_input_file a dict containing
-                    datafile,   containing the full path 
-                    runlist, run number or list of runs
-                    grp_calib, grouping and alpha paramter dictionary, see below
-                    offset, first good bin
-                    startuppath, path where mudash is lauched                      
-        * grp_calib is a list of dictionaries (minimum one)
-          {'forward':stringfw,'backward':stringbw,'alpha':alpha}
-          strings are translated into np.arrays of histograms by tools get_grouping
-        * upon initialization automatically
-                checks input, stores paths
-                load_runs(): stores data load instance(s) in self._the_runs_
-                store_groups() stores list of dicts in self.grouping, each containing
-                               'forward' and 'backward' lists of detector indices
-                promptfit(): determines t0
-                timebase(): stores self.time (1d)  
-        if console = 'print' self.console will exec print(string)
-        if mudashed calls suite with console = 'self.log', a method of mudashed  
-              self.console will exec self.log(string), i.e. write on board output                           
+        invoked from command line or in the mudashed gui 
+        (no if __name__ == '__main__')
+        inputs: see the suite docstring for details  
         """
 
         from mujpy.tools.tools import derun
@@ -172,9 +157,9 @@ class suite(object):
     
     def console(self,string):
         """
-        writes string to initiated self.console_method
+        writes string to initiated self.console_method::
 
-           when suite invoked without console, self.console_method defaults top 'print'
+           when suite invoked without console, self.console_method defaults to 'print'
            when invoked from mudashes, self.console_method = mudashed.log
         """
 
@@ -187,11 +172,13 @@ class suite(object):
  
     def add_runs(self,k):
         """
-        Tries to load one or more runs to be added together
+        Tries to load one or more runs to be added together::
 
-        by means of murs2py, muisis2py or muroot2py. 
-        self.runs[k] is a list of strings containing integer run numbers 
-        Returns -1 and quits if musr2py, muroot2py or muisis2py complain, 0 otherwise
+            by means of murs2py, muisis2py or muroot2py. 
+            self.runs[k] is a list of strings containing integer run numbers 
+            Returns 
+                -1 and quits if musr2py, muroot2py or muisis2py complain, 
+                0 otherwise
         """
 
         from mujpy.muroot2py.muroot2py import muroot2py as rootload 
@@ -266,16 +253,21 @@ class suite(object):
 
     def load_runs(self):
         """
-        load musr2py. muroot2py or muisis2py instances stored as a list of lists [[runs to add], ...]
+        load musr2py. muroot2py or muisis2py instances stored as a list of lists [[runs to add], ...]::
 
-        self._the_runs_[0][0] a single run, or the first of a suite 
-        self._the_runs_[k][0] the k-th run of a run suite
+            self._the_runs_[0][0] a single run, or the first of a suite 
+            self._the_runs_[k][0] the k-th run of a run suite
         
-        Invoked after creating a suite instance, typically as
-            the_suite = suite('log/input.suite') # the_suite implements the class suite according to input.suite
-            if the_suite.load_runs():            # this and the following two statements load data
-                if the_suite.store_groups():     #                                       define groups
-                    the_suite.promptfit(mplot=False)    #                                fit t0 = 0
+        Invoked after creating a suite instance, typically as::
+
+            the_suite = suite('log/input.suite') 
+                # the_suite implements the class suite according to input.suite
+            if the_suite.load_runs():            
+                # this and the following two statements load data
+                if the_suite.store_groups():     
+                    #   define groups
+                    the_suite.promptfit(mplot=False)    
+                        #   fit t0 = 0
         """
 
         read_ok = True
@@ -325,10 +317,10 @@ class suite(object):
               
     def t_value_error(self,k):
         """
-        calculates T and eT values also for runs to be added
+        calculates T and eT values also for runs to be added::
         
-        sillily, but it works also for single run
-            ignores self.LEM_back_subt, a negligible factor for weight
+            sillily, but it works also for single run
+                ignores self.LEM_back_subt, a negligible factor for weight
         """
 
         from numpy import sqrt
@@ -347,15 +339,15 @@ class suite(object):
 
     def promptfit(self,mplot, mprint = False):
         """
-        indentifies t0 and stores self.nt0 array (all intruments) [ISIS not yet]
+        indentifies t0 and stores self.nt0 array (all intruments) [ISIS not yet]::
 
-        t0 prompt fit method for PSI gps, gpd, dolly, ltf, flame identified by muroot2py.get_instrument() or by musr2py.readbin
-        t0 bin value for PSI lem by muroot2py.get_t0_int()
-        t0 edge method for ISIS (all), now broken
-        t0 guess method for PSI hifi 
+            t0 prompt fit method for PSI bulk musr 
+                    identified by muroot2py.get_instrument() or by musr2py.readbin
+            t0 bin value for PSI lem by muroot2py.get_t0_int()
+            t0 edge method for ISIS (all), now broken
+            t0 guess method for PSI hifi 
 
-        refactored for run addition and
-        suite of runs
+        refactored for run addition and suite of runs
         WARNING: this module is tenporarily for PSI only, included root        
         """
 
@@ -628,23 +620,26 @@ class suite(object):
 
     def timebase(self):
         """
-        generates self.time
+        generates self.time::
 
-        * initializes self histoLength 
-        * fills self.time. 1D numpy array
-        * all histogram selects common time
-        * PSI has different t0 per histogram
-        * and must standardize to a common length 
+            initializes self histoLength 
+            fills self.time. 1D numpy array
+            all histogram selects common time
+            PSI has different t0 per histogram
+            and must standardize to a common length 
         
-        # Time definition for center of bin n: 
-        #          time = (n - self.nt0 + self.offset + self.dt0)*binWidth_ns/1000.
-        # 1) Assume the prompt is entirely in bin self.nt0. (python convention, the bin index is 0,...,n,... 
-        # The content of bin self.nt0 will be the t=0 value for this case and self.dt0 = 0.
-        # The center of bin self.nt0 will correspond to time t = 0
-        # 2) Assume the prompt is equally distributed between n and n+1. 
-        #    Then self.nt0 = n and self.dt0 = 0.5, the same formula applies
-        # 3) Assume the prompt is 0.45 in n and 0.55 in n+1. 
-        #    Then self.nt0 = n+1 and self.dt0 = -0.45, the same formula applies.
+        Time definition for center of bin n::
+
+            time = (n - self.nt0 + self.offset + self.dt0)*binWidth_ns/1000.
+
+        1) Assume the prompt is entirely in bin self.nt0. 
+            (python convention, the bin index is 0,...,n,... 
+            The content of bin self.nt0 will be the t=0 value for this case and self.dt0 = 0.
+            The center of bin self.nt0 will correspond to time t = 0
+        2) Assume the prompt is equally distributed between n and n+1. 
+            Then self.nt0 = n and self.dt0 = 0.5, the same formula applies
+        3) Assume the prompt is 0.45 in n and 0.55 in n+1. 
+            Then self.nt0 = n+1 and self.dt0 = -0.45, the same formula applies.
         """
 
         import numpy as np
@@ -715,29 +710,40 @@ class suite(object):
         """
         basic method for single group single run count arrays
 
-        * input: 
-        *         runs, runs to add 
-        *         grouping, {'forward':[3],'backward':[4]} for 3-4 
-        * output:
-        *    for PSI, with b_j = mean(data_j before muon arrival)
-        *         yfc, ybc     = sum_{j in for or back} (data_j - b_j)
-        *    for ISIS (b_j = 0)
-        *                      = sum_{j in for or back} data_j) 
-        *         eyfc, eyfc   = sqrt(sum_{j in for or back}(data_j + (b_j + p(0,b)/n)))
-        *                 with error e = sqrt(N+(b+p(0,b))/n), 
-        *                 where p(0,b) is probability for 0 count, 
-        *                              either
-        *                 p_0b = normal probability , ~Poisson std=sqrt(b)
-        *                      = exp(-b/2)/sqrt(2*pi*b), or
-        *                 P_0b = true Poisson = exp(-b) 
-        * Method used both in self.asymmetry_single normal fits
-        * and in calib (alpha minuit parameter)
-        #        NOTE: in calib fits alpha is a fit parameter with an error unknown while minimizing
-        #              at the minimum e_alpha is typically 2e-3 on PSI calib runs
-        #              Neglected here, could recalculate chi_square at minimum including error from non corrected chi_square
-        #        eA = 2*alpha/(self._yfc_ - alpha*self._ybc_)**2 * sqrt((self._ybc_*self._eyfc_)**2 + (self._yfc_*self._eybc_)**2) 
-        *
-        * all output objects are 1D numpy arrays
+        input:: 
+
+            runs, runs to add 
+            grouping, {'forward':[3],'backward':[4]} for 3-4 
+        
+        output::
+
+            for PSI, with b_j = mean(data_j before muon arrival)
+                yfc, ybc = sum_{j in for or back} (data_j - b_j)
+            for ISIS (b_j = 0)
+                         = sum_{j in for or back} data_j) 
+                eyfc, eyfc  = sqrt(sum_{j in for or back}(data_j + (b_j + p(0,b)/n)))
+                    with error e = sqrt(N+(b+p(0,b))/n), 
+                        where p(0,b) is probability for 0 count, 
+                                either
+                            p_0b = normal probability , ~Poisson std=sqrt(b)
+                                 = exp(-b/2)/sqrt(2*pi*b), or
+                            P_0b = true Poisson = exp(-b) 
+        
+        Method used both in self.asymmetry_single normal fits
+        and in calib (alpha minuit parameter)
+        
+        .. note::
+
+            calib fits: alpha is a fit parameter with an error, unknown while minimizing
+            at the minimum e_alpha is typically 2e-3 on PSI calib runs
+            Neglected here, 
+            could recalculate chi_square at minimum
+            including error from non corrected chi_square::
+
+                eA = 2*alpha/(self._yfc_ - alpha*self._ybc_)**2 * sqrt((self._ybc_*self._eyfc_)**2 + 
+                     (self._yfc_*self._eybc_)**2) 
+        
+        All output objects are 1D numpy arrays
         """
 
         from numpy import zeros, array, mean, exp, where, sqrt
@@ -796,14 +802,23 @@ class suite(object):
         """
         basic methods for count array slices
         
-        input:
+        input::
+
             krun = index in range(len(self._the_runs_)) or -1 for [:len(self._the_runs_)]
             kgroup = index in range(len(self.groups)) or -1 for [:len(self.groups)]
-        output
+        
+        output::
+
             the corresponding yf, yb, eyf, eyb slices
-        cases:
-            slice==suite: A1, A21, C1, C2 slice is (-1,-1) but it is not really needed 
-            slice<suite:  A20 1d (0,kgroup), B1 1d (krun,0), B20 1d (krun,kgroup), B21 2d (krun,-1)  
+        
+        cases::
+
+            slice==suite: A1, A21, C1, C2:  
+                slice(-1,-1) [not really needed] 
+            slice<suite:  A20 1d: slice(0,kgroup), 
+                          B1 1d: slice(krun,0), 
+                          B20 1d: slice(krun,kgroup), 
+                          B21 2d: slice(krun,-1)  
         """
 
         from numpy import array, vstack
@@ -850,15 +865,17 @@ class suite(object):
         """
         basic method for plain asymmetry and errors arrays
 
-        input:
+        input::
+
             the_run = list containing the instance[s] of the run[s to be added]
             k = index of self.grouping, a list of dicts 
                 self.grouping[k]['forward'] and ['backward'] (py-index, i.e "counter 1-Backw" is  0)
                 containing the respective lists of detectors
-        * run instances from musr2py/muisis2py  (psi/isis load routine) 
-        *
-        outputs: 
-            # can be A1 fit, but is also invoked by all others
+
+        * run instances from musr2py/muroot2py/muisis2py  (psi/isis load routine) 
+        
+        outputs:: 
+            
             asymmetry and asymmetry error (1d)
         """
 
@@ -896,15 +913,25 @@ class suite(object):
         """
         asymmetry for mufit (-1 index lingo), can yield slice <= suite
 
-        input:
+        input::
+
             krun = index in range(len(self._the_runs_)) or -1 for [:len(self._the_runs_)]
             kgroup = index in range(len(self.groups)) or -1 for [:len(self.groups)]
-        output
+        
+        output::
+
             the corresponding asymmetry slice 
-        cases:
-            slice==suite: A1  1d (0,0), A21 2d (0,-1), C1 2d (-1,0), C2 3d (-1,-1)
-                        the same is obtained with asymmetry_multirun_multigroup(self)
-            slice<suite:  A20 1d (0,kgroup), B1 1d (krun,0), B20 1d (krun,kgroup), B21 2d (krun,-1)
+        
+        cases::
+
+            slice==suite: A1  1d: slice(0,0), 
+                          A21 2d: slice(0,-1), 
+                          C1  2d: slice(-1,0), 
+                          C2  3d: slice(-1,-1)
+            slice<suite:  A20 1d: slice(0,kgroup), 
+                          B1  1d: slice(krun,0), 
+                          B20 1d: slice(krun,kgroup), 
+                          B21 2d: slice(krun,-1)
         """
 
         from numpy import array, vstack
@@ -942,7 +969,8 @@ class suite(object):
         """
         True if len(self.runs)==1
 
-        output:
+        output::
+
             True if there is a single run (fit type A)
             False if there are many runs (fit types B and C)
         """
@@ -958,7 +986,8 @@ class suite(object):
         """
         False if A1 or B1 or C1, True otherwise
 
-        output:
+        output::
+
             True if more groups (fits A2, B2, C2)
             False if just one group (fits A1, B1, C1)
         """
@@ -976,7 +1005,8 @@ class suite(object):
         """
         returns suite scan string, "T[K] " , "B[mT]", "[deg]", "#   ", False if self.single()
 
-        output
+        output::
+
             False if single
             'B[mT]' if it's a B scan
             'T[K] ' if it's a T scan

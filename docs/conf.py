@@ -31,11 +31,18 @@ sys.path.insert(0, os.path.abspath('../mujpy'))
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones. Napoleon is perhaps beyond my scope: my docstrings are very unruly
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "_ext"))
+
 extensions = ['sphinx.ext.autodoc',
     'sphinx.ext.todo',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    "sphinx_copybutton"
+    "sphinx_copybutton",
+    "docgroups",
               ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -171,3 +178,46 @@ texinfo_documents = [
 ]
 
 html_css_files = ["custom.css"]
+import re
+
+
+def clean_musr2py_docstring(app, what, name, obj, options, lines):
+    if not name.startswith("musr2py."):
+        return
+
+    cleaned = []
+    for line in lines:
+        line = line.replace("/*!", "").replace("/**", "").replace("*/", "")
+        line = re.sub(r"^\s*\* ?", "", line)
+
+        # C++ "\brief" may arrive as a backspace character + "rief".
+        line = line.replace("\x08rief", "").replace(r"\brief", "")
+        cleaned.append(line.rstrip())
+
+    # Ensure bullet lists are separated from surrounding paragraphs.
+    result = []
+    in_list = False
+    for line in cleaned:
+        is_bullet = bool(re.match(r"^\s*[-+*]\s+", line))
+
+        if is_bullet and not in_list and result and result[-1].strip():
+            result.append("")
+        elif in_list and line.strip() and not is_bullet and not line[:1].isspace():
+            result.append("")
+
+        result.append(line)
+        if line.strip():
+            in_list = is_bullet
+
+    lines[:] = result
+
+def skip_grad_members(app, what, name, obj, skip, options):
+    member = name.rsplit(".", 1)[-1]
+    if "grad" in member or member.lstrip("_").startswith("derivative"):
+        return True
+    return None  # Keep Sphinx's normal decision.
+
+def setup(app):
+    app.connect("autodoc-process-docstring", clean_musr2py_docstring)
+    app.connect("autodoc-skip-member", skip_grad_members)
+

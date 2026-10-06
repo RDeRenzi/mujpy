@@ -1,25 +1,23 @@
-################
-# PLOT METHODS #
-################
-
 def plot_parameters(nsub,labels,fig=None): 
-    r"""
+    """
     standard plot of fit parameters vs B,T (or X to be implemente)
-    input
-       nsub<6 is the number of subplots
-       labels is a dict of labels, 
-       e.g. {title:title, xlabel:'T [K]', ylabels: ['asym',r'$\lambda$',r'$\sigma$,...]}
-       fig is the standard fig e.g fig_pars
+    
+    input::
+
+       nsub,        number of subplots <6
+       labels,      dict of labels, 
+                        e.g. {title:title, 
+                            xlabel:'T [K]', 
+                            ylabels: ['asym',r'$\lambda$',r'$\sigma$,...]}
+       fig          standard fig e.g self.fig_pars
        
-    output 
-       the ax array on which to plot 
-       one dimensional (from top to bottom and again, for two columns)
-       example 
-         two asymmetry parameters are both plotfal=1 and are plotted in ax[0]
-         a longitudinal lambda is plotflag=2 and is plotted in ax[1]
-         ...
-         a transverse sigma is plotflag=n and is plotted in ax[n-1]
-         
+    output::
+
+       ax           array of axes
+                        one dim (top to bottom) 
+                        again, for two columns
+
+    Assumes global parameters are plotted and plt index is ax index     
     """
     import matplotlib.pyplot as P
     nsubplots = nsub if nsub!=5 else 6 # nsub = 5 is plotted as 2x3 
@@ -110,16 +108,27 @@ def plot_parameters(nsub,labels,fig=None):
 
 def plotile(x,xdim=0,offset=0):
     """
-    Produces a tiled plot, in the sense of np.tile e.g.
+    Produces a tiled plot, e.g asymmetries displaced vertically by 
 
-    ::
+    input::
 
-        x.shape = (1,1000) 
-        y.shape = (4,1000)
-        xt = plotile(x,4)
-        yt = plotile(y,offset=0.1) 
+        x,      2D array
+
+    ``*kwargs`` = default::
+
+        xdim = 0,       means xdim = x.shape[0], else xdim
+        offset = 0,     y-axis, 2D array
+
+    example::
+
+        x.shape = (1,1000) # a 1d frequency vector
+        y.shape = (4,1000) # four spectra in a 2d column 
+        xt = plotile(x,4) # a 2d column of 4 identical copies of x  
+        yt = plotile(y,offset=0.1) #  a copy of y with shifted vertically for clarity
+        plot(xt.transpose(),yt.transpose()) # a vertically shifted multiplot
 
     """
+
     # x is an array(x.shape[0],x.shape[1])
     # xoffset is a step offset
     # xdim = x.shape[0] if xdim == 0 else xdim
@@ -130,7 +139,7 @@ def plotile(x,xdim=0,offset=0):
     from numpy import tile, arange
     xt = deepcopy(x)
     if xdim != 0: # x is a 1D array, must be tiled to xdim
-        xt = tile(xt,(int(xdim),1))
+        xt = tile(xt,(int(xdim),1)) # this numpy tile produces a column of xt replicas
     if offset != 0:
         xt += tile(offset*arange(xt.shape[0]),(x.shape[1],1)).transpose()
     return xt
@@ -139,13 +148,17 @@ def plotile(x,xdim=0,offset=0):
 # mufitplot figures #
 #####################
 
-def set_fig(num,nrow,ncol,title,**kwargs):  # NOT CLEAR WHERE IT IS USED
+def set_fig(num,nrow,ncol,title,**kwargs): 
     """
-    [re]creates fix, ax
+    [re]creates fig, ax
 
-        num         figure number (static, to keep the same window) 
-        nrow, ncol  number of subplots rows and columns
-        kwargs      a dict of keys to pass to subplots as is
+    input::
+
+        num,            figure number (static, to keep the same window) 
+        nrow,           number of subplots rows
+        ncol,           and columns 
+        ``**kwargs``    a dict of keys to pass to subplots as is
+
     initializes fig when first called 
     or after accidental killing
     """
@@ -157,28 +170,26 @@ def set_fig(num,nrow,ncol,title,**kwargs):  # NOT CLEAR WHERE IT IS USED
 
 def set_single_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):#,canvas=None):
     """
-    call single mufitplot with no animation
+    call single mufitplot, static
 
-    input:
-        flags = [early_late, anim] True/False
-        model = model name
-        data = [t,y,ey,f_res,tf,f,dy_fit] 
-            used for errorbar(t,y,yerr=ey), 
-                     plot(tf,f), 
-                     plot(t,y-f_res), 
-                     chi(dy_fit)
-        group = [fgroup,bgroup,,alpha]
-        run_title, for figure title
-        chi_dof = [nu,chi], number of dof and chi2 (chi scalar in single)
-        data_late = [t_late,y_late,ey_late,f_res_late,tfl,fl,dy_fit_early,dy_fit_late]
-                    if early_late else None
-        chi_dof_late = [nu_e,nu_l,chi_e,chi_l,w_e,w_l], if early_late else Nonu
-            w_e = nu_fit*ones(t_fit_early.shape[0])/nu_fit_early
-            w_l = nu_fit*ones(t_fit_late.shape[0])/nu_fit_late
+    input::
+
+        out,            Output for plot, None for Qt backend
+        fig,            handle
+        model,          name
+        early_late      bool,
+        data            [t,y,ey,f_res,tf,f,dy_fit] 
+        group           [fgroup,bgroup,,alpha]
+        run_title       for figure title
+        chi_dof,        [nu,chi], n of dof, chi2
+        data_late,      like data if early_late False
+        chi_dof_late    [nu_e,nu_l,chi_e,chi_l,w_e,w_l]
+        rrf=0           ditto
+    
     output: 
-        fig, to reuse fig window
-    recovers or creates figure subplots 
-    for single fit
+    
+        fig,            to reuse fig window
+    
     """
 
     import matplotlib.pyplot as P
@@ -275,28 +286,14 @@ def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_
     """
     call sequence mufitplot, with animation
 
-    input:
-        flags = [early_late, anim] True/False
-        model = model name
-        data = [t,y,ey,f_res,tf,f,dy_fit] 
-            used for errorbar(t,y,yerr=ey), 
-                     plot(tf,f), 
-                     plot(t,y-f_res), 
-                     chi(dy_fit)
-        group = [fgroup,bgroup,,alpha]
-        run_title, for figure title
-        chi_dof = [nu,chi], number of dof and chi2 (chi list in sequence)
-        data_late = [t_late,y_late,ey_late,f_res_late,tfl,fl,dy_fit_early,dy_fit_late]
-                    if early_late else None
-        chi_dof_late = [nu_e,nu_l,chi_e,chi_l,w_e,w_l], if early_late else Nonu
-            w_e = nu_fit*ones(t_fit_early.shape[0])/nu_fit_early
-            w_l = nu_fit*ones(t_fit_late.shape[0])/nu_fit_late
-    output: 
-        fig, to reuse fig window
-    recovers or creates figure subplots 
+    input::
 
-    until FuncAnimation does not work in a ipywidgets Outpu()
-        if type(out) != 'NoneType': produce a list of images  
+        see set_single_fit, same input, arrays are multidimensional
+    
+    output: 
+
+        fig,        to reuse fig window
+
     """
 
     import matplotlib.pyplot as P
@@ -314,10 +311,14 @@ def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_
     def animate_fit(i): 
         """
         anim function
-        update errorbar data, fit, residues and their color,
-               chisquares, their histograms 
+        
+        update::
+            
+            errorbar data, fit, residues and their color,
+            chisquares, their histograms 
 
         """
+
         from  numpy import histogram, array
         # early_late == False if data_late == None
         #early_late = False if data_late == None else False
@@ -624,7 +625,8 @@ def set_figure_fft(out,fig,model_name,ylabel,f,ap,apf,ep,group,run_title):
     """
     draw the mufitplot FFT figure, anim for 2,3d a, af
 
-    input:
+    input::
+
         fig_fft figure handle
         model_name e.g. "mgml"
         f frequency slice
@@ -648,7 +650,10 @@ def set_figure_fft(out,fig,model_name,ylabel,f,ap,apf,ep,group,run_title):
     def animate_fft(i):
         """
         anim function
-        update fft data, fit fft and their color 
+        
+        updates::
+            
+            fft data, fit fft and their color 
 
         """
         # color = next(ax_fft._get_lines.prop_cycler)['color']
@@ -662,10 +667,7 @@ def set_figure_fft(out,fig,model_name,ylabel,f,ap,apf,ep,group,run_title):
 
     def init_animate_fft():
         """
-        anim init function
-        blitting (see wikipedia)
-        to give a clean slate 
-
+        anim init function blitting (see wikipedia) to give a clean slate 
         """
         ax_fft.set_title(run_title[0])
         marks.set_ydata(ap[0,:])
@@ -749,15 +751,25 @@ def errorb(ax,t,y,ey,color):
     """
     returns handles of ax.errorbar(t,y,yerr=ey,mfc=color,...)
 
-    input:
-        ax = axis handle, 
-        t, y, ey = time data and error
-        color = symbol and errorbar color 
-    output:
-        line, xe, ye = three handles for the animations
-    Works for early, late, whole, depending on input 
-    To ignore handles for single run: 
-            dum, = errorb(...)
+    input::
+
+        ax,         axis handle, 
+        t,          time  
+        y,          data
+        ey,         error
+        
+    ``**kwargs``::
+        
+        accepts standard errorbar ones      
+    
+    output::
+        
+        line, xe, ye,   three handles for the animations
+    
+    Works for early, late, whole, depending on input
+
+    To ignore handles for single run: dum, = errorb(...)
+    
     Draws errorbar of data
     """
 
@@ -771,14 +783,17 @@ def plot_fit(ax,t,f,color):
     """
     returns captured handles calling ax.plot(t,f,yerr=ey,mfc=color,...)
 
-    input:
-        ax, axis handle
-        t, f, time fit
-        color = line color 
-    output:
-        fline = fit line handle for animation
-    Ignore handle for single run
-        dum = plot_fit(...)
+    input::
+        ax,         axis handle
+        t, f,       time fit
+        color,      line color
+
+    output::
+
+        fline,      fit line handle for animation
+    
+    Ignore handle for single run: dum = plot_fit(...)
+
     Draws overlayed fit     
     """
 
@@ -790,7 +805,8 @@ def decorate_data(ax,t,ym,yM):
     """
     sets x limits (forces 0), y limits, writes y_label 'Asymmetry'
 
-    input:
+    input:.
+
         ax,     axis handle
         t,      x array 0, x.max()
         ym, yM  y limits
@@ -804,7 +820,8 @@ def decorate_data_late(ax,t,ym,yM):
     """
     sets x strong limits, y limits, writes x_label, removes y ticks
 
-    input:
+    input::
+
         ax,     axis handle
         t,      x array x[0] x.max()
         ym, yM  y limits
@@ -819,14 +836,18 @@ def plot_res(ax,t,dy,color):
     """
     Draws residues, returns handle         
 
-    input:
-        ax,     axis handle
-        t, dy,  time, residues
-        color_index = 0, 2 for early (whole) or late
-    output:
+    input::
+
+        ax,         axis handle
+        t, dy,      time, residues
+        color,      index = 0, 2 
+                        for early (whole) or late
+
+    output::
+
         res     residue line handle for animation
-    Ignore handle for single run
-        dum     plot_res(...)
+    
+    Ignore handle for single run: dum = plot_res(...)
     """
 
     res, = ax. plot(t,dy,'-',lw=1.0,alpha=0.8,zorder=2,color=color) # residues 
@@ -836,11 +857,14 @@ def decorate_res(ax,t,ey,rm,rM):
     """
     sets limits, writes x_label, y_label, draws 1-, 2-std lines 
 
-    input:
+    input::
+
         ax,     axis handle
         t,ey,   time, std
         rm,rM   residue limits
-    output:
+    
+    output::
+
         handles to +1 -1 +2 -2 std ines
     """
 
@@ -863,12 +887,15 @@ def decorate_res_late(ax,t,ey,rm,rM):
     """
     sets limits, writes x_label, y_label, draws 1-, 2-std lines 
 
-    input:
+    input::
+
         ax,     axis handle
         t,ey,   time, std
         rm,rM   residue late limits
+    
     output:
-        handles to +1 -1 +2 -2 std ines            
+    
+        handles to +1 -1 +2 -2 std lines            
     """    
     from matplotlib import ticker
     from matplotlib.pyplot import rcParams
@@ -890,15 +917,19 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
     """
     write stuff at top right, returns 1 [None padded or + 2 text handles] (9 items)
 
-    input: 
+    input:
+
         ax
         nu_fit, nu_early, nu_late: dofs
         chi_fit, chi_early, chi_late: reduced chi2
         fgroup, bgroup, alpha: fit group
         ylim: data ylim 
-    background white for fit, 
-               color[0] for data, data_early
-               color[2] for data_late 
+
+    background:: 
+
+        white for fit
+        color[0] for data, data_early
+        color[2] for data_late 
     """
 
     from scipy.special import gammainc 
@@ -963,13 +994,14 @@ def plot_chi2(ax,dy_fit,nu_fit,dy_early,w_early,dy_late,w_late):
     """
      histogram of chi2 distrib, returns 1 histo, bar, bottom handles, [None padded or + 2 histo, bar handles]
 
-    input:
-        ax, axis handle
-        dy_fit, normalized deviation for fit, on fi-range
-        dy, normalized deviation for y, plot (full range or early)
-        w_plot, n_dof(fit)/n_dof(data_plot)*data_plot.shape[0]
-        dy_late, normalized deviation for y_late, plot (late)  or None
-        w_late, n_dof(fit)/n_dof(data_plot)*data_plot.shape[0] or None
+    input::
+
+        ax, axis    handle
+        dy_fit,     normalized deviation for fit, on fi-range
+        dy,         normalized deviation for y, plot (full range or early)
+        w_plot,     n_dof(fit)/n_dof(data_plot)*data_plot.shape[0]
+        dy_late,    normalized deviation for y_late, plot (late)  or None
+        w_late,     n_dof(fit)/n_dof(data_plot)*data_plot.shape[0] or None
     """
 
     from numpy import linspace, ndarray, histogram
@@ -1028,9 +1060,9 @@ def set_bar(n,b):
     """
     service to animate histograms
 
+    extracted from matplotlib animate histogram example
+    
     called in mufitplot plot_chi2
-        extracted from matplotlib animate 
-        histogram example
     """
 
     from numpy import array, zeros, ones
@@ -1067,6 +1099,8 @@ def set_bar(n,b):
 
 
 def display_anim(anima, run_title, init_anima, delay, out, fig):
+    """hart of animation"""
+
     import matplotlib.animation as animation
     from IPython.display import display
 
@@ -1081,13 +1115,15 @@ def display_anim(anima, run_title, init_anima, delay, out, fig):
         blit=False,
     )
 
-    fig._my_anim = anim
+    fig._my_anim = anim # VERY IMPORTANT!!
 
     fig.canvas.toolbar_visible = False
     fig.canvas.header_visible = False
     fig.canvas.footer_visible = False
 
     def toggle_pause(event):
+        """toggle start stop animatin with mouse click"""
+
         nonlocal paused
         if paused:
             anim.event_source.start()

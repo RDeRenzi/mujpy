@@ -1,25 +1,35 @@
 class mufitplot(object):
     """
-    class to plot fit guess/results and fft the residues
+    A mujpy plot class for fit guess/results and fft the residues
 
-    input 
-       plot_range: 2 to 5 values
-          None (skip time plot)
-          start stop
-          start stop pack
-          start stopearly packearly stop packlate
-       the_fit: the mufit instance, 
-          must be run before 
-       guess: True, False (default)
-       rotating_frame_frequencyMHZ: 0.0 default
-       fit_range: 1 or 3 values
-          None default
-          start, stop, sigma (LB) in MHz  
-    mufitplot class 
-    produces the fitplot
-    multiple runs sequential produce anim
-    can plot in the rotating frame
-    optional fft of residues toggles
+    input::
+
+        plot_range: 2 to 5 values
+            start, stop
+            start, stop, pack for rebinned data
+            start, stopearly, packearly, stop, packlate
+                the early range and the late range have distinct packs
+        the_fit: the mufit instance, invoked before calling mufitplot
+
+    ``**kwargs`` = default::
+
+        guess = False, results are plotted, True, starting guess plot
+        rotating_frame_frequencyMHZ = 0 -> no transform, float -> transform
+        fft_range = 1 or 3 values,
+            None, default, no fft
+            start, stop, sigma (LB, in MHz aliasing exponential filter)  
+            real = True, rephased fft amplitude, False power
+            fig_fit = None, a handle to recycle the fig
+            fig_fft = None, same
+            plot_out = None, an Output widget for ipympl plots
+
+    produces::
+
+        the single asymmetry fit A1 
+            a static plot
+        multiple asymmetries, fit A20, A21, B1, B20, B21, C1, C2
+            animations, 1s/frame, stop/anim toggle
+
     fig handle is now handled automatically 
     """
 
@@ -32,18 +42,7 @@ class mufitplot(object):
                  fig_fft=None,
                  plot_out=None):
         """
-        init args are plot_range and a mufit instance [options]
-
-        input:
-            plot_range a csv string, start, stop [,pack [start_r, stop_r]]  
-            the_fit mufit instance 
-                    self.dashboard = the_fit.dashboard best fit json file
-                mufit(...,initialize_only=True) for dry Minuit to plot guess
-            [guess = True for initial guess plot, default False for Minuit results]
-            [rotating_frame_frequencyMHz, ditto if not == 0.0 (default)]
-            [fft_range ditto if not None (default)]
-            [real = False for fft power]
-        finally calls set_single_fit, or set_sequence_fit for animations
+        __init__  for the class
         """
 
 #        from mujpy.mucomponents.mucomponents import mumodel
@@ -99,23 +98,30 @@ class mufitplot(object):
         """
         recovers data and statistics from mufit.mumodel and plots fit result/guess
         
-        input :
+        input::
+
             plot_range
                 (start,stop)
                 (start,stop,pack)
                 (start_early,stop_early,pack_early,stop_late,pack_late)
-        calls
-            self.chi, which calls self.reload((start,stop,pack))
-                            uploads rebinned data slice in self.model._x_, self.model._y_, self.model._e_
-                            produces ndof, f, chi for the chosen slice  (through model)
-        finally calls 
-            set_single_fit or set_sequence_fit, from tools.plot
-                                    (produce actual figures)
-            Draws either static or anim figures using tools.plot functions
 
-            Data are rebinned with reload, using mumodel methods.
-            Rot frame: self.rrf_y, self.rrf_e are unbinned mixed data/errors
-            Here they are just rebinned and their fit with same pack is mixed
+        calls::
+
+            self.chi, which calls self.reload((start,stop,pack))
+                uploads rebinned data slice into 
+                    self.model._x_, self.model._y_, self.model._e_
+                    using mucomponents methods
+                produces ndof, f, chi for the chosen slice  (through model)
+            set_single_fit or set_sequence_fit, from tools.plot
+                produce actual figures
+        
+        Draws either static or anim figures using tools.plot functions
+
+        Rot frame::
+
+            tools.mixer does the job using a suitable filter, into 
+                self.rrf_y, self.rrf_e unbinned, mixed data/errors
+                rebinned together with their mixed fit, same pack
         """
 
         from mujpy.tools.tools import derange, rebin, rshp
@@ -327,16 +333,21 @@ class mufitplot(object):
     
     def chi(self,tup):
         """
-        reloads data and statistics through mufit.mumodel
+        reloads data and statistics through mufit.mumodel (mucomponents methods)
 
-        input:
+        input::
+
             tup = start, stop, pack
-        output:
-            ndof number of degrees of freedom [*approximated] for each 1d slice of self.model._y_
-            f fit function, same dim as self.model._y_
-            chi2_r [*approximate] reduced chisquare of each 1d slice 
+        
+        output::
+
+            ndof, number of degrees of freedom [*] for each 1d slice of self.model._y_
+                [*] approxinated for global fits
+            f, fit function, same dimension as self.model._y_
+            chi2_r, reduced chisquare [*] of each 1d slice
+
         valid for any fit, A1, A20, A21*, B1, B20, B21*, C1*, C2*
-                                                  and their calib
+        and their calib
         """
         
         from mujpy.tools.tools import rshp
@@ -382,20 +393,27 @@ class mufitplot(object):
         """
         returns model name (e.g. 'mlbg')
 
-            used by plot_run
+        used by plot_run
         """
 
         model = self.dashboard["model_guess"]
         return ''.join([component["name"] for component in model]) 
- 
+
+#"""
+################################
+# FFT methods, to be refurbished
+################################
+#"""
+
     def choosefftplot(self,fft_range,real):    
         """
-        Must be refurbished: either amplitude or power fft of residues (refurbish!)
+        either amplitude or power fft of residues (refurbish!)
 
-        distinguishes  
-          single-multi run
-          single-multi group
-          sequential-global  
+        distinguishes::
+
+            single - multi run
+            single - multi group
+            sequential-global  
         """
 
         from mujpy.tools.tools import function_multi_in_components
@@ -470,19 +488,21 @@ class mufitplot(object):
         """
         plots fft of residues 
 
-        input:
-            fft_range
-                start,stop,sigma MHz
-            pars list (single, calib) or list of lists (sequence)
+        input::
+
+            fft_range, start, stop, sigma (LB) MHz
+            pars list, (single, calib) or list of lists (sequence)
             asymm, asyme  1d (single, calib) or 2d (sequence)
+
         uses data as dictated by self.dashboard["fit_range"]
         
-        calls either 
+        calls::
+
             self.chi_fft (only for model function) 
             set_single_fft or set_sequence_fft, from tools.plot
             first version single only
-                                    (produces actual figures
-                                     using tools.plot functions)
+                produces actual figures
+                using tools.plot functions
         """
 
         from mujpy.tools.tools import derange, rebin, autops, ps

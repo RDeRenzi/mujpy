@@ -1,17 +1,15 @@
 .. encoding: utf-8
-.. |mSR| replace:: :math:μSR
 
 =====
 mujpy
 =====
 
-A Python |mSR| data analysis package, for both command line and a graphical interface
+A Python μSR data analysis package, for both command line and a graphical interface
 running under Jupyter and Voilà, released under the GPL-3 licence. 
 
-It aims at the power of musrfit
-with the user-friendly appearance of mulab.
+It aims at the power of musrfit with the user-friendly appearance of mulab.
 
-Feom version 3.1.3 Main technical features: 
+From version 3.1.3 on, the main technical features are: 
 
 - a model built on two-letter bricks: mg, for
   Gaussian-damped cosine, ml for Lorentzian-damped cosine etc. 
@@ -24,15 +22,15 @@ Feom version 3.1.3 Main technical features:
 
 **Try mujpy!** 
 
-on linux, or on Windows by lightweight WSL2 (~10GB of ubuntu-in-Windows). Follow simple `installation instructions <https://mujpy.readthedocs.io/latest/Installation.html>`_. Both os come with python, you only need to:  
+on linux, or on Windows by wsl (requires ~10GB for ubuntu-in-Windows). Follow simple `installation instructions <https://mujpy.readthedocs.io/latest/Installation.html>`_. Both os come with python (wsl requires a further step), you only need to:  
 
 * create a venv ``python -m venv ~/.mujpy-env``, 
 * activate it ``source ~/.mujpy-env/bin/activate``, 
-* invoke ``python -m pip install --upgrade mujpy``
+* invoke ``python -m pip install --upgrade mujpy`` 
 
-Now try your freshly installed ``mujpy`` from command line, to demonstrate its capabilities. Just type ``python -m mujpy.tests.tests`` and 16 fully automatic cases will popup, in order of growing complexity (find a description in the `Tutorial <https://mujpy.readthedocs.io/latest/Tutorial.html>`_).
+Now try your freshly installed ``mujpy`` from command line, to demonstrate its capabilities. Type ``python -m mujpy.tests.tests``: 16 fully automated command line executions will start and popup their graphics (find the description in the `Tutorial <https://mujpy.readthedocs.io/latest/Tutorial.html>`_).
 
-There is also a GUI with its demos, see basic instructions on `ReaTheDocs <https://mujpy.readthedocs.io/latest/Tutorial.html>`_. Choice of jupyter notebook ``%matplotlib qt`` for popup plots, or ``%matplotlib widget`` for Log-tab side-by-side log+plot. Even simpler with ``voila``
+For normal use a GUI (with its onw demos) is available (see basic instructions on `ReaTheDocs <https://mujpy.readthedocs.io/latest/Tutorial.html>`_) with choice of popuop plots - jupyter notebook ``%matplotlib qt`` - or Log-tab side-by-side log+plot - ``%matplotlib widget``. Dircet browser access with ``voila``
 
 Please email bugs to the author.
 

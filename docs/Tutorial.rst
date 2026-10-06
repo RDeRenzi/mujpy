@@ -29,7 +29,7 @@ Now launch a Python3 notebook. Write
 
 in the first cell (hover the green box for a code copy widget). This activates the `qt` backend for graphic popup windows, fine for smallish screens. If you prefer tabbed graphics type instead
 
-.. code-block::
+.. code-blgTock::
 
     %matplotlib ipympl
     
@@ -40,24 +40,26 @@ Then move to the second cell and type
         from mujpy.mudashed import dashed
         the_dash = dashed()
   
-Rename this notebook e.g. `Mudashed.ipynb`. From now on you can use this same notebook to run all your fits. 
+Rename this notebook, e.g. `Mudashed.ipynb`. From now on you can use this same notebook to run all your fits. 
+
+.. _dashed-tutorial:
 
 Use it
 ~~~~~~
 Assume you are running an :math:`\alpha` calibration in TF geometry, e.g. gps run 822, 2021.
 Click on the first cell and press twice :math:`\blacktriangleright` in the notebook bar. Each time you want to restart from scratch `Mudashed` do the same). Three rows of widgets appear 
 
-.. image:: Mudashed-0.png
+.. image:: _static/Mudashed-0.png
 
 You can now retrieve run 822 from the Fetch data tab. 
 Check that Group 0 is OK for you (it is, for 822). Then press DL and choose a prototype data file. Now type the run number (no leading zeros) in the run list box and press Enter. A new row of widgets appears. New info has appeared in the fist two widget rows, explore them. Notice that most widgets have tips shown when the mouse hovers on them (with browser in focus!).
  
 
-.. image:: Mudashed-1.png
+.. image:: _static/Mudashed-1.png
 
 Type your chosen model acronym in the box, e.g. ``almg``, calibrate :math:`\alpha`, and press ``Enter``. The model editor appears. 
 
-.. image:: Mudashed-2.png 
+.. image:: _static/Mudashed-2.png 
 
 * Component `al`, on the left side has one parameter :math:`\alpha`. Select a guess value, say 1.0. Forget Flag and Function, for now. 
 * `mg` is a precessing component with Gaussian damping. Parameter names are self evident, `B` is mT, :math:`\phi` degrees. The figure has easonable guess values. Chech the FR box, fit range and binning, and press Fit to get your minimization. 

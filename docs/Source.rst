@@ -6,6 +6,13 @@
 Source documentation
 ====================
 
+--------
+mudashed
+--------
+.. autoclass:: mudashed.dashed
+    :members:
+    :private-members:
+
 -------
 musuite
 -------
@@ -25,18 +32,17 @@ muprompt
 .. autoclass:: mucomponents.muprompt.muprompt
     :members:
 
---------
-mudashed
---------
-.. autoclass:: mudashed.dashed
-    :members:
-    :private-members:
-
-
 -----
 mufit
 -----
 .. autoclass:: mufit.mufit
+    :members:
+    :private-members:
+
+-------
+mumodel
+-------
+.. autoclass:: mucomponents.mucomponents.mumodel
     :members:
     :private-members:
 
@@ -47,25 +53,20 @@ mufitplot
     :members:
     :private-members:
 
+-----
+tools
+-----
+.. automodule:: tools.tools
+   :nomembers:
+
+.. autodocgroups:: tools.tools
+
 ----
 plot
 ----
 .. automodule:: tools.plot
     :members:
-    :private-members:
-
------
-tools
------
-.. automodule:: tools.tools
-    :members:
-    :private-members:
-
--------
-mumodel
--------
-.. autoclass:: mucomponents.mucomponents.mumodel
-    :members:
+    :member-order: bysource
     :private-members:
 
 ---------
@@ -83,5 +84,8 @@ munxs2py
 -------
 musr2py
 -------
-wrapper by P. Bonfà, `musr2py <https://github.com/bonfus/musr2py>`_ to MuSR_td_PSI_bin, extracted from Class_MuSR_PSI by A. Amato and A. Raselli, and described in `psi format <https://www.psi.ch/sites/default/files/2026-04/psi_format.pdf>`_ 
+wrapper by P. Bonfà, `musr2py <https://github.com/bonfus/musr2py>`_ to MuSR_td_PSI_bin, by A. Amato and A. Raselli.
 
+.. autoclass:: musr2py.MuSR_td_PSI_bin
+   :members:
+   :member-order: alphabetical
