@@ -48,7 +48,8 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 version_file = "mujpy/_version.py"
 
-[tool.setuptool.packages.find]
+[tool.setuptools.packages.find]
+where = ["."]  
 include = ["mujpy","mujpy.*"]
 
 [tool.setuptools.package-data]
