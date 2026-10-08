@@ -3392,6 +3392,16 @@ def fetch_PSI_data(year,area,run_start,run_stop,datapath):
             tar.extractall(path=datapath)
         return r.raise_for_status()
 
+
+def get_recent_files(directory):
+    """ report PSI fetched files from out.txt """
+    import os
+
+    with open(os.path.join(directory,'out.txt'),'r') as f:
+        next(f)
+        string = f.readline()
+    return [os.path.split(chunk)[1] for chunk in string.split(' ') if chunk[1:4]=='psi'] 
+
 def make_copy(test):
     """
     copy groups and, in case, the tests data of type test

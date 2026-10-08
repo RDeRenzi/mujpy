@@ -337,7 +337,7 @@ class suite(object):
             t_value, t_error = 0, 0
         return t_value, t_error
 
-    def promptfit(self,mplot, mprint = False):
+    def promptfit(self,mplot, mprint = True):
         """
         indentifies t0 and stores self.nt0 array (all intruments) [ISIS not yet]::
 

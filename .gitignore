@@ -29,6 +29,7 @@ mujpy/v.1
 mujpy/v.2.7
 mujpy/tests/_pycache__
 mujpy/tests/v.1.0/
+mujpy/muroot2py/muroot.plan.txt
 *.egg-info/
 .installed.cfg
 *.egg

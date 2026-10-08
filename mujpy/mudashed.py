@@ -1006,22 +1006,29 @@ class dashed(object):
                                 ]),
                       Textarea(value='',disabled=True,layout=Layout(width='900px',height='160px'))])
         """
-        from mujpy.tools.tools import fetch_PSI_data
-        from os.path import isdir, split
+        from mujpy.tools.tools import fetch_PSI_data, get_recent_files
+        from pathlib import Path
+        from os import mkdir, listdir
         area = self.fetch_box.children[0].children[0].value
         year = self.fetch_box.children[0].children[1].value
         run_start = self.fetch_box.children[0].children[2].value
         run_stop = self.fetch_box.children[0].children[3].value
-        datapath = self.suite_box.children[2].children[2].value
-        if datapath:
-            datapath = datapath if isdir(datapath) else split(datapath)[0]
-            error = fetch_PSI_data(year,area,run_start,run_stop,datapath)
-            if error:
-                self.fetch_box.children[1].value += 'Error searching PSI database\n {}'.format(error)
-            else:
-                self.fetch_box.children[1].value = 'Loaded {} file(s) in data/ path'.format(run_stop-run_start+1)
+        run_stop = run_stop if run_stop>=run_start else run_start
+        datapath = Path(self.suite_box.children[2].children[2].value)
+        if datapath.is_file(): datapath = datapath.parent()
+        elif not datapath.exists(): datapath.parent.mkdir(parents=True, exist_ok=True) 
+        self.log(datapath)
+        error = fetch_PSI_data(year,area,run_start,run_stop,datapath)
+        if error:
+            self.fetch_box.children[1].value += 'Error searching PSI database\n {}'.format(error)
         else:
-            self.fetch_box.children[1].value = 'No data path present, write one in the Fit tab'
+            fetch = get_recent_files(datapath)
+            if fetch:
+                string = 'Loaded {} files, from {} to {}'.format(run_stop-run_start+1,fetch[0],fetch[-1])
+                if len(fetch) == 1: string = 'Loaded 1 file, {}'.format(fetch[0])
+            else:
+                string = 'Loaded 0 files in {}'.format(datapath)
+            self.fetch_box.children[1].value = string
 
     def board(self):
         '''
@@ -1330,8 +1337,9 @@ class dashed(object):
                                 IntText(value = 1,
                                         description = 'start run',
                                         layout=Layout(width='20%')),
-                                IntText(value = 2,
+                                IntText(value = 0,
                                         description = 'stop run',
+                                        tooltip = '0 is start run only',
                                         layout=Layout(width='20%')),
                                         fetch_button         
                                     ]),
