@@ -27,12 +27,11 @@ class muroot2py():                        # defines the python class
           initiated on the data file
           returns True (success) or False (insuccess)
         """    
-        with uproot.open(path_filename) as run:
-            try:
-               	self.run = run
-               	read_ok = True
-            except:
-                read_ok = False
+        try:
+            self.run = uproot.open(path_filename)
+            read_ok = True
+        except:
+            read_ok = False
         return read_ok
 
 # internal methods
