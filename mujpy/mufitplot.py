@@ -52,12 +52,15 @@ class mufitplot(object):
         from mujpy._version import __version__
         self.__version__ = __version__
         self.plot_out = plot_out
+        self.dashed = the_fit.dashed
+        self.warn_msg = False
         self.fit_types = the_fit.fit_types
         self.calib = the_fit.calib()
         self.global_fit = the_fit.global_fit()
         self.model = the_fit.the_model
         self.suite = the_fit.suite
         self.log = the_fit.log
+        #self.log(r'\n\n\nTry this out from mufitplot, is this working?')
         self.lastfit = the_fit.lastfit
         self.lastfits = the_fit.lastfits
         self.global_fit = the_fit.global_fit()
@@ -174,7 +177,9 @@ class mufitplot(object):
             self.rrf_y = mixer(time,self.model._a_,self.rotating_frame_frequencyMHz)
             self.rrf_e = mixer(time,self.model._ea_,self.rotating_frame_frequencyMHz)
             # self.rrf_y, self.rrf_e are rotating frame unbinned data, stds
-        fittup,ermsg = derange(self.dashboard["fit_range"],self.suite.histoLength)# range as tuple
+        fittup,errmsg = derange(self.dashboard["fit_range"],self.suite.histoLength)# range as tuple
+        if errmsg: # this can happen only from script, mudashed checks in mufit
+            self.log(errmsg,' **** wrong "fit_range" in json')
         fittup = fittup if len(fittup) == 3 else (fittup[0],fittup[1],1) # if pack is missing
         fit_start,fit_stop,fit_pack = fittup[0:3] # only one range, trailing in longer fittup ignored
         
@@ -191,8 +196,12 @@ class mufitplot(object):
             _, y_fit, ey_fit = rebin(self.suite.time,self.rrf_y,[fittup[0],fittup[1]],fittup[2],e=self.rrf_e)  # y_fit ey_fit in rot frame
             f_fit = mixer(time,f_fit,self.rotating_frame_frequencyMHz)                    # fit in rot frame
 
-        plottup,ermsg = derange(plot_range,self.suite.histoLength)
 
+        plottup,errmsg = derange(plot_range,self.suite.histoLength)
+        if errmsg:
+            plottup = fittup
+            errmsg += '\nUsed fit range instead\nSwitch manually to Log tab'
+            self.warn_msg = ['Check fit range!',errmsg]
         if len(plottup)==5: 
         #########################################
         # double range plot                     #
@@ -201,13 +210,15 @@ class mufitplot(object):
             early_late = True
             start, stop, pack, last, packlate = plottup # required by rebin rrf late
         
-            # t_late,y_late,ey_late,f_late_res
+            # t_late,y_late,ey_late,f_late_res:
+            # compute only late pack data and function for residues, stats doesn't matter 
             lattup = (stop,last,packlate)
             _, f_late_res, _  = self.chi(lattup) # load rebinned rshp(self.model._x_), rshp(self.model._y_), rshp(self.model._e_)
             # f_late_res for calculating residues on data points 
             t_late,y_late,ey_late = rshp(self.model._x_), rshp(self.model._y_), rshp(self.model._e_) # rebinned late data slice         
 
             # tfl,fl for late plot curve
+            # same for denser plotting curve function, stats and data don't matter
             packfit = int(packlate/2)
             fltup = (stop, last, packfit)
             _,fl,_ = self.chi(fltup)
@@ -225,16 +236,19 @@ class mufitplot(object):
                 f_late_res = mixer(time, f_late_res, self.rotating_frame_frequencyMHz) 
                 fl = mixer(timf, fl, self.rotating_frame_frequencyMHz) 
             
-            fit_late_start = int(stop/packlate*fit_pack) # divides fit_range in early and late
-            fitlattup = (fit_late_start,fit_stop,fit_pack) # for dy_fit_late histogram
+            # approx late stats, f, data (needed for residues)
+            #fit_late_start = int(stop/packlate*fit_pack) # divides fit_range in early and late
+            fitlattup = (stop,fit_stop,fit_pack) # for dy_fit_late histogram
 
-#             # redo the same with the original fit binning fit_pack, only for histo and chi2
-            nu_fit_late, f_fit_late, chi_fit_late = self.chi(fitlattup) # chi(t_fit_late,y_fit_late,ey_fit_late,pars)
+            # redo the same with the original fit binning fit_pack, only for histo and chi2
+            ratio = (fit_stop-stop+1)/(fit_stop-fit_start+1)
+            nu_fit_late, f_fit_late, chi_fit_late = self.chi(fitlattup,ratio=ratio) # chi(t_fit_late,y_fit_late,ey_fit_late,pars)
             t_fit_late,y_fit_late,ey_fit_late = rshp(self.model._x_),rshp(self.model._y_),rshp(self.model._e_)        
 
-           # redo the same with the original fit binning fit_pack, only for histo and chi2
-            fiteartup = (start,fit_late_start,fit_pack)
-            nu_fit_early, f_fit_early, chi_fit_early = self.chi(fiteartup) #chi(t_fit_early,y_fit_early,ey_fit_early,pars)
+            # same approx early stats, f, data (needed for residues)
+            fiteartup = (start,stop,fit_pack)
+            ratio = (start-stop+1)/(fit_stop-fit_start+1)
+            nu_fit_early, f_fit_early, chi_fit_early = self.chi(fiteartup,ratio=ratio) #chi(t_fit_early,y_fit_early,ey_fit_early,pars)
             t_fit_early,y_fit_early,ey_fit_early = rshp(self.model._x_), rshp(self.model._y_), rshp(self.model._e_) 
 #            
 #            # single slices as in fit 
@@ -331,13 +345,15 @@ class mufitplot(object):
                                     chi_dof_late,rrf=self.rotating_frame_frequencyMHz)#,canvas=self.suite.canvas)
         
     
-    def chi(self,tup):
+    def chi(self,tup,ratio=None):
         """
         reloads data and statistics through mufit.mumodel (mucomponents methods)
 
         input::
 
-            tup = start, stop, pack
+            tup,        (start, stop, pack)
+            ``*ratio``   None, default
+                        ratio, for partial nfit, if early_late
         
         output::
 
@@ -348,6 +364,8 @@ class mufitplot(object):
 
         valid for any fit, A1, A20, A21*, B1, B20, B21*, C1*, C2*
         and their calib
+
+        valid for estimated partial values in early_late plots 
         """
         
         from mujpy.tools.tools import rshp
@@ -361,26 +379,29 @@ class mufitplot(object):
         #print('chi f.shape = {}'.format(f.shape))
         A1,A20,A21,B1,B20,B21,C1,C2 = self.fit_types()
         n_runs, n_groups = self.suite.nruns, len(self.suite.groups) # suite dimensions
+        nfit = self.lastfit.nfit 
+        # ratio must be the fraction (this-stop-this-start+1)/(last-start+1)
+        nfit = nfit if not ratio else nfit*ratio # estimated contribution
+
         if A1: # 1d yin and f, par is a simple list
-            ndof = self.model._y_.size - self.lastfit.nfit # degrees of freedom
+            ndof = self.model._y_.size - nfit # degrees of freedom 
             # chi2 = self.fit.lastfit.fval/ndof
             chi2_r = (((self.model._y_-f)/self.model._e_)**2).sum()/ndof # exact
         elif A21: # 2d yin and f, par is a list
             n_groups = f.shape[0]
-            ndof = self.model._y_.shape[-1] - round(self.lastfit.nfit/n_groups) # approximate
+            ndof = self.model._y_.shape[-1] - nfit/n_groups # approximate
             chi2_r = []
             for kgroup in range(n_groups):
                 chi2 = (((self.model._y_[kgroup,:]-f[kgroup,:])/self.model._e_[kgroup,:])**2).sum()/ndof
                 chi2_r.append(chi2) # list of n_groups approximate chi2_r
         elif A20 or B1: # suite 2d yin and f, par is a list of lists
-            nfit = self.lastfit.nfit if A20 or B1 else round(self.lastfit.nfit/n_runs)
             ndof = self.model._y_.shape[-1] - nfit # exact, all equal
             chi2_r = []
             for k in range(len(self.lastfits)): # either ngroups (A20) or nruns (B1) or 1 (C1)
                 chi2 = (((self.model._y_[k,:]-f[k,:])/self.model._e_[k,:])**2).sum()/ndof
                 chi2_r.append(chi2) # list of n_groups/n_runs exact chi2_r
         else: # if B20 or B21 or C1 or C2: # 3d yin and f, par is a list of lists 
-            nfit = self.lastfit.nfit if B20 else round(self.lastfit.nfit/n_groups) if B21 else round(self.lastfit.nfit/(n_runs*n_groups))
+            nfit = nfit if B20 else self.lastfit.nfit/n_groups if B21 else nfit/(n_runs*n_groups)
             ndof = self.model._y_.shape[-1] - nfit
             chi2_r = []
             for krun in range(n_runs):
@@ -535,7 +556,9 @@ class mufitplot(object):
         # this works for single 
         # and for sequential
         #############################
-        fittup,ermsg = derange(self.dashboard["fit_range"],self.suite.histoLength) # range as tuple
+        fittup,errmsg = derange(self.dashboard["fit_range"],self.suite.histoLength) # range as tuple
+        if errmsg: # this can happen only from script, mudashed checks in mufit
+            self.log(errmsg,' **** wrong "fit_range" in json')
         fit_pack = 1
         if len(fittup)==3: # plot start stop pack
             fit_start, fit_stop, fit_pack = fittup[0], fittup[1], fittup[2]

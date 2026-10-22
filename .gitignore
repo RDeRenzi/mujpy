@@ -80,3 +80,6 @@ MANIFEST
 
 # dynamic versioning
 mujpy/_version.py
+mujpy/muisis2py/muisis2py.plan.txt
+mujpy/tests/oldies/
+mujpy/muroot2py/muroot.plan.txt

@@ -17,7 +17,7 @@ class mufit(object):
             dry run, for ploting guess values 
         grad = False,
             dead branch for analytical gradients
-        scan = None, 
+        scan = [None], 
             orders csv according to run number
             other options 'T' temperature, 'B' field, '[' orient
         verbose = False,
@@ -35,42 +35,51 @@ class mufit(object):
             * then the plain method name deals with fixes alpha fits 
     """
 
-    def __init__(self,suite,dashboard_file,chain=True,dash_log=None,no_fit=False, grad=False, scan = None, verbose = False):
+    def __init__(self,suite,dashboard_file,chain=True,dash_log=None,no_fit=False, grad=False, scan = [None], verbose = False, dashed = False):
         """
         accepts suite instance, dashboard file,*kwargs
         """
 
         from mujpy._version import __version__
         from mujpy.mucomponents.mucomponents import mumodel
-        from mujpy.tools.tools import derange 
+        from mujpy.tools.tools import derange
 
         self.__version__ = __version__
         self.suite = suite
         self.log = dash_log if dash_log else self.suite.console # input log prevails
+        self.dashed = dashed
         self.nodash = True
         self.nodata = True
         self.dofit = not no_fit # initialize_only True just loads guess values, no Minuit
         self.grad = grad 
+        # self scan determines the order of the csv rows: one of "Run #","Temperature","B field","Orient
         self.scan = scan  # is handled automatically if caller sets scan = the_suite.scan()[0]
-        self.scan = 'θ' if self.scan == '[' else self.scan
         self.verbose = verbose
         self.chain = chain
+        self.abort_msg = False
 
         if self._dash_load_(dashboard_file):# model syntax and data/range ok
             if not self.suite.loadfirst: # is suite loaded?
-                self.log('******* no data in musuite')
-                self.log('* check access to database')
+                if self.dashed:
+                    self.abort_msg = ['No data in suite!','Forgot DL or run list or RL?']
+                else:
+                    self.log('******* No data in suite!')
+                return
             else:
                 self.nodata = False
                 #print('mufit __init__ self.nodata {}'.format(self.nodata))
-                returntup,errmsg = derange(self.dashboard["fit_range"],self.suite.histoLength) 
-                if returntup[1]>0:
-                    start, stop, self.pack = returntup # self.pack used in summary
-                else:
-                    self.log('fit range: {}, histoLength: {}, errmsg {},{}, check syntax!'.format(
-                                      self.dashboard["fit_range"],self.suite.histoLength,returntup[0],returntup[1]))
-                    self.nodata = True # misuse to stop execution here below           self.the_model = mumodel()
-            self.lastfits = [] # lastfit initialization: 
+                returntup,errmsg = derange(self.dashboard["fit_range"],self.suite.histoLength)
+                if errmsg or len(returntup)==5:
+                    errmsg = f'{returntup}: 5 items not allowed in fit range' if len(returntup)==5 else errmsg 
+                    if self.dashed:
+                        self.abort_msg = ['Error in fit range',errmsg]
+                        #stop = str(int(self.suite.histoLength/1000)*1000)
+                        #self.dashboard["fit_range"] = '0,'+stop+',1'
+                    else:
+                        self.log('********' +errmsg)
+                    return
+                start, stop, self.pack = returntup # self.pack used in summary
+            self.lastfits = [] # lipyw_warning_dialastfit initialization: 
             self.notconverged = False
             self.dofit_(returntup) # execute fit
         if self.nodata:# 
@@ -175,7 +184,11 @@ class mufit(object):
         if not methods_keys: # if translate, called by int2_method_keys gets an exception
             self.log('     mufit stops here')
             return
-        values,errors,fixed,limits,names,pospar = int2min_(self.dashboard,runs) 
+        values,errors,fixed,limits,names,pospar = int2min_(self.dashboard,runs)
+        #fixed.append(True)
+        #for name,fix in zip(names,fixed):
+        #    self.log(f'debug mufit {name}, fixed {fix}')
+        #fixed.pop(-1)
         self.lastfit = Minuit(cost,
                               name=names,
                               *values)  # the only instance   
@@ -228,7 +241,7 @@ class mufit(object):
                             self.suite.grouping[kgroup]["alpha"] = self.lastfit.values[kgroup]
                         self.last_summary = True if kgroup == lastgroup else False
                         #summary(start, stop, krun, kgroup) # self.summary_global for B21, self.summary for B1
-                        summary(start, stop, 0, kgroup) # self.summary_global for B21, self.summary for B1
+                        summary(start, stop, krun, kgroup) # self.summary_global for B21, self.summary for B1
                     savefit(krun,0) # save_fit for B1, save_fit_global for B21
                     self.lastfit.values = values if not self.chain else self.lastfit.values
             nr, ng = self.suite.nruns,len(self.suite.groups)
@@ -496,7 +509,6 @@ class mufit(object):
         file_csv = self.suite.__csvpath__+modelname+'.'+version+'.csv'
         #print('mufit summary_global file_csv {}'.format(file_csv))
 
-        scan = '' if not self.scan else 'θ' if self.scan[0] == '[' else self.scan[0]
         cnames, cvalues, cstds, cnonhash = min2int_global(self.dashboard,self.lastfit.values,self.lastfit.errors,
                                                       krun,kgroup,self.the_model._slice_nruns_,self.the_model._slice_ngroups_) # comp list of par lists
         # print('mufit summary_global cnames {}'.format(cnames))
@@ -550,7 +562,7 @@ class mufit(object):
 
                     file = self.suite.__csvpath__+'U_'+modelname+'.'+version+'.csv'
                     header, row = self.prepare_globcsv_row(n,par_err_str,krun)
-                    string1, string0 = write_csv(header,row,the_run,file,filespec,scan=scan) 
+                    string1, string0 = write_csv(header,row,the_run,file,filespec,scan=self.scan) 
                     self.log(string0)
                 else: # C1 and C2
                     # a sinle log file with une line run
@@ -615,12 +627,12 @@ class mufit(object):
             if self.last_summary:
                 f.write('|'+(nch-4)*'_'+'|\n')
                 self.log('|'+nch*'_'+'|')
+                self.if_not_converged(f)
             #string2.append(string)
 
     #       close f
 
-        if self.last_summary: # only last summary_global call  
-            self.if_not_converged(f)
+            #if self.last_summary: # only last summary_global call  
 
         # now write Minuit parameter csv
   
@@ -788,7 +800,7 @@ class mufit(object):
 
     def prepare_csv_row(self,par_err_str,krun = 0,kgroup=0):
         """
-        writes header row, model single row for all fit types
+        writes header row, single model row, for all fit types
 
         input::
 
@@ -802,49 +814,16 @@ class mufit(object):
                     to compare with csv file
             row, line to be added to the csv file
 
-        prepares a csv-like row of best fit parameters 
-        that can be imported to produce figures
+        prepares a csv-like row (#, Tsample, B, O [,group], best fit parameters)
+        to be imported for figures
         """
 
         from mujpy.tools.tools import chi2std, init_csv_row, stringify_group #, get_title, spec_prec
         from mujpy.tools.tools import chi2_csv, min2int_names
-        #from mujpy.tools.tools import min2_csv, min2_global_csv #, list_depth
-
         
-        # A1, A20, A21, B1, B20, B21, C1, C2 = self.fit_types()
         filespec = self.suite.datafile[-3:]
         lowchi, hichi = chi2std(self.number_dof)
 
-        # if A21, B21, C1, C2: # includes calib
-        #    nruns = len(self.suite.runs) # is 1 for A21
-        #    ngroups = len(self.suite.groups) # is 1 for C1
-        #    vstr, estr, mvstr, mestr = min2_global_csvself.dashboard,self.lastfit.values,self.lastfit.errors,self.suite.nruns)
-        #    # A21, B21: single run multi group write row and append in group loop 
-        #    # C1: multi run single group write row in and append in group loop is fine, only one append per run
-        #    # C2: multi both write row and append in group is fine
-        #    # component parameters appended sequentially at the same level per each run and group 
-        #    #minparam2_csv(self.dashboard,self.lastfit.values,self.lastfit.errors,multirun=self.suite._the_runs_)
-        #    #nest = list_depth(vstr)i# always 3
-        #    rows = []
-        #    dof_single = self.number_dof/(nruns*ngroups)
-        #    for krun in range(nruns): # one line per run, only model parameter csv
-        #        for kgroup in range(ngroups): # one line per group 
-        #            the_run = self.suite._the_runs_[krun][0]
-        #            k, l = (krun, None) if C1 else (kgroup, None) if B21 or A21 else (krun,kgroup) # if C2  
-        #            chi_run = self.the_model._chisquare_single_(*self.lastfit.values,k=k,l=l)/= dof_single
-        #            group = self.suite.groups[kgroup] 
-        #            fgroup, bgroup, alpha = group['forward'],\
-        #                                    group['backward'],\
-        #                                    group['alpha']
-        #            row = init_csv_row(the_run.get_field(), filespec, the_run, group = stringify_group(group) )
-        #            for v,e in zip(vstr[krun][kgroup][:],estr[krun][kgroup][:])
-        #                row +=  v+','+e,+','
-        #        row += chi2_csv(chi_run,lowchi,hichi,alpha,self.suite.offset)   
-        #        row += '\n'
-        #        rows.append(row)
-        #    row = rows # in this case, C1, row is a list of rows
-        # else: # A1 or A20 or B1 or B20, includes calib
-            # A1, A20, B1, B20 are all single single when it comes to the summary
         the_run = self.suite._the_runs_[krun][0]
         group = self.suite.groups[kgroup] # assumes only one group
         fgroup, bgroup, alpha = group['forward'],\
@@ -860,10 +839,10 @@ class mufit(object):
         # row is formatted with appropriate rounding, write directly
         # self.console(row)
         if filespec == 'bin' or filespec == 'mdu' or filespec == 'root':
-            header = ['#0.Run','1.T_cryo[K]','2.e_T_cryo[K]','3.T_sample[K]','4.e_T_sample[K]','5.B[G]','6.group']
-            k = 6
+            header = ['#0.Run','1.T_cryo[K]','2.e_T_cryo[K]','3.B[G]','4.Orient','5.group']
+            k = 5
         else: # ISIS NeXus
-            header = ['#0.Run','1.T[K]','2.eT[K]','3.B[G]','4.group']
+            header = ['#0.Run','1.T[K]','2.B[G]','3.Orient','4.group']
             k = 4
         # now model parameter names for header
         nruns = 1

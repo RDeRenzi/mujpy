@@ -1,8 +1,9 @@
-import uproot
+from uproot import ReadOnlyFile
+from uproot.dynamic import Model_TFolder_v1
+from uproot.reading import ReadOnlyDirectory
 import numpy as np
 
 class muroot2py():                        # defines the python class
-
     """
     the user method names are standardized, when possible, to those of MuSR_td_PSI_bin() by Amato Raselli
     
@@ -11,7 +12,11 @@ class muroot2py():                        # defines the python class
       from mujpy.muroot2py import muroot2py as muld
       path2file = 'path and filename'
       run = muld()  # this is the method instance
-     """
+
+    header type 5 is only Readreen Offset: 0 -@, treated as 1
+    header type 3 Physical quantity treated as str up to an optional ";" 
+    """
+
     def __init__(self, path_filename):
         self.readingOOK = self.read(path_filename)  # reads data
         self._header_dictionary() # creates header dictionary self._header_dictionary
@@ -28,7 +33,9 @@ class muroot2py():                        # defines the python class
           returns True (success) or False (insuccess)
         """    
         try:
-            self.run = uproot.open(path_filename)
+            self.run = ReadOnlyFile(path_filename) # universal, Tfolder_v1 and TDirectory 
+            self.run_type = type(self.run.root_directory["RunHeader"])
+            #self.run = uproot.open(path_filename)
             read_ok = True
         except:
             read_ok = False
@@ -37,38 +44,62 @@ class muroot2py():                        # defines the python class
 # internal methods
 
     def _runheader(self):
-        return self.run["RunHeader"].members["fFolders"]
+        """header (v1 and TDictionary)"""
 
-    def _extract(self,num,key):	
-        return str(self._runheader()[0][num]).partition(key)[2].partition(' -@')[0]
+        # header = self.run["RunHeader"].members["fFolders"]
+        if self.run_type == Model_TFolder_v1:
+            header = self.run.members["fFolders"][0]
+        else: # ReadOnlyDirectory
+            header = self.run["RunInfo"].items()
+        return header 
+
+    def _info_header(self):
+        """list of strings extractor (v1 and TDictionary)"""
+
+        return [str(x) for x in self._runheader()] if self.run_type == Model_TFolder_v1 else [str(x) for x,_ in self._runheader()] 
+
+    def _extract(self,k):
+        """single header string extractor (v1 and TDictionary)"""
+
+        return str(self._runheader()[0][k] if self.root_type == Model_TFolder_v1 else self._runheader()[k][0])
 
     def _temperature_error_float(self):
         return float(self._header_dictionary['Sample Temperature string'].partition(' +- ')[2].partition(' ')[0])
-        
+
     def _header_key(self,k):
-        return str(self._runheader()[0][k]).split(':')[0].split('- ')[1]
+        """key for uproot to header dict(v1 and TDictionary)"""
+
+        # string = str(self._runheader()[0][k])
+        return self._extract(k).split(':')[0].split('- ')[1]
         
     def _header_type(self,k):
-        return int(str(self._runheader()[0][k])[-1])
+        """deprecated"""
+
+        return int(self._extract(k)[-1])
         
     def _header_value(self,k):
-        header = str(self._runheader()[0][k])
-        muroot_type = int(header[-1])
-        value = header.partition(self._header_key(k)+': ')[2].partition(' -@')[0]
-        if muroot_type == 0: # string
-            pass
-        elif muroot_type == 1: # integer
-            value = int(value)
-        elif muroot_type == 2: # float
-            value = float(value)
-        elif muroot_type == 3: # physical quantity
-            value = value.split()[0]
-            value = float(value) if '.' in value else int(value)
-        return value
+        """value for uproot to header dict(v1 and TDictionary)"""
+        val = self._extract(k).split(' -@')
+        jtyp, val = val[1], val.split(';')[0]
+        # header = str(self._runheader()[0][k])
+        # muroot_type = int(header[-1])
+        # value = header.partition(self._header_key(k)+': ')[2].partition(' -@')[0]
+        #if self._header_type(k) == 0: # string
+        #    pass
+        #elif self._header_type == 1: # integer
+        #    value = int(value)
+        #elif muroot_type == 2: # float
+        #    value = float(value)
+        #elif muroot_type == 3: # physical quantity
+        #    value = value.split()[0]
+        #    value = float(value) if '.' in value else int(value)
+        return val if jtyp=='0' or jtyp=='3' else float(val) if (jtyp=='2' or '.' in val) else int(val)
 
-    def _header_dictionary(self): 
+    def _make_header_dictionary(self): 
+        """uproot to header dict (v1 and TDictionary)"""
+
         self._header_dictionary = {}
-        for k in range(len(self._runheader()[0][:])):
+        for k in range(len(self._info_header())):
             self._header_dictionary[self._header_key(k)] = self._header_value(k)
             if self._header_key(k) == 'Sample Temperature' or self._header_key(k) == 'Sample Magnetic Field':
                 header = str(self._runheader()[0][k])

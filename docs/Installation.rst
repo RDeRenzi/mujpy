@@ -18,7 +18,11 @@ The terminal prompt has now ``(.mujpy-venv)`` prepended. Install ``mujpy`` by ru
 
     python3 -m pip install --upgrade mujpy
 
-This provides all the required dependencies and, from now on, each time you activate the venv any python or jupyter command knows mujpy. 
+This provides all the required dependencies for the jupyter widget/ipympl matplotlib backend, and, from now on, each time you activate the venv any python or jupyter command knows mujpy. If you have Qt5 and want to enable also popup Qt graphics, run instead 
+
+.. code::
+
+    python -m pip install "mujpy[qt]"  # also enable Qt popup
 
 For those who want to have the source, the repository can by obtained creating a git folder and running from there 
 

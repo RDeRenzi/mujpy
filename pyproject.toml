@@ -29,11 +29,12 @@ dependencies = [
 		'ipywidgets',
 		'fonttools',
 		'voila',
-		'pyqt5',
 		'sphinx-rtd-theme',
 		'sphinx-copybutton'
 		]
 
+[project.optional-dependencies]
+qt = ["PyQt5"]
 
 [project.urls]
 Repository = "https://github.com/RDeRenzi/mujpy"

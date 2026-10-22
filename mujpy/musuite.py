@@ -94,7 +94,7 @@ class suite(object):
             # decode the run string
             #######################           
         self.runs, errormessage = derun(runlist) # self.runs is a list of lists of run numbers (string)
-        if errormessage is not None: # derun error
+        if errormessage is not None: # derun error, only syntax errors, no check if a run does not exist
             self.console('Run syntax error? {}. You typed: {}'.format(errormessage,runlist))
             return  # with console error message
 
@@ -154,31 +154,29 @@ class suite(object):
         else:
             self.loadfirst = False
             self.console('*********************** suite exits without loading data ****************************')
-    
-    def console(self,string):
-        """
-        writes string to initiated self.console_method::
 
-           when suite invoked without console, self.console_method defaults to 'print'
-           when invoked from mudashes, self.console_method = mudashed.log
-        """
+    def console(self, string):
+        """Write through the supplied console callback, or print."""
 
-        #print('debug string = '+string)
-        #print('debug console_method = {}'.format(self.console_method))
-        if self.console_method == 'print': 
+        if self.console_method == "print":
             print(string)
         else:
-            exec('self.console_method'+'("'+string+'")')
- 
+            self.console_method(string)    
+
     def add_runs(self,k):
         """
         Tries to load one or more runs to be added together::
 
+        input::
+            
+            k is index in self.runs, a list of lists
+                     of integer-run-number strings
+
+        output::
+
+                -1      and quits if musr2py, muroot2py or muisis2py complain, 
+                bool    otherwise
             by means of murs2py, muisis2py or muroot2py. 
-            self.runs[k] is a list of strings containing integer run numbers 
-            Returns 
-                -1 and quits if musr2py, muroot2py or muisis2py complain, 
-                0 otherwise
         """
 
         from mujpy.muroot2py.muroot2py import muroot2py as rootload 
@@ -188,68 +186,62 @@ class suite(object):
         from mujpy.tools.tools import get_datafilename, get_title, short_path#, tk_error
         from os.path import isfile
         
-        def instrument(run): # used by 'PSI' bin and mdu files
+        def instrument(run_): # used by 'PSI' bin and mdu files
             # datafilename, e.g. deltat_tdc_gps_0001.bin, contains '_instrument name_'
             instrument_set = set(['gps','gpd','dolly','flame','ltf','hifi','vms'])
-            return list(set(run.Filename().split('_')).intersection(instrument_set))[0].upper()
+            return list(set(run_.Filename().split('_')).intersection(instrument_set))[0].upper()
 
         read_ok = True
         runadd = []
         for j,run in enumerate(self.runs[k]): # run is a single run number
             path_and_filename =  get_datafilename(self.datafile,run)
             if not isfile(path_and_filename): 
-                self.console('{} does not exist!'.format(path_and_filename))
+                self.console('{path_and_filename} does not exist!')
                 return False
             # PSI cases
+            facility = 'PSI'
             if self.datafile[-4:]=='root': # 
                 run_ = rootload(path_and_filename)
-                if run_.readingOOK:
-                    runadd.append(run_) # opens one run in the list
-                    self._the_instrument_ = run_.get_instrument()
-                    self._the_facility_ = 'PSI'
-                else:
-                    read_ok = False
+                read_ok = run_readingOK
             elif self.datafile[-3:]=='bin' or self.datafile[-3:]=='mdu':
-                runadd.append(psiload())
-                if runadd[j].read(path_and_filename) != 0:
-                    read_ok = False # THE RUN DATA FILE IS LOADED HERE
-                else:
-                    self._the_instrument_ = instrument(runadd[j])
-                    self._the_facility_ = 'PSI'
-            # ISIS case
+                run_ = psiload()
+                read_ok = run_.read(path_and_filename) == 0           
             elif self.datafile[-3:]=='nxs': 
                 try: 
-                    #self.console('{} ns'.format(isisload(path_and_filename,'r').get_binWidth_ns()))
-                    runadd.append(isisload(path_and_filename,'r'))  # adds a new instance of isisload
-                    #self.console('path = {}'.format(path_and_filename))
-                    self._the_instrument_ = runadd[-1].get_instrument()
-                    self._the_facility_ = 'ISIS'
+                    run_ = isisload(path_and_filename,'r')
+                    read_ok = True
+                    facility = 'ISIS'
                 except:
                     read_ok = False
-            if read_ok==True:
+
+            if read_ok:
+                if '_the_instrument_' in self.__dir__():
+                    numhis = run_.get_numberHisto_int()
+                    binwidth = run_.get_binWidth_ns()
+                    his = numhis != self._the_runs_[0][0].get_numberHisto_int()
+                    bwt = binwidth != self._the_runs_[0][0].get_binWidth_ns()
+                    same_t0 = self.promptfit(False,check=True)
+                    if his:
+                        self.console(f'File {path_and_filename} has wrong histoNumber {numhis}')
+                    elif bwt:
+                        self.console('File {} has wrong binWidth {:.2f}'.format(path_and_filename,binwidth))
+                    elif not same_t0 : 
+                        self.console(f'File {path_and_filename} has different t0!')
+                    if his or bwt or not same_t0:
+                    #    self.runs.pop(-1)
+                        return
+                    else:
+                        runadd.append(run_) # opens one run in the list
+                else:
+                    runadd.append(run_)
+                    self._the_instrument_ = instrument(run_) 
+                    self._the_facility_ = facility
                 self._the_runs_.append(runadd) # 
-                    
-                self.console('{} loaded:'.format(short_path(path_and_filename,self.__startuppath__)))
-                self.console('Run {}: {}'.format(run,get_title(self._the_runs_[-1][0])))
-#                import sys
-#                self.console('sys.__stdout__ is {}, sys.__stderr__ is {}'.format(sys.__stdout__,sys.__stderr__))
-
-                if k>0:
-                    ok = [self._the_runs_[k][0].get_numberHisto_int() == 
-                          self._the_runs_[0][0].get_numberHisto_int(),
-                          self._the_runs_[k][0].get_binWidth_ns() == 
-                          self._the_runs_[0][0].get_binWidth_ns()]
-                    if not all(ok): 
-                        self.console(r'\nFile {} has wrong histoNumber or binWidth'.format(
-                                  get_datafilename(self.datafile,self._the_runs_[k][0].get_runNumber_int())))
-                        return -1  # this leaves the first run of the suite
-
+                
+                filename_short = short_path(path_and_filename,self.__startuppath__) 
+                title = get_title(self._the_runs_[-1][0])
+                self.console(f'{filename_short} loaded, run {run}: {title}')
                 return True
-            else:
-                # print(path_and_filename)
-                self.console(r'\nRun file: {} does not exist'.format(path_and_filename))
-           	    #self.console('            if reading from afs check that klog is not expired!')
-                return False
 
     def load_runs(self):
         """
@@ -272,9 +264,19 @@ class suite(object):
 
         read_ok = True
         for k in range(len(self.runs)):#  self.runs is a list of lists of run number stringsto add
-            read_ok = read_ok and self.add_runs(k) # this code reads and returns a read_ok code
+            if not self.add_runs(k):
+                if k==0: 
+                    read_ok = False
+                else:
+                    string = ', '.join([self.runs[k][0] for k in range(k-1)])
+                    self.console('**************************')
+                    self.console(f'Warning: loaded runs {string}, run {self.runs[k][0]} not loaded')
+                    self.runs.pop(k)
+                    break
+                  # this code reads and returns a read_ok code
         
         return read_ok # False with console error message in add_runs
+   
 
     def check_group(self,group):
         """
@@ -337,9 +339,22 @@ class suite(object):
             t_value, t_error = 0, 0
         return t_value, t_error
 
-    def promptfit(self,mplot, mprint = True):
+    def promptfit(self,mplot, mprint = True, check=False):
         """
-        indentifies t0 and stores self.nt0 array (all intruments) [ISIS not yet]::
+        indentifies t0 and stores self.nt0 array (all intruments) [ISIS check]
+
+        input::
+
+            mplot           False, by suite default, if Tuue produces plost 
+            ``*mprint``     True sets Minuit.print.level = 1, False 0
+            ``*check``      False, saves output thorugh self
+                            True, for all subsequent instances,
+                                does nothing if nt0 == self.nt0 conforms:
+                                    np.all(nt0==self.nt0), dt0
+
+        output::
+
+                            through self.nt0, self.dt0, self.lastbin
 
             t0 prompt fit method for PSI bulk musr 
                     identified by muroot2py.get_instrument() or by musr2py.readbin
@@ -347,16 +362,15 @@ class suite(object):
             t0 edge method for ISIS (all), now broken
             t0 guess method for PSI hifi 
 
-        refactored for run addition and suite of runs
         WARNING: this module is tenporarily for PSI only, included root        
         """
 
-        from numpy import array, where, arange, zeros, zeros_like, mean, ones, sqrt, linspace
+        from numpy import array, where, arange, zeros, zeros_like, mean, ones, sqrt, linspace, any 
         from iminuit import Minuit, cost
         import matplotlib.pyplot as P
         from mujpy.mucomponents.muprompt import muprompt
         from mujpy.mucomponents.muedge import muedge
-        from mujpy.tools.tools import TauMu_mus, scanms, step
+        from mujpy.tools.tools import TauMu_mus, scan_hifi_t0_step, step
         from mujpy.tools.plot import set_fig 
     
         if mplot:  # setup figure window if a plot of the prompt peak or edge fits is required
@@ -390,10 +404,14 @@ class suite(object):
         if self._the_instrument_  == 'LEM':
             # t0 calibration encoded in file, override only by setting self.nt0 by hand
             # self.nt0 and self.dt0 are independent of self.LEM_back_subt
-            self.nt0 = array([int(self._the_runs_[0][0].get_t0_int(k)) for k in range(self._the_runs_[0][0].get_numberHisto_int())])
-            self.dt0 = zeros_like(self.nt0) # fraction of bin, ignored with tdc resolution of 195 pds  
-            self.lastbin = self.nt0.min() # unused for lem
-
+            nt0 = array([int(self._the_runs_[0][0].get_t0_int(k)) for k in range(self._the_runs_[0][0].get_numberHisto_int())])
+            if 'nt0' in self.__dir__(): 
+                if any(nt0 != self.nt0):
+                    return False
+            else:
+                self.nt0 = nt0
+                self.dt0 = zeros_like(self.nt0) # fraction of bin, ignored with tdc resolution of 195 pds  
+                self.lastbin = self.nt0.min() # unused for lem
             
         elif self._the_instrument_ in ['GPS','GPD','DOLLY','FLAME','LTF']: # self.datafile[-3:] == 'bin': # PSI gps, flame, ltf, dolly, gpd
             second_plateau = 100
@@ -479,9 +497,14 @@ class suite(object):
                 ##############################################################################
 
                 # these three are the sets of parameters used by other methods
-            self.nt0 = x0.round().astype(int) # bin of peak, nd.array of shape run.get_numberHisto_int() 
-            self.dt0 = x0-self.nt0 # fraction of bin, nd.array of shape run.get_numberHisto_int() 
-            self.lastbin = self.nt0.min() - self.prepostpk[0] # nd.array of shape run.get_numberHisto_int() 
+            nt0 = x0.round().astype(int) # bin of peak, nd.array of shape run.get_numberHisto_int()
+            if 'nt0' in self.__dir__(): 
+                if any(nt0 != self.nt0):
+                    return False
+            else:
+                self.nt0 = nt0
+                self.dt0 = x0-self.nt0 # fraction of bin, nd.array of shape run.get_numberHisto_int() 
+                self.lastbin = self.nt0.min() - self.prepostpk[0] # nd.array of shape run.get_numberHisto_int() 
 
         elif self._the_instrument_ == 'HIFI' and self._the_facility_ == 'PSI': # self.datafile[-3:] =='mdu': # PSI HIFI
             first_plateau = - 500
@@ -500,7 +523,7 @@ class suite(object):
                 histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
                 for k in range(len(self._the_runs_[0])): # may add runs
                     histo += self._the_runs_[0][k].get_histo_vector(counter,1)
-                npeakguess = scanms(histo,100) # simple search for a step pattern
+                npeakguess = scan_hifi_t0_step(histo,100) # simple search for a step pattern
                 if npeakguess>0:
                     npeaks.append(npeakguess)
                 elif counter != 0:
@@ -553,8 +576,14 @@ class suite(object):
                     x_text,y_text = npeaks[counter]+10,0.8*histo.max()
                     prompt_fit_text[counter] = ax_counters[divmod(counter,3)].text(x_text,
                                   y_text,'Det #{}\nt0={}bin'.format(counter+1,x0[counter]))
-            self.nt0 = x0 # bin of peak, nd.array of shape run.get_numberHisto_int() 
-            self.dt0 = zeros(x0.shape) # fraction of bin, nd.array of shape run.get_numberHisto_int()
+            nt0 = x0
+            if 'nt0' in self.__dir__(): 
+                if any(nt0 != self.nt0):
+                    return False
+            else:
+                self.nt0 = nt0
+                self.dt0 = zeros_like(self.nt0) # unused for hifi
+                self.lastbin = self.nt0.min() # unused for hifi
 
         elif self._the_facility_ == 'ISIS': # self.datafile[-3:]=='nxs': # ISIS
             histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
@@ -586,10 +615,13 @@ class suite(object):
                 ax_counters.plot(t,mm.f(t,t0,N,D))
                 x_text,y_text = t[int(2*n2/3)],0.2*max(histo[n1:n2])
                 ax_counters.text(x_text,y_text,'t0 = {:.1f} mus'.format(t0))
-            self.nt0 = array([t0/float(self.nsbin.value)]).round().astype(int) # bin of peak, 
-                                             # nd.array of shape run.get_numberHisto_int() 
-            self.dt0 = array(t0-self.nt0) # fraction of bin, in ns
-
+            nt0 =  array([t0/float(self.nsbin.value)]).round().astype(int) # bin of peak, 
+            if 'nt0' in self.__dir__(): 
+                if any(nt0 != self.nt0):
+                    return False
+            else:
+                self.nt0 = nt0
+                self.dt0 = array(t0-self.nt0) # fraction of bin, in ns
 
         if mplot:   # show results                  
             fig_counters.canvas.manager.window.tkraise()
@@ -599,6 +631,7 @@ class suite(object):
             pass
 #            self.console('Succesfully completed prompt Minuit fit, check nt0, dt0 ')
 #        self.console('****************END OF SUITE*****************')
+        return True
 
 ##########################
 # ASYMMETRY
@@ -1003,7 +1036,7 @@ class suite(object):
 
     def scan(self):
         """
-        returns suite scan string, "T[K] " , "B[mT]", "[deg]", "#   ", False if self.single()
+        returns suite scan string, "T[K] " , "B[mT]", "Orient", "Run #   ", False if self.single()
 
         output::
 
@@ -1017,6 +1050,6 @@ class suite(object):
         if self.single(): return False
         elif [run[0].get_temp() for run in self._the_runs_]!=[self._the_runs_[0][0].get_temp()]*len(self._the_runs_): return 'T[K] '
         elif [run[0].get_field() for run in self._the_runs_]!=[self._the_runs_[0][0].get_field()]*len(self._the_runs_): return 'B[mT]'
-        elif [run[0].get_orient() for run in self._the_runs_]!=[self._the_runs_[0][0].get_orient()]*len(self._the_runs_): return '[deg]'
-        else: return '#    '
+        elif [run[0].get_orient() for run in self._the_runs_]!=[self._the_runs_[0][0].get_orient()]*len(self._the_runs_): return 'Orientation '
+        else: return 'Run # '
 

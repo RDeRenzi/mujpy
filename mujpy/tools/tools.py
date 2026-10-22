@@ -172,7 +172,7 @@ def derange(string,vmax,pack=1):
         x_range,    tuple of integers or floats
                         depending on ``*varargs`` number 
             5:          start, stop, packe, last, packl  # for plot
-            4:          start, stop, last, packl         # for plot (packe is 1) 
+            4:          not valid, often a mistake 
             3:          start, stop, pack
             2:          start, stop (pack is added)
                     default 0,vmax,pack, if checks fail
@@ -183,32 +183,31 @@ def derange(string,vmax,pack=1):
 
     Used in musuite (mufit and mufitplot)
     """
-    
-    # print('In derange, string = {}'.format(string))
-    errmsg = ''
-    x_range = string.split(',') # assume ',' is the separator
-    if len(x_range)==1: # try ' ' as separator
-        x_range = string.split(' ')
+
+    from re import split as splt
+    from numpy import integer
+    errmsg = False
+    x_range = splt("[\\s,]+",string) # assume ',' or ' ' is the separator
     if len(x_range)==1: # wrong syntax
-        x_range = [vmax-vmax,vmax,pack] # default, int for int vmax, float for float vmax
-        errmsg = 'no range'
+        errmsg = f'{string} is not a bin range (lacks separators)'
     if not errmsg:
         try: # three items are they integers floats or misprints?
-            if isinstance(vmax,float): # should be three floats
-                x_range = [float(chan) for chan in x_range] # breaks if non digits in x_range 
-            else: # should be three integers
+            if isinstance(vmax,(int,integer)): # should be three floats
                 x_range = [int(chan) for chan in x_range] # breaks if non digits in x_range 
+            else: # should be three integers
+                x_range = [float(chan) for chan in x_range] # breaks if non digits in x_range 
             if len(x_range)==2: # guarantees three items
                 x_range.append(pack)
-            if x_range[2]>(x_range[1]-x_range[0])//2: # True for fit_range[1]<fit_range[0]  or too large pack
-                raise Exception
-        except:
-            x_range = [vmax-vmax,vmax,pack] # default
-            errmsg = 'Syntax error, reset range to default. '
-    # to re-compose a correct string use
-    # string = ','.join([str(val) for val in x_range])
-    # print('tools derange: x_range = {}'.format(x_range))
-        
+            elif len(x_range)==4: raise ValueError('4 items, a typo?')
+            elif len(x_range)>5: raise ValueError('too many items, a typo?')
+            if x_range[0]<0: raise ValueError(' start < 0')
+            if x_range[1]<x_range[0]: raise ValueError('start < stop')
+            if x_range[2]>(x_range[1]-x_range[0])//2: raise ValueError('pack too large')
+            if len(x_range)==5:
+                if x_range[4]>(x_range[3]-x_range[1])//2: raise ('wrong late pack of limits') 
+        except Exception as e:
+            
+            errmsg = f'{string} '+str(e)
     return x_range, errmsg # a list of values (int or float as appropriate)
     
 def derun(string):
@@ -334,6 +333,8 @@ def get_datafilename(datafile,run):
     padded = re.match('.*?([0-9]+)$', datafile_nosuffix).group(1) # run string of digits, including padding zeros
     oldrun = str(int(padded)) # strip padding zeros
     datafileprefix = datafile[:datafile.find(oldrun)] # prefix up to original zero padding
+    if not run:
+        return "" # a try
     if len(run)-len(oldrun)>0:
         datafilename = datafileprefix[:len(oldrun)-len(run)]+run+dot_suffix
     elif len(run)-len(oldrun)==-1:
@@ -503,7 +504,7 @@ def step(x,a,n,dn,b):
     # error function as step function for t=0 in HIFI
     return a+b*norm.cdf(x,n,dn)
 
-def scanms(y,n):
+def scan_hifi_t0_step(y,n):
     """
     produces guess for hifi t=0 bin, to be fed to a step fit function
     
@@ -761,13 +762,13 @@ def check_function(dashboard,groups):
     # global fits minuit parameters coincide with globpardicts, 
         for kp, pardict in enumerate(dashboard['globpardicts_guess']):
             if pardict['flag'] == '=': 
-                print("++++ Wrong json syntax, only '~','!','#' flags allowed in 'globpardicts_guess'")
+                print("++++ Wrong json syntax, '=' flag not allowed in global parameters")
                 return -1, kp, 0
 
         for kc, component in enumerate(model):
             for kp,pardict in enumerate(component['pardicts']):
                 if pardict['flag'] != '=':
-                    error ='++++ Wrong json syntax, only '+"'='"+' flag allowed in '+"'model_guess'"
+                    error ="++++ Wrong json syntax\nGlobal fit, only '=' model flags allowed"
                     return kc, kp, 0, error
                 if 'function' in pardict.keys() and len(pardict['function']):
                     kgroup = 0 # default
@@ -787,7 +788,7 @@ def check_function(dashboard,groups):
                 elif 'function_multi' in pardict.keys() and len(pardict['function_multi'][0]):
                     pardict.pop('function',None)
                     if len(pardict['function_multi']) != len(groups):
-                        error = "++++ Wrong json syntax, need as many 'function_multi' strings as groups in 'model_guess'"
+                        error = "++++ Wrong json syntax, function is one, or ngroup ';'-separated strings"
                         return kc, kp, len(groups), error
                     for kgroup in range(len(groups)): # loop groups
                         string = pardict['function_multi'][kgroup]
@@ -798,11 +799,11 @@ def check_function(dashboard,groups):
                             else:
                                 raise ValueError("missing 'p['")
                         except Exception as e:
-                            return kc,kp, kgroup, "{}: '{}' is not a correct function syntax".format(e,string)
+                            return kc,kp, kgroup, "{}: '{}' wrong function syntax".format(e,string)
 
 
                 else:
-                    error = "++++ Wrong json syntax, missing 'function' or 'function_multi' strings in 'model_guess'"
+                    error = "++++ Wrong json syntax, missing function in model parameters"
                     return kc, kp, 0, error
 
     else: # local fit
@@ -811,7 +812,7 @@ def check_function(dashboard,groups):
             for kp,pardict in enumerate(component['pardicts']):
                 #if pardict['flag'] == '=':
                 if 'function' in pardict.keys() and len(pardict['function']):
-                    if pardict['flag'] != '=': return kc, kp, kgroup, 'Function is {}\nbut Flag is {}\n'.format(
+                    if pardict['flag'] != '=': return kc, kp, kgroup, 'function is {}\nbut flag is {}\n'.format(
                                                                 pardict['function'],pardict['flag'])
                     string = pardict['function']
                     try:
@@ -820,9 +821,9 @@ def check_function(dashboard,groups):
                         else:
                             raise ValueError("missing 'p['")
                     except Exception as e:
-                        return kc,kp, kgroup, "{}: '{}' is not a correct function syntax".format(e,string)
+                        return kc,kp, kgroup, "{}: '{}' wrong function syntax".format(e,string)
                 elif pardict['flag'] == '=':
-                    error = "++++ Wrong json syntax, missing or empty 'function' in 'model_guess'"
+                    error = "++++ Wrong json syntax, missing or empty function in model parameters"
                     return kc, kp, kgroup, error
     return -1,-1,-1, "" # none has failed the syntax check
 
@@ -996,9 +997,10 @@ def int2min_global(dashboard,runs,guess=True):
         lim.append(pardict['limits'])
         if pardict['flag'] in ['~','!']:
             nam.append(pardict['name'])
-            fix.append(False)
             if pardict['flag'] == '!':
                 fix.append(True)
+            else:
+                fix.append(False)
         elif pardict['flag'] == '#': # for A21, B21 fits this is never the case and leaves hash_parameter_id empty
             nam.append(pardict['name']+'_'+runs[0][0])
             hash_parameter_id.append(k_internal)
@@ -1408,50 +1410,51 @@ def init_csv_row(filespec, the_run, group = False):
         group = False   else stringify(group)
                             is added as last column
 
-    Updated for ISIS,
+    Updated for ISIS, updated for bin, mdu, MusrRoot (all return sample, not cryo)
     Used in mufit
     """
 
+    import re
     nrun = str(the_run.get_runNumber_int())
     #print('tools init_csv_row nrun {}'.format(nrun))
     Bstr  = the_run.get_field()
+    orient = the_run.get_orient()
     try:
         Bstr = '{:.1f}'.format(float(Bstr[:Bstr.index('G')])/10)
     except:
         Bstr = '{:.1f}'.format(float(Bstr)/10)
-
-    filespecs = ['bin','mdu'] 
+    pattern = r"-?\d+(?:\.\d+)?"
+    orient = re.findall(pattern, orient)[0]
+    
+    filespecs = ['bin','mdu','oot'] 
     if filespec in filespecs:
-        TsTc, eTsTc = the_run.get_temperatures_vector(), the_run.get_devTemperatures_vector()
-        n1,n2 = spec_prec(eTsTc[0]),spec_prec(eTsTc[1]) # calculates format specifier precision
-        form = '{},{:.'+'{}'.format(n1)+'f},{:.'+'{}'.format(n1)
-        form += 'f},{:.'+'{}'.format(n2)+'f},{:.'+'{}'.format(n2)+'f},{:.0f},'
-        if group:
-            form += '{},'
-            return form.format(nrun, TsTc[0],eTsTc[0],TsTc[1],eTsTc[1], float(Bstr[:Bstr.find('G')]),group)
-        else:
-            return form.format(nrun, TsTc[0],eTsTc[0],TsTc[1],eTsTc[1], float(Bstr[:Bstr.find('G')]))
-
-    elif filespec=='oot': # oot is the last 3 chars of 'root'!
+    #    TsTc, eTsTc = the_run.get_temperatures_vector(), the_run.get_devTemperatures_vector()
+    #    n1,n2 = spec_prec(eTsTc[0]),spec_prec(eTsTc[1]) # calculates format specifier precision
+    #    form = '{},{:.'+'{}'.format(n1)+'f},{:.'+'{}'.format(n1)
+    #    form += 'f},{:.'+'{}'.format(n2)+'f},{:.'+'{}'.format(n2)+'f},{:.0f},'
+    #    if group:
+    #        form += '{},'
+    #        return form.format(nrun, TsTc[0],eTsTc[0],TsTc[1],eTsTc[1], float(Bstr[:Bstr.find('G')]),group)
+    #    else:
+    #        return form.format(nrun, TsTc[0],eTsTc[0],TsTc[1],eTsTc[1], float(Bstr[:Bstr.find('G')]))
+    #elif filespec=='oot': # oot is the last 3 chars of 'root'!
         TsTc, eTsTc = the_run.get_temperatures_vector(), the_run.get_devTemperatures_vector()
         n1 = spec_prec(eTsTc[0])
-        form = '{},{:.'+'{}'.format(n1)+'f},{:.'+'{}'.format(n1)+'f}'
+        form = '{},{:.'+f'{n1}f'+'},{:.'+f'{n1}f'+'},{},{},'
         if group:
             form += '{},'
-            return form.format(nrun, TsTc[0],eTsTc[0],float(Bstr[:Bstr.find('G')]),group)
+            return form.format(nrun, TsTc[0],eTsTc[0],Bstr,orient,group)
         else:
-            return form.format(nrun, TsTc[0],eTsTc[0],float(Bstr[:Bstr.find('G')]))
-
+            return form.format(nrun, TsTc[0],eTsTc[0],Bstr,orient)
 
     elif filespec=='nxs':
         Ts = the_run.get_temperatures_vector()
-        n1 = '1'       
-        form = '{},{:.'+'{}'.format(n1)+'f},{},' 
+        form = '{},{:.1f},{},{},' 
         if group:
             form += '{},'
-            return form.format(nrun, Ts[0], Bstr[:Bstr.find('G')],group)
+            return form.format(nrun, Ts[0], Bstr,orient,group)
         else:
-            return form.format(nrun, Ts[0], Bstr[:Bstr.find('G')])
+            return form.format(nrun, Ts[0], Bstr,orient)
    
 def chi2_csv(chi2,lowchi2,hichi2,alpha,offset):
     """
@@ -1486,7 +1489,7 @@ def chi2_csv(chi2,lowchi2,hichi2,alpha,offset):
     row += ',{},{}'.format(offset,strftime("%d.%b.%H:%M:%S", localtime()))
     return row
 
-def write_csv(header,row,the_run,file_csv,filespec,scan=None):
+def write_csv(header,row,the_run,file_csv,filespec,scan=[None]):
     """
     writes a row onto csv, finding the right location or a new file
 
@@ -1499,7 +1502,7 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
                         (first one for added runs)
         file_csv,   full path/filename to csv file 
         filespec,   'bin', 'mdu', root, or 'nsx'
-        scan,       'T', 'B', or None ('[' not implemented)
+        scan,       'Run''T[K]', 'B[mT]', 'Orient' or [None]
 
     output::
 
@@ -1519,12 +1522,15 @@ def write_csv(header,row,the_run,file_csv,filespec,scan=None):
     nrun = int(re.split(" |,|, ",row)[0])
     now = datetime.now()
     dt_string = now.strftime("%d/%m/%Y %H:%M:%S") 
-    if scan==None:  # order by nrun, first item in csv
+    if scan[0] in [None, 'R']:  # order by nrun, first item in csv
         csv_index = 0
-    elif scan=='T': # order by T, 4th or 2nd item in csv
+    elif scan[0]=='T': # order by T, 4th or 2nd item in csv
         csv_index = 3 if filespec == 'bin' or filespec == 'mdu' else 1
-    else:           # order by B, 6th or 4th item in csv
+    elif scan[0]=='B':           # order by B, 6th or 4th item in csv
         csv_index = 5 if filespec == 'bin' or filespec == 'mdu' else 3
+    else:              # scan order by O, 7th or 5th
+        csv_index = 6 if filespec == 'bin' or filespec == 'mdu' else 4 
+    # missing 'O' for orient
     rowvalue = float(re.split(" |,|, ",row)[csv_index]) # also nrun is transformed into float 
 
     if os.path.isfile(file_csv):
@@ -2766,7 +2772,7 @@ def par2widgets(pardict,k,glob=False,NG = 0):
 
     from ipywidgets.widgets import HBox, Text, FloatText, Label, Dropdown, Layout
     width = ['5%','8%','25%','20%','30%'] # total 88%
-    options = ['='] if glob else ['~','!','=']
+    options = ['=','!'] if glob else ['~','!','=']
     value = 0 if 'value' not in pardict else pardict['value']
     if 'function_multi' in pardict:
         function = ';'.join(pardict['function_multi'])
@@ -2925,19 +2931,21 @@ def find_model_difference(oldmodel,model):
     sys2 = [model[i:i+2] for i in range(0, len(model), 2)]
 
     out = []
+    add = False
     # Case 1: Second string is the first plus a syllable
     if len(sys2) == len(sys1) + 1:
+        add = True
         for i in range(len(sys2)):
             if sys1[:i] + [sys2[i]] + sys1[i:] == sys2:
-                out.append(i)
+                out.append(i) # [possible] index of new component in model
                 
     # Case 2: Second string is the first minus a syllable
     elif len(sys1) == len(sys2) + 1:
         for i in range(len(sys1)):
             if sys1[:i] + sys1[i+1:] == sys2:
-                out.append(-(i))
+                out.append(i) # [possible] index of oldmodel component to remove 
     elif model==oldmodel: out=None
-    return out
+    return out, add
 
 def muvalid(string):
     """
@@ -3060,7 +3068,7 @@ def rebin(x,y,strstp,pack,e=None):
 
 import os
 from ipywidgets import VBox, HBox, Layout, Button, HTML, Text, Select, Label, RadioButtons
-from traitlets import Any
+from traitlets import Any, Bool
 
 class ValueButton(Button):
     """defines an ipywidget Button with a .value attached"""
@@ -3069,6 +3077,11 @@ class ValueButton(Button):
         super().__init__(*args, **kwargs)
         # Add a custom value traitlet
         self.add_traits(value=Any(value))
+
+class BoolRadio(RadioButtons):
+    """defines an ipywidget RadioButtons with a Bool .toggled attached"""
+
+    toggled = Bool(default_value=False)
 
 def create_overlay_layout(start='none'):
     """Creates CSS style for the popup backbround"""
@@ -3097,35 +3110,49 @@ def show_hide_tab(overlay,display_change,tabs):
     tabs.children = kiddos
     return tabs
 
-def ipyw_yes_no_dial(title="Check!",message=""):
+def ipyw_yes_no_dial(title, message, callback):
     """ 
     ask yes or no input
 
     output::
         
-        overlay,    observe(overlay.layout,names='display') 
-                        to toggle tab.selected_index
-                    setattr(overlay.layout, 'display', 'flex')
-        yes_btn,    yes_btn.value returns True for yes, False for no 
+        overlay,    show_hide it  
     """
 
+    from html import escape
+    from ipywidgets import HTML, Button, HBox, VBox
     from mujpy.tools.tools import create_overlay_layout, create_dialog_box_layout
-    title_html = HTML(f"<h3>{title}</h3>") #⚠️
-    html_message = ""
-    for snip in message.split("\n"):
-        html_message += "<br>"+snip+"</br>"
-    message_html = HTML(html_message, layout=Layout(margin='10px 0px 20px 0px'))
-    yes_btn = ValueButton(description="Yes", layout=Layout(width='100px', align_self='center'))
-    yes_btn.style.button_color = '#c0b1ab'
-    no_btn = Button(description="No", layout=Layout(width='100px', align_self='center'))
-    no_btn.style.button_color = '#c0c0c0'
-    # Contenitore del dialogo
-    dialog_box = VBox([title_html, message_html,HBox([yes_btn,no_btn])], layout=create_dialog_box_layout())
-    overlay = VBox([dialog_box], layout=create_overlay_layout())
-    
-    yes_btn.on_click(lambda b: [setattr(yes_btn,'value',True), setattr(overlay.layout, 'display', 'none')])
-    no_btn.on_click(lambda b: [setattr(yes_btn,'value',False), setattr(overlay.layout, 'display', 'none')])
-    return overlay, yes_btn 
+
+    yes = Button(description="Yes")
+    yes.style.button_color = '#c0b1ab'
+
+    no = Button(description="No")
+    no.style.button_color = '#c0c0c0'
+
+    dialog = VBox(
+        [
+            HTML(value=f"<h3>{escape(title)}</h3>"),
+            HTML(value=escape(message).replace("\n", "<br>")),
+            HBox([yes, no]),
+        ],
+        layout=create_dialog_box_layout(),
+    )
+    overlay = VBox([dialog], layout=create_overlay_layout())
+    finished = False
+
+    def finish(answer): # 
+        """when finished, hide overlay, then callback(choice), then is inactive"""
+
+        nonlocal finished
+        if finished:
+            return
+        finished = True
+        overlay.layout.display = "none"
+        callback(answer)
+
+    yes.on_click(lambda b: finish(True))
+    no.on_click(lambda b: finish(False))
+    return overlay
 
 def ipyw_warning_dial(title="Warning", message=""):
     """
@@ -3137,7 +3164,7 @@ def ipyw_warning_dial(title="Warning", message=""):
                         observe(overlay.layout,names='display') 
                             to toggle tab.selected_index
                         setattr(overlay.layout, 'display', 'flex')
-        ok_btn,     ok_btn.value is True for ok and False for not ok 
+        ok_btn,    click to acknowledge
     """
     
     from mujpy.tools.tools import create_overlay_layout, create_dialog_box_layout
@@ -3155,42 +3182,58 @@ def ipyw_warning_dial(title="Warning", message=""):
     ok_btn.on_click(lambda b: setattr(overlay.layout, 'display', 'none'))
     return overlay
 
-def ipyw_radio_dial(options, title="<b>Select one option:</b>"):
+def ipyw_radio_dial(radio, callback, title):
     """
-    Display a range of RadioButton and store the choice 
+    Display a range of RadioButton in Dialogs and store/cancel the choice when acronym change is ambiguous 
 
     input::
         
-        options,    for RadioButton 
-                        ['text0','text1','text2'], get string in radio.value
-                        [('text0',0),('text1',1)], also get index in radio.index
-
-    ``**kwarg`` = default::
+        radio,      a simple RadioButton instance
+        title,      the dialog title (works both for add and remove)
         
-        title = '<b>Select one option:</b>'
+    output::
 
-    observe(overlay.layout,names='display') then toggle tab.selected_index for tab output
+        overlay     to be displayed in Log tab with show_hide
+        [value]     indirect, from RadioButtons, passed by non observed callback(choice) 
+                                                        -> self._on_air(choice)
     """
     
     from mujpy.tools.tools import create_overlay_layout, create_dialog_box_layout
+
     title_html = HTML(value=f"<h3>{title}</h3>")
-    
-    radio = RadioButtons(
-        options=options,
-        layout=Layout(width='100%', margin='10px 0px')
-    )
-    
     cancel_btn = Button(description="Cancel", layout=Layout(margin='0 5px 0 0'))
-    ok_btn = widgets.Button(description="OK", layout=Layout(margin='0 0 0 5px'))
-    ok_btn.style.button_color = '#c0b1ab'
-    buttons_hbox = HBox([cancel_btn, ok_btn], layout=Layout(justify_content='flex-end', margin='10px 0 0 0'))
-    
+    cancel_btn.style.button_color = '#ebd7d7'
+    #ok_btn = Button(description="OK", layout=Layout(margin='0 0 0 5px'))
+    #ok_btn.style.button_color = '#abc0b1'
+    buttons_hbox = HBox([cancel_btn], layout=Layout(justify_content='flex-end', margin='10px 0 0 0'))
     dialog_box = VBox([title_html, radio, buttons_hbox], layout=create_dialog_box_layout())
     overlay = VBox([dialog_box], layout=create_overlay_layout())
-    
-    confirm_btn.on_click(lambda b: setattr(overlay.layout, 'display', 'flex'))
-    cancel_btn.on_click(lambda b: setattr(overlay.layout, 'display', 'none'))
-    return overlay, radio
+    finished = False
+
+    def finish(choice):
+        """when finished, housekeeping, then callback(choice), then is inactive"""
+        nonlocal finished
+
+        if finished:
+            return
+
+        finished = True
+        radio.unobserve(on_selection, names="value") # avoids self generated retriggers
+
+        # Detach first while unobserved: hiding the dialog may trigger other observers.
+        overlay.layout.display = "none"
+        callback(choice) # call mudahed._on_air(choice), passes on the choice as value
+
+    def on_selection(change):
+        """true observed callback, calls finish(choice) only if choice is not None"""
+
+        if change["new"] is not None: # when a choice was done
+            finish(change["new"]) # passes on the radio value (not index!) as choice 
+
+    radio.observe(on_selection, names="value") # initially observe,
+    cancel_btn.on_click(lambda b: finish(None)) # cancel returns choice None as Value for _on_air
+
+    return overlay  
 
 def ipyw_path_file_dial(target_button, callback, path=None, filter_pattern=None, title="<b>1-click select:</b>"):
     """
@@ -3199,7 +3242,7 @@ def ipyw_path_file_dial(target_button, callback, path=None, filter_pattern=None,
     input::
 
         target_button,      must be a ValueButton
-        callback, 
+        callback,           the ValueButton specific callback (_on_LG, _on_LF, on_DL) 
 
     ``**kwargs`` = default::
 
@@ -3466,38 +3509,6 @@ def make_copy(test):
             return True
     else:
         return False
-
-from PyQt5 import QtCore, QtWidgets
-import traceback
-
-class QtDispatcher(QtCore.QObject):
-    """Run mudashed plotting operations on Qt's GUI thread."""
-
-    requested = QtCore.pyqtSignal(object)
-
-    def __init__(self):
-        super().__init__()
-
-        app = QtWidgets.QApplication.instance()
-        if app is None or self.thread() != app.thread():
-            raise RuntimeError(
-                "Create QtDispatcher on the GUI thread, after %matplotlib qt"
-            )
-
-        self.requested.connect(
-            self._execute,
-            QtCore.Qt.QueuedConnection,
-        )
-
-    @QtCore.pyqtSlot(object)
-    def _execute(self, callback):
-        try:
-            callback()
-        except Exception:
-            traceback.print_exc()
-
-    def submit(self, callback):
-        self.requested.emit(callback)
 
 # DOCGROUPS: gradient tools
 

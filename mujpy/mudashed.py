@@ -26,8 +26,9 @@ class dashed(object):
         Launches the gui, class to be invoked in Jupyter notebook
         '''
  
-        from mujpy.tools.tools import make_copy, QtDispatcher
+        from mujpy.tools.tools import make_copy
         from os import getcwd
+        from matplotlib import get_backend 
 
         self.startuppath = getcwd()
         self.facility = facility
@@ -53,19 +54,21 @@ class dashed(object):
             self.test = test # needed in self.board
             if test: self.data_dir = writeable_folder # if test make_copy returns data_dir
 
-            self._qt_dispatcher = QtDispatcher() # needed if the backend is Qt
+            # self._qt_dispatcher = QtDispatcher() # needed if the backend is Qt, relocated to 
+            backend = get_backend().lower()
+            self._qt_dispatcher = None 
+            if backend in {"qtagg", "qt5agg", "qtcairo", "qt5cairo"}:
+                from mujpy.tools.qt_dispatcher import QtDispatcher
+                # this new Qt dispatcher can also divert erro messages to the Log tab. Not nice but more certain to be seen
+                self._qt_dispatcher = QtDispatcher(log=self.log)
             self.board()
         else: # start outside %HOME
             print('please start from a writeable folder')
 
-    def log(self,string):
-        """
-        redirects log text to self.board_box ipywidgets Output  
-        """
+    def log(self, string):
+        """Append log text directly to the dashboard Output widget."""
 
-        with self.board_box: # just an Output
-            # THIS MUST BE print, NOT self.log!
-            print(string) 
+        self.board_box.append_stdout(str(string) + "\n")
 
     def _global(self):
         """
@@ -173,31 +176,36 @@ class dashed(object):
                 except:
                     self.log('change["new"] = {} is not a string integer'.format(value))
 
-    def _draw_qt(self, plot_range, the_fit, rotfreq):
+    def _draw_qt(self, plot_range, rotfreq):
         """required only to display animation with the Qt backend GUI thread"""
 
         from mujpy.mufitplot import mufitplot
+        from mujpy.tools.tools import ipyw_warning_dial, show_hide_tab
         the_plot = mufitplot(
             plot_range,
-            the_fit,
+            self.fit,
             rotating_frame_frequencyMHz=rotfreq,
             plot_out=None,
             fig_fit=self.fig_fit,
         )
         self.fig_fit = the_plot.fig
-            
+        if the_plot.warn_msg:
+            overlay = ipyw_warning_dial(title = the_plot.warn_msg[0],
+                                message = the_plot.warn_msg[1])
+            show_hide_tab(overlay,self.on_modal_display_change,self.tab)   
+
     def _on_Fit(self,b):
         """
         invokes mufit and muplotfit extracting their args from the widgets
 
         callback invokes::
 
-            the_fit = mufit(self.suite,
+            self.fit = mufit(self.suite,
                             dashboard_file,
                             dash_log = self.log)
             if  "ipympl" not in get_backend() and get_backend() != 'widget': self._qt_dispatcher()
             the_plot = mufitplot(plot_range,
-                                 the_fit,
+                                 self.fit,
                                  rotating_frame_frequencyMHz =rotfreq,
                                  plot_out=self.figure_box,
                                  fig_fit=self.fig_fit)
@@ -209,22 +217,23 @@ class dashed(object):
         from matplotlib import get_backend 
         from matplotlib.pyplot import ioff
         from mujpy.mufit import mufit
-        from mujpy.mufitplot import mufitplot
         from mujpy.tools.tools import check_function, ipyw_warning_dial, show_hide_tab
         from functools import partial
 
         dashbd = self.build_dashboard_from_widgets()
         kc, kp, kgroup, errmsg = check_function(self.dashboard,self.suite.groups) # minimal model syntax check
-        self.log('{}, {}, {}: {}'.format(kc,kp,kgroup,errmsg))
+        self.log('first instance, component {}, parameter {}, group {}:\n{}'.format(kc,kp,kgroup,errmsg))
         if self._global() and len(self.suite.groups)>1:
             if not any(['function_multi' in pardict.keys() for component in self.dashboard['model_guess'] for pardict in component['pardicts']]):
                 errmsg += ('++++ Check global parameters or grouping:\nmulti group imply ";" in some function') 
         if errmsg:
             title = 'Check syntax or logic'
             if kc >= 0 and kp >= 0: # failed json dashboard syntax check
-                errmsg += '++++ Check model parameters:\ncomponent {}, parameter {}, group {}'.format(kc, kp, kgroup)
+                if self._global(): # there are no parameter indices on the dash
+                    kp = self.dashboard['model_guess'][kc]['pardicts'][kp]['name']
+                errmsg += f'\n++++ Check all model parameters, first:\ncomponent {kc}, parameter {kp}, group {kgroup}'
             elif kc < 0 and kp > 0:
-                errmsg += ('++++ Check global parameters:\nno function allowed in parameter {}'.format(kp))
+                errmsg += f'\n++++ Check all global parameters:\nno function allowed in parameter {kp}'
             overlay = ipyw_warning_dial(title = title,
                                         message = errmsg)
             show_hide_tab(overlay,self.on_modal_display_change,self.tab)
@@ -256,9 +265,18 @@ class dashed(object):
                 json.dump(self.dashboard,f) # mufit wants to read this from a file
 
             # TEMPORARY COMMENT TO KEEP ALL DEBUG LOGS
+            self.board_box.outputs = ()
             # self.board_box.clear_output()
+            # debug
+            #self._board_capture_before_fit = self.board_box.msg_id
 
-            the_fit = mufit(self.suite,dashboard_file,dash_log = self.log) # writes text to board_box
+            scan = self.model_box.children[0].children[0].value
+            self.fit = mufit(self.suite,dashboard_file,dash_log = self.log,scan=scan,dashed=True) # writes text to board_box
+            if self.fit.abort_msg:
+                overlay = ipyw_warning_dial(title = self.fit.abort_msg[0],
+                                            message = self.fit.abort_msg[1])
+                show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+                return
             plot_range = self.command_1.children[8].value
             rotfreq = self.command_1.children[9].value
             fft_range = self.command_1.children[12].value # not yet in use 
@@ -266,26 +284,35 @@ class dashed(object):
 
             is_ipympl = "ipympl" in get_backend() or get_backend() == 'widget'
 
-            self.figure_box.clear_output()
+            self.figure_box.outputs = ()
+            #self.figure_box.clear_output()
             if is_ipympl:
+                from mujpy.mufitplot import mufitplot
                 with ioff():
                     the_plot = mufitplot(
                             plot_range,
-                            the_fit,
+                            self.fit,
                             rotating_frame_frequencyMHz=rotfreq,
                             plot_out=self.figure_box,
                             fig_fit=self.fig_fit,
                             )
                     self.fig_fit = the_plot.fig
+                    if the_plot.warn_msg:
+                        overlay = ipyw_warning_dial(title = the_plot.warn_msg[0],
+                                            message = the_plot.warn_msg[1])
+                        show_hide_tab(overlay,self.on_modal_display_change,self.tab)
             else:
+                # debug
+                #self._board_capture_before_plot = self.board_box.msg_id
+
                 self._qt_dispatcher.submit(
-                            partial(self._draw_qt, plot_range, the_fit, rotfreq)
+                            partial(self._draw_qt, plot_range, rotfreq)
                             )
 
         else: 
             self.log('Build dashboard was unsuccessful, no fit')
         self.tab.selected_index = 2
-        if the_fit.notconverged:
+        if self.fit.notconverged:
             title = "Minuit did not converge"
             message = "++++ some fit[s] did not converge\nCheck Log tab for correlations!"
             overlay = ipyw_warning_dial(title = title,
@@ -299,12 +326,12 @@ class dashed(object):
 
         callback invokes::
 
-            the_fit = mufit(self.suite,
+            self.fit = mufit(self.suite,
                             no_fit = guess,
                             dash_log = self.log)
             if  "ipympl" not in get_backend() and get_backend() != 'widget': self._qt_dispatcher()
             the_plot = mufitplot(plot_range,
-                                 the_fit,
+                                 self.fit,
                                  rotating_frame_frequencyMHz =rotfreq,
                                  plot_out=self.figure_box,
                                  fig_fit=self.fig_fit)
@@ -324,7 +351,8 @@ class dashed(object):
             with open(str(dashboard_file),'w',encoding='utf-8') as f:
                 json.dump(self.dashboard,f) # mufit wants to read this from a file
             guess = self.command_1.children[6].value=='Guess'
-            the_fit = mufit(self.suite,dashboard_file,no_fit = guess, dash_log = self.log) # writes text to board_box
+            if 'fit' not in self.__dir__() or guess: # do only if not done before
+                 self.fit = mufit(self.suite,dashboard_file,no_fit = guess, dash_log = self.log, dashed = True) # writes text to board_box
             plot_range = self.command_1.children[8].value
             rotfreq = self.command_1.children[9].value
             self.figure_box.clear_output()
@@ -335,7 +363,7 @@ class dashed(object):
                 with ioff():
                     the_plot = mufitplot(
                             plot_range,
-                            the_fit,
+                            self.fit,
                             rotating_frame_frequencyMHz=rotfreq,
                             plot_out=self.figure_box,
                             fig_fit=self.fig_fit,
@@ -343,7 +371,7 @@ class dashed(object):
                     self.fig_fit = the_plot.fig
             else:
                 self._qt_dispatcher.submit(
-                            partial(self._draw_qt, plot_range, the_fit, rotfreq)
+                            partial(self._draw_qt, plot_range, rotfreq)
                             )
 
 
@@ -360,7 +388,10 @@ class dashed(object):
 
         from ipywidgets.widgets import Layout, Button, Label, Text, Dropdown, FloatText
         command1_width = ['10%','5%','10%','5%','6%','12%','10%','5%','16%','10%','8%','5%','8%','10%']
-        fit_range = self.dashboard['fit_range'] if 'dashboard' in self.__dir__() else '0,20000,40' if self.suite._the_facility_ == 'PSI' else '0,1000,1'
+        stop = 20000 if int(self.suite_box.children[0].children[5].value) > 20000 else int(self.suite_box.children[0].children[5].value)
+        pack = 40 if stop > 5000 else 1
+        fit_range_default = '0,'+str(stop)+','+str(pack)
+        fit_range = self.dashboard['fit_range'] if 'dashboard' in self.__dir__() else fit_range_default 
         version = self.dashboard['version'] if 'dashboard' in self.__dir__() else '1'
 
         buttonfit = Button(description='Fit',layout=Layout(width=command1_width[0]))
@@ -419,7 +450,7 @@ class dashed(object):
         adds two columns of rows in ['global' box] 'model' box 
         '''
 
-        from ipywidgets.widgets import HBox, VBox, Label, HTML, Text, Layout
+        from ipywidgets.widgets import HBox, VBox, Label, HTML, Text, Layout, Dropdown
         from mujpy.tools.tools import pardicts2widgets, comp2widgets, par2widgets, par2labels 
         from mujpy.tools.tools import _available_components_, add_step_limits
         
@@ -429,12 +460,17 @@ class dashed(object):
         #gbt_style = "<style>.gbt_input input { background-color:#FFDAB9 !important; }</style>"
         #glotitle.add_class('gbt_input')
 
+        scan = Dropdown(description = 'csv order',
+                        options=['Run #','Temperature','B title field','Orientation'],
+                        value='Run #',
+                        layout={'width':'42%','height':'16pt'}
+                        )
         hspacer = Label(' ',layout={'width':'42%','height':'16pt'})
         modtitle = Text(value='model parameters',disabled=True,layout={'width':'14%','height':'16pt'}) 
         mod_style = "<style>.mod_input input { background-color:#DDC1B0 !important; }</style>"
         modtitle.add_class('mod_input')
-        model_title = HBox([hspacer,HTML(mod_style),modtitle,hspacer])
-        flags = ['~','!']
+        model_title = HBox([scan,HTML(mod_style),modtitle,hspacer])
+        flags = ['~']
         if 'dashboard' in self.__dir__(): # 
             if 'globpardicts_guess' in self.dashboard:
                 pardicts = self.dashboard['globpardicts_guess']
@@ -445,7 +481,6 @@ class dashed(object):
             elif self.NG_int.value == 0:
                 self.command_0.children[0].value='sequential fit'
                 self.global_box.children = []
-                flags = ['~','!']
             else: # no 'globpardicts_guess' and NG>=1 (a change from sequential to global)
                 if self.NG_int.value > 0:
                     pardicts = []
@@ -455,6 +490,7 @@ class dashed(object):
         else: # a fresh start on global
             if self.NG_int.value > 0:
                 pardicts = []
+                flags = ['~','!','#']
                 for kp in range(self.NG_int.value):
                     pardicts.append({'name':'','value':0.0,'flag':'~','error':0.001,'limits':[None,None],'positive_parity':False})
 
@@ -462,12 +498,13 @@ class dashed(object):
         glob = False
         if self.NG_int.value > 0: # 'globpardicts_guess' in self.dashboard: 
             glob = True
+            flags = ['~','!','#']
             kids, self._pardicts_observers = pardicts2widgets(pardicts,flags,self.NG_int.value,self._on_add_del_plot)
             self.global_box.children = kids 
             # [global_title,HBox([VBox(left_column),VBox(right_column)])]
             #  global lists k name value flag error limits pospar
             #  always add model, = self.dashboard or from _available_components_, + label + value + error + limits  
-        if 'dashboard' in self.__dir__():
+        if 'dashboard' in self.__dir__() and self.dashboard['model_guess']:
             model = self.dashboard['model_guess'] # list of components
             model_name = ''.join([component['name'] for component in model])
             self.MN_text.value = model_name 
@@ -604,7 +641,7 @@ class dashed(object):
         from mujpy.tools.tools import check_dashboard_json
 
         file_json = self.suite.__fitpath__+'dashed.json'
-        if os.path.isfile(file_json):
+        if file_json and os.path.isfile(file_json):
             with open(str(file_json),'r',encoding='utf-8') as f:
                 self.dashboard = json.load(f) # copies json dict to self.dashboard
             ck = check_dashboard_json(self.dashboard) # returns '' if OK else error message string
@@ -635,7 +672,7 @@ class dashed(object):
         import os
 
         file_json = self.LF_button.value
-        if os.path.isfile(file_json):
+        if file_json and os.path.isfile(file_json):
             if file_json[-4:]=='json':
                 with open(str(file_json),'r',encoding='utf-8') as f:
                     self.dashboard = json.load(f) # copies json dict to self.dashboard
@@ -657,7 +694,54 @@ class dashed(object):
         else:
             self.tab.selected_index = 2
             self.log('no valid json file was selected {}'.format(file_json))
- 
+
+    def _on_air(self,value):
+        """callback for ipyw_radio_dial(self._radio,_on_air,title)
+
+        input::
+
+            value           is the component index
+
+        output::
+                
+                        self methods
+                            self._overlay.children[0].children[1] is self._radio 
+                                                            with the radio mods
+
+        sets self._overlay.layout.display = 'none', 
+
+        calls self.add_remove() and self.build_model_editor_widgets 
+        """
+        
+        self._overlay.layout.display = 'none' # "clears" the Dialogs tab
+        self._radio.unobserve(self._on_air)
+        if value is None: # output cancel, restore self._oldmodel
+            self.MN_text.value = self._oldmodel
+        else: # both single indices or selected by radio_dial
+            self.add_remove(value) # knows self._radio, self._add, self._change_component
+                              # adds/removes in self.dahshboard
+            self.build_model_editor_widgets() # builds from self.dashboard
+            self.__dict__.pop('fit',None) # semoves self.fit instance if obtained with different model
+
+    def add_remove(self, value):
+        from mujpy.tools.tools import _available_components_
+        from copy import deepcopy as cp
+
+        if self._add:
+            component = cp(next(
+                c for c in _available_components_()
+                if c["name"] == self._change_component
+            ))
+
+            for p in component["pardicts"]:
+                p["flag"] = (
+                    "=" if "globpardicts_guess" in self.dashboard else "~"
+                )
+
+            self.dashboard["model_guess"].insert(value, component)
+        else:
+            del self.dashboard["model_guess"][value]
+
     def _on_MN(self,change):
         '''
         if model_box is empty adds third stage widgets else performs model_box limited edits 
@@ -665,19 +749,19 @@ class dashed(object):
     
         # command box, global box: VBox of rows (HBox)
         # model_box: HBox of two columns (VBox) of components (VBox) of rows, pardicts (HBox) of component widgets
-        from mujpy.tools.tools import validmodel, find_model_difference, _available_components_
+        from mujpy.tools.tools import validmodel, find_model_difference
         from json import loads as str2lst
         from ipywidgets import Text, IntText, Layout, Button, HBox,  \
                                VBox, ToggleButtons, Label, FloatText
         from mujpy.tools.tools import ipyw_radio_dial, ipyw_warning_dial, ipyw_yes_no_dial, show_hide_tab
-        #self.log('change["new"] is {}'.format(change['new']))
+        model = self.MN_text.value.strip() # removes accidental lead & trail blanks
 
-        #if change['type'] == 'change' and change['name'] == 'value':
-
-        # now started by LM button, no change mechanism!
-        go = True # go = False returns without model editor
-        model = self.MN_text.value
-        if not model: return # model cannot be empty
+        if not model: # model cannot be empty
+            overlay = ipyw_warning_dial(title = 'Empty model',
+                                        message = 'acronym {} empty.\nSee Help tab'.format(model))
+            show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+            self.command_box.children[0].children[3].value=""
+            return
 
         if not validmodel(model):
             overlay = ipyw_warning_dial(title = 'Wrong model syntax',
@@ -686,75 +770,129 @@ class dashed(object):
             return
         
         if 'dashboard' in self.__dir__():
-            oldmodel = ''.join([component['name'] for component in self.dashboard['model_guess']])               
-        else: oldmodel = '' # means this is startup (or self.dashboard erased, re-startup)
-
-        #model = change['new'].strip() # removes accidental lead & trail blanks
-
-        # decide if it is [re]startup
-        if oldmodel: # not the startup, changing Glob <-> Seq or editing or both
-
-            if self.NG_int.value>=1 and not self.global_box.children: # changing from sequential to global
-                if self.NG_int.value==1:
-                    overlay, widg = ipyw_yes_no_dial(title = 'Check!',
-                                                    message = "only NG=1 global parameter\ndon't you need more?")
-                    go = not widg.value # widg.value is yes I do need more, no need go on, need stop
-                    show_hide_tab(overlay,self.on_modal_display_change,self.tab)
-
-            elif self.NG_int.value==0 and self.global_box.children: # changing from global to sequential
-                self.global_box.children = []
-                self.dashboard.pop('globpardicts_guess',None)
-                for component in self.dashboard['model_guess']:
-                    for pardict in component['pardicts']:
-                        pardict['flag'] = '~'
-                        if 'function' in pardict:
-                            pardict['function'] = ''
-                        if 'function_multi' in pardict: 
-                        # if, not elif because, surrisingly, 'al' from global comes with both function and function_multi
-                        # although, only function_multi in loaded json! Somewhere a 'function' is added and it should not
-                            pardict.pop('function_multi',None)
-                            pardict['function'] = ''
-
-            # now check if the acronym was changed
-            indices = find_model_difference(oldmodel,model) # returns [] as False, for complex and empty
-
-            if indices: # edit the dash
-                k = indices[0]
-                indices = [abs(j)-1 for j in indices] if k<0 else indices
-                action = 'Add after, in' if k>0 else 'Remove from'
-                m_c = model if k>0 else oldmodel
-                cc = [m_c[i:i+2] for i in range(0, len(m_c), 2)]
-                components = [(cc[i],i) for i in indices] # indices are 
-                if len(indices)>1: # decide which
-                    #self.tab.children[3].children[3], widg = ipyw_radio_dial(components,title='{} model {}'.format(action,model))
-                    #ki = widg.index
-                    #self.tab.children[3].children[3].layout.observe(self.on_modal_display_change,names='display')
-                    #setattr(self.tab.children[3].children[3].layout, 'display', 'flex')
-                    overlay, widg = ipyw_radio_dial(components,title='{} model {}'.format(action,model))
-                    show_hide_tab(overlay,self.on_modal_display_change,self.tab)
-                    ki = widg.index
-                elif len(indices)==1: # single component
-                    ki = abs(k)
-                if k<0: # remove component  len(indices)==1 an
-                    del self.dashboard['model_guess'][ki]
-                else: # add component
-                    for c in _available_components_():
-                        if c['name'] == cc[k]: component = c
-                    for j,p in enumerate(component['pardicts']):
-                        component['pardicts'][j]['flag']='=' if 'globpardicts_guess' in self.dashboard else '~'
-                    self.dashboard['model_guess'].insert(ki,component)
-                    self.log('{}: inserted empty component {} in position {}'.format(m_c,cc[k],k))
-            elif isinstance(indices,list): # too complex, indices = []
-                overlay, widg = ipyw_yes_no_dial(title = 'Complex model edit',
-                                                 message = "(could edit one by one instead)\nOK to procede with an empty {}?".format(model))
+            if (self.NG_int.value > 1 and 
+                'globpardicts_guess' in self.dashboard and 
+                self.NG_int.value != len(self.dashboard['globpardicts_guess'])):
+                overlay  = ipyw_warning_dial(title = 'NG, change global parameter number',
+                                        message = "Add/Delete one at a time\nusing the +-/add/del dropdown\nin the 7-th columns.")
                 show_hide_tab(overlay,self.on_modal_display_change,self.tab)
-                go = widg.value # widg.value is yes I do need more, no need go on, need stop
-        
-        if go:
-            if len(self.model_box.children)==0: # true startup
-                self.build_or_rebuild_commad_2ndrow() # create command_box from scratch
-            # a complex new model edit with a yes askyesno answer jumps here 
+                self.NG_int.value = len(self.dashboard['globpardicts_guess'])
+                return
+            self._oldmodel = ''.join([component['name'] for component in self.dashboard['model_guess']])               
+        else: self._oldmodel = '' # means this is startup (or self.dashboard erased, re-startup)
+
+        indices, self._add = find_model_difference(self._oldmodel,model) # returns [] as False, for complex and empty
+
+        if not self._oldmodel: # startup
+            self.build_or_rebuild_commad_2ndrow() # create command_box from scratch
             self.build_model_editor_widgets()  # always, if model and OK
+            # self.fit does not exist yet
+            return
+
+        switching_to_global = (
+            self.NG_int.value >= 1
+            and not self.global_box.children
+        )
+
+        if switching_to_global and self.NG_int.value == 1:
+            def answered(needs_more):
+                if needs_more:
+                    return
+                self._continue_MN(model, indices)
+
+            overlay = ipyw_yes_no_dial(
+                title="Check!",
+                message="Only NG=1 global parameter.\nDo you need more?",
+                callback=answered,
+            )
+            show_hide_tab(
+                overlay, self.on_modal_display_change, self.tab
+            )
+            return
+
+        self._continue_MN(model, indices)            # both need to go through to self.build_
+
+    def _continue_MN(self, model, indices):
+        '''
+        continue performing model_box limited edits 
+        '''
+ 
+        from mujpy.tools.tools import ipyw_yes_no_dial, show_hide_tab, ipyw_radio_dial
+        from ipywidgets.widgets import RadioButtons, Layout
+
+        switching_to_global = self.NG_int.value >= 1 and not self.global_box.children
+        switching_to_sequential = self.NG_int.value == 0 and bool(self.global_box.children)
+
+        # Apply defaults only when changing fitting mode.
+        if switching_to_global or switching_to_sequential:
+            flag = "=" if switching_to_global else "~"
+
+            if switching_to_sequential:
+                self.global_box.children = ()
+                self.dashboard.pop("globpardicts_guess", None)
+
+            for component in self.dashboard["model_guess"]:
+                for pardict in component["pardicts"]:
+                    pardict["flag"] = flag
+
+                    if "function" in pardict:
+                        pardict["function"] = ""
+
+                    if "function_multi" in pardict:
+                        pardict.pop("function_multi")
+                        pardict["function"] = ""
+
+        if indices is None:
+            self.build_model_editor_widgets()
+            self.__dict__.pop('fit',None) # semoves self.fit instance if obtained with different model
+            return
+
+        if isinstance(indices, list) and not indices:
+            def answered(proceed):
+                if not proceed:
+                    self.MN_text.value = self._oldmodel
+                    return
+
+                self.dashboard["model_guess"] = []
+                self.model_box.children = ()
+                self.build_model_editor_widgets()
+                self.__dict__.pop('fit',None) # semoves self.fit instance if obtained with different model
+
+            overlay = ipyw_yes_no_dial(
+                                title="Complex model edit",
+                                message=(
+                                "You could edit one component at a time instead.\n"
+                                f"Proceed with an empty {model}?"
+                                ),
+                                callback=answered,
+                                )
+            show_hide_tab(overlay, self.on_modal_display_change, self.tab)
+            return
+
+        # Place your now-working component-edit block here:
+        elif indices: # really edit the dash
+            k = indices[0] # single component or first index of component to add or remove 
+            mod = model if self._add else self._oldmodel
+            cc = [mod[i:i+2] for i in range(0, len(mod), 2)] # component names in self._oldmodel
+            if self._add: # index[es] of new component in model
+                self._change_component = model[2*k:2*k+2]
+                indexed_old = ''.join(cc[:k])+''.join([cc[j]+str(j) for j in indices])+''.join(cc[indices[-1]+1:])
+                title = 'Add {} at index {}'.format(self._change_component,indexed_old)
+            else: # index[es] of self._oldmodel component to remove
+                self._change_component = self._oldmodel[2*k:2*k+2]
+                indexed_old = ''.join(cc[:k])+''.join([str(j)+cc[j] for j in indices])+''.join(cc[indices[-1]+1:])
+                title = 'Choose which {} to remove from {}'.format(self._change_component,indexed_old)
+
+        if len(indices) == 1:
+            self._on_air(indices[0])
+        else:
+            self._radio = RadioButtons(
+                                options=indices,
+                                index=None,
+                                layout=Layout(width="100%", margin="10px 0px"),
+                                )
+            self._overlay = ipyw_radio_dial(self._radio, self._on_air, title)
+            show_hide_tab(self._overlay, self.on_modal_display_change, self.tab)
 
     def _on_RL(self,change):
         """Traps the text widget's 'Enter' press safely."""
@@ -824,7 +962,7 @@ class dashed(object):
                 grp_calib.append(grp_c)
 
         offset = self.suite_box.children[1].children[8].value
-        if os.path.isfile(datafile):
+        if datafile and os.path.isfile(datafile):
             if runlist:
                 self.suite = suite(datafile , runlist , grp_calib , offset , 'input setuppath not used' ,console=self.log) #startuppath is set in suite
                 # self.log info
@@ -1270,14 +1408,14 @@ class dashed(object):
 
         MN_label = Label(value='model acronym',layout=Layout(width=command_width[2]))
         self.MN_text = Text(value = '',
-                            placeholder = 'e.g. almg[Enter]',
-                            tooltip ='LM activates model',
+                            placeholder = 'e.g. almg + LM',
+                            tooltip ='(LM opens/updates editor)',
                             layout = Layout(width=command_width[3],height=self.textheight),
                             continuous_update=False) # requires CR
         #self.MN_text.observe(self._on_MN,names='value')
 
         LM_button = Button(description = 'LM',
-                           tooltip = 'Load/edit model\nfrom acronym',
+                           tooltip = 'Edit/update model\nfrom acronym',
                            layout = Layout(width=command_width[4]))
         LM_button.style.button_color = self.command_button_color
         LM_button.on_click(self._on_MN)
