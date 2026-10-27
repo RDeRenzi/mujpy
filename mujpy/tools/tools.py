@@ -1424,8 +1424,8 @@ def init_csv_row(filespec, the_run, group = False):
     except:
         Bstr = '{:.1f}'.format(float(Bstr)/10)
     pattern = r"-?\d+(?:\.\d+)?"
-    orient = re.findall(pattern, orient)[0]
-    
+    orient = re.findall(pattern, orient)
+    orient = '' if not orient else orient[0]
     filespecs = ['bin','mdu','oot'] 
     if filespec in filespecs:
     #    TsTc, eTsTc = the_run.get_temperatures_vector(), the_run.get_devTemperatures_vector()

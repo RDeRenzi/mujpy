@@ -10,17 +10,35 @@ class muroot2py():                        # defines the python class
     .. code::
 
       from mujpy.muroot2py import muroot2py as muld
-      path2file = 'path and filename'
-      run = muld()  # this is the method instance
+      run(path_and_filename) # this is the loaded instance 
 
-    header type 5 is only Readreen Offset: 0 -@, treated as 1
-    header type 3 Physical quantity treated as str up to an optional ";" 
+        reads: 
+        lem 2006- lem06_his_nnnn.root
+        ins 2023-202x deltat_tdc_ins_yyyy_nnnn.root where ins:x = dolly:4, vms:-, hifi:-
+        gps 2023- deltatbc_tdc_gps_yyyy_nnnn.root  <-^ all these are TFolders type 
+        flame 26- flameyy_his_nnnn.root            <-- this is TDirectory tye
+
+    .. temporary methods description::
+
+        self._runheader()       returns header (both types) in root format
+        self._oldroot()         True for Tfolders, False for TDirectory (flame26)
+        self._info_header()     self._runheader() as list of strings
+        self._extract(k)        the k-th header string
+        self._header_key(k)     extracts the key from the k-th string 
+        self._header_value(k)   extracts the value from the k-th string so that
+                                    self._header_dict[self._header_key(k)]
+                                                         is self._header_value(k)
+        self
+        self._histos()          returns histos (both types) root tree
+
+    header type 5 is ReadGreen Offset: 0 -@, treated as -@1
+    header type 3 Physical quantity treated as str up to an optional ";"
     """
 
     def __init__(self, path_filename):
         self.readingOOK = self.read(path_filename)  # reads data
-        self._header_dictionary() # creates header dictionary self._header_dictionary
-        self._histo_dictionary()  # creates histo dictionary self._histo_dictionary
+        self._make_header_dict() # creates header dictionary self._header_dict
+        self._make_histo_dicts()  # creates histo dictionary self._histo_dicts
                                   # used by all get_ calls
     def read(self,path_filename):
         """
@@ -28,14 +46,12 @@ class muroot2py():                        # defines the python class
         
         .. code::
 
-          run = muld(path2file)  # this is the method instance 
+          run = muld(path2file)  # this is the loaded method instance 
           initiated on the data file
           returns True (success) or False (insuccess)
         """    
         try:
-            self.run = ReadOnlyFile(path_filename) # universal, Tfolder_v1 and TDirectory 
-            self.run_type = type(self.run.root_directory["RunHeader"])
-            #self.run = uproot.open(path_filename)
+            self.run = ReadOnlyFile(path_filename).root_directory # universal, Tfolder_v1 and TDirectory 
             read_ok = True
         except:
             read_ok = False
@@ -46,25 +62,27 @@ class muroot2py():                        # defines the python class
     def _runheader(self):
         """header (v1 and TDictionary)"""
 
-        # header = self.run["RunHeader"].members["fFolders"]
-        if self.run_type == Model_TFolder_v1:
-            header = self.run.members["fFolders"][0]
+        if self._oldroot():
+            header = self.run['RunHeader'].members["fFolders"][0]
         else: # ReadOnlyDirectory
-            header = self.run["RunInfo"].items()
+            header = self.run["RunHeader/RunInfo"].items()
         return header 
+
+    def _oldroot(self):
+        """ self.run.is_instance('TFolder')"""
+
+        # _newroot = 'classnames' in self.run['RunHeader'].__dir__() 
+        return 'members' in self.run['RunHeader'].__dir__()
 
     def _info_header(self):
         """list of strings extractor (v1 and TDictionary)"""
 
-        return [str(x) for x in self._runheader()] if self.run_type == Model_TFolder_v1 else [str(x) for x,_ in self._runheader()] 
+        return [str(x) for x in self._runheader()] if self._oldroot() else [str(x) for x,_ in self._runheader()] 
 
     def _extract(self,k):
         """single header string extractor (v1 and TDictionary)"""
 
-        return str(self._runheader()[0][k] if self.root_type == Model_TFolder_v1 else self._runheader()[k][0])
-
-    def _temperature_error_float(self):
-        return float(self._header_dictionary['Sample Temperature string'].partition(' +- ')[2].partition(' ')[0])
+        return self._info_header()[k]
 
     def _header_key(self,k):
         """key for uproot to header dict(v1 and TDictionary)"""
@@ -79,494 +97,273 @@ class muroot2py():                        # defines the python class
         
     def _header_value(self,k):
         """value for uproot to header dict(v1 and TDictionary)"""
-        val = self._extract(k).split(' -@')
-        jtyp, val = val[1], val.split(';')[0]
-        # header = str(self._runheader()[0][k])
-        # muroot_type = int(header[-1])
-        # value = header.partition(self._header_key(k)+': ')[2].partition(' -@')[0]
-        #if self._header_type(k) == 0: # string
-        #    pass
-        #elif self._header_type == 1: # integer
-        #    value = int(value)
-        #elif muroot_type == 2: # float
-        #    value = float(value)
-        #elif muroot_type == 3: # physical quantity
-        #    value = value.split()[0]
-        #    value = float(value) if '.' in value else int(value)
-        return val if jtyp=='0' or jtyp=='3' else float(val) if (jtyp=='2' or '.' in val) else int(val)
+        jtyp = self._extract(k).split(': ')[-1].split(' -@')[1].split(';')[0]
+        val = self._extract(k).split(': ')[1].split(' -@')[0]
+        return val if jtyp in ['0','3','5'] else float(val) if (jtyp=='2' or '.' in val) else int(val)
 
-    def _make_header_dictionary(self): 
+    def _make_header_dict(self):
         """uproot to header dict (v1 and TDictionary)"""
 
-        self._header_dictionary = {}
+        self._header_dict = {}
         for k in range(len(self._info_header())):
-            self._header_dictionary[self._header_key(k)] = self._header_value(k)
-            if self._header_key(k) == 'Sample Temperature' or self._header_key(k) == 'Sample Magnetic Field':
-                header = str(self._runheader()[0][k])
-                self._header_dictionary[self._header_key(k)+' string'] = header.partition(self._header_key(k)+': ')[2].partition(' -@')[0]
+            self._header_dict[self._header_key(k)] = self._header_value(k)
+            #if self._header_key(k) == 'Sample Temperature' or self._header_key(k) == 'Sample Magnetic Field':
+            #    header = str(self._runheader()[0][k])
+            #    self._header_dict[self._header_key(k)+' string'] = header.partition(self._header_key(k)+': ')[2].partition(' -@')[0]
 
-    def _histo_key(self,histogram,k):
-        return str(self._runheader()[1][histogram][k]).split(':')[0].split('- ')[1]
-        
-    def _histo_type(self,histogram,k):
-        return int(str(self._runheader()[1][histogram][k])[-1])
-        
-    def _histo_value(self,histogram,k):
-        header = str(self._runheader()[1][histogram][k])
-        muroot_type = int(header[-1])
-        value = header.partition(self._histo_key(histogram,k)+': ')[2].partition(' -@')[0]
-        if muroot_type == 0: # string
-            pass
-        elif muroot_type == 1: # integer
-            value = value
-        elif muroot_type == 2: # float
-            value = float(value)
-        elif muroot_type == 3: # physical quantity
-            value = value.split()[0]
-            value = float(value) if '.' in value else int(value)
-        return value
+    def _histo_info_list(self,k_histo):
+        """list of strings for histo name, number, length, t0 bin, first good, last good, [AddedHistos]"""
 
-    def _histo_dictionary(self): 
-        self._histo_dictionary = {}       
-        for histo in range(len(self._runheader()[1][:])):
-            for k in range(len(self._runheader()[1][histo][:])):
-                self._histo_dictionary[self._histo_key(histo,k)+' '+str(histo)] = self._histo_value(histo,k)
+        if self._oldroot():
+            info = self.run['RunHeader'].members["fFolders"][1][k_histo]
+            info_list = [str(x) for x in info]
+        else: # ReadOnlyDirectory
+            histo = "RunHeader/DetectorInfo/Detector00"+str(k_histo+1)
+            info = self.run[histo].items()
+            info_list = [str(x) for x,_ in info]
+        return info_list
 
-    def _histos(self):
-        return self.run["histos"].members['fFolders'][0].members['fFolders'] 
+    def _histo_key(self,k_histo,k):
+        """key for uproot to header dict(v1 and TDictionary)"""
+
+        # string = str(self._runheader()[0][k])
+        return self._histo_info_list(k_histo)[k].split(':')[0].split('- ')[1]
+
+    def _histo_values(self,k_histo):
+        """values for uproot to histo _dicts (v1 and TDictionary)"""
+        vals = []
+        for string in self._histo_info_list(k_histo):
+            val = string.split(': ')[-1].split(' -@')
+            jtyp, val = val[1].split(';')[0], val[0].split(';')[0]
+            val = val if jtyp=='0' or jtyp=='3' else float(val) if (jtyp=='2' or '.' in val) else int(val)
+            vals.append(val)
+        return vals
+
+    def _make_histo_dicts(self):
+        """uproot to _histo_dicts list of dict"""
+
+        number_histos = self._header_dict['No of Histos']
+        self._histo_dicts = [
+                {self._histo_key(k_histo,k):val for k,val in enumerate(self._histo_values(k_histo))} for 
+                k_histo in range(number_histos)]
+
+    def _histo_number(histo_number):
+        """from Histo Number, e.g. lem 21, to 0-based k in k-th TH1F, e.g. lem 8"""
+
+        number_histos = self._header_dict('No of Histos')
+        offsets = self.get_RedGreen_offsets().split('; ')
+        index = [histo_number<int(o) for o in offsets].index(True)-1
+        offset = int(offsets[index])
+        return histo_number%offset-1+histo_number//offset*number_histos
+
+    def _histo(self,k):
+        """np.array of counts from k-th TH1F vector"""
+
+        if self._oldroot():
+            histo= self.run['histos'].members["fFolders"][0].members['fFolders'][k]
+        else: # ReadOnlyDirectory
+            histo = self.run["histos/DecayAnaModule/hDecay00"+str(k+1)]
+        # uproots arrays ARE numpy arrays
+        return histo.counts()
 
     def _plots(self):
-        if self._header_dictionary['Instrument']=='LEM':
+        """deprecated?"""
+
+        if self._header_dict['Instrument']=='LEM':
             return self.run["histos"].members['fFolders'][5].members['fFolders'] 
         else:
             return self.run["histos"].members['fFolders'][1].members['fFolders'] 
     
     def _rbn(self,hist,binning):
+        """assumes hist is a numpy array, as from self._histo(k)""" 
         return hist[:(hist.size//binning)*binning].reshape(hist.size//binning,binning).sum(axis=1)
         
 # user methods
 
     def Filename(self):
-        """
-        filename
+        """header filename"""
 
-        """
-
-        return self._header_dictionary['File Name']
+        return self._header_dict['File Name']
         
     def readingOK(self):
+        """True if instance loaded the data file"""
+
         return self.readingOOK
 
     def Show(self):
-        """
-        print RunHeader, fFolders
-        """
+        """print RunHeader, fFolders"""
 
-        k1 = len(self.run["RunHeader;1"].members['fFolders'][:])
-        for k in range(k1):
-            k2 = len(self.run["RunHeader;1"].members['fFolders'][k][:])
-            for l in range(k2):
-                print('{}'.format(self.run["RunHeader;1"].members['fFolders'][k][l][:]))
+        for x in self._info_header(): print(' '+x)
                 
     def get_binWidth_ns(self):
-        """
-        bin width in ns
+        """bin width in ns"""
         
-        .. code::
- 
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          dt = run.get_binWidth_ns()
-          # dt is now a float with the time resolution in ns
-
-        """
-
-        return self._header_dictionary['Time Resolution']
+        return float(self._header_dict['Time Resolution'].split(' ns')[0])
 
     def get_binWidth_us(self):
-        """
-        bin width in us
+        """bin width in us"""
 
-        .. code::
- 
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          dt = run.get_binWidth_ns()
-          # dt is now a float with the time resolution in ns
-
-        """
-
-        return self._header_dictionary['Time Resolution']/1000.
+        return self.get_binWidth_ns/1000.
 
     def get_histoLength_bin(self):
-        """
-        histogram length in bins
+        """histogram0 length in bins"""
 
-        .. code::
-
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          l = run.get_histoLength_bin() # l is now an integer with the number of bins in PSI detector histo
-        """
-
-        return int(self._histo_dictionary['Histo Length 0'])
+        return int(self._histo_dicts[0]['Histo Length'])
 
     def get_numberHisto_int(self):
-        """
-        number of histograms
+        """number of histograms"""
 
-        .. code::
-
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          l = run.get_numberHisto_int(histo) # l is now an integer with the number of detectors
-       """
-
-        return self._header_dictionary['No of Histos']
+        return self._header_dict['No of Histos']
     
     def get_RedGreen_offsets(self):
-        """
-        offset in red-green mode
+        """list of offsets (Red-Green mode)"""
 
-        .. code::
-
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          offsets = run.get_RedGreen_offsets() # offsets is now a list of integer offsets for PSI RedGreen mode
-          # beware, histograms are contuiguous, the offset is in the PSI Histo Number
-       """
-
-        return [int(k) for k in self._header_dictionary['RedGreen Offsets'].split(';')]
+        str_offsets = self._header_dict['RedGreen Offsets'].split('; ')
+        #for line in self._info_header(): 
+        #    if 'RedGreen Offsets' in line: 
+        #        str_offsets = line.split(': ')[1].split(' -@')[0].split('; ')
+        #        break
+        return [int(x) for x in str_offsets]
     
-    def get_histo_int(self, histogram,nbin):
-        """
-        counts in histogram at nbin
+    def get_histo_int(self,k_histo,k):
+        """counts in k_histo-th detector histo(k)"""
 
-        .. code::
+        return int(self._histo(k_histo)[k])
 
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          # histogram in range(self.get_numberHisto_int())
-          h = run.get_histo_int(3,100)
-          # h is now the integer count of bin 100 in the 3rd histogram (PSI convention), python index 2
-        (remember python indices starts from 0)
-        """
+    def get_histo_vector(self,k_histo,binning=1):
+        """np.array of counts for k_histo-th detector""" 
 
-        return int(self._histos()[histogram].counts()[nbin])
-
-    def get_histo_vector(self,histogram,binning=1):
-        """
-
-        numpy array of counts for histogram 
-
-        .. code::
-
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          # histogram in range(self.get_numberHisto_int())
-          h = run.get_histo_vector(offset)
-          # h is a column of numpy row array (not list!) of integers containing the number of events per histo for the histos with a given offset
-        """
-
-        if binning == 1:
-            return np.array(self._histos()[histogram].counts())
-        else:
-            return self._rbn(np.array(self._histos()[histogram].counts()),binning)
+        return self._histo(k_histo) if binning==1 else self._rbn(self,_histo(k_histo),binning)
     
-    def get_histo_vector_no0(self,histogram,binning=1):
-        """
-        numpy array of counts for histogram with 0s replaced by 0.1
+    def get_histo_vector_no0(self,k_histo,binning=1):
+        """np.array of counts for k_histo-th detector (0.1 for 0)"""
 
-        .. code::
-
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          # histogram in range(self.get_numberHisto_int())
-          h = run.get_histo_vector_no0(offset)
-          # h is a column of numpy row array (not list!) of integers containing the number of events per histo for the histos with zeros replaced by 0.1
-        """
-
-        hist = np.array(self._histos()[histogram].counts())
-        if binning != 1:
-            hist = self._rbn(hist,binning)
+        hist = self.get_histo_vector(k_histo,binning=binning)
         return np.where(hist != 0, hist, 0.1)
     
-    def get_histo_fromt0_vector(self,histogram,binning=1,offset=0):
-        """
-        numpy array of counts for histogram from t0 bin
+    def get_histo_fromt0_vector(self,k_histo,binning=1,offset=0):
+        """np.array of counts for k_histo-th detector from t0 bin"""
 
-        .. code::
+        return self.get_histo_vector(k_histo,binning=binning)[self.get_t0_int(k_histo)+offset:]
 
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          # histogram in range(self.get_numberHisto_int())
-          h = run.get_histo_fromt0_vector(offset)
-          # h is a column of numpy row array (not list!) of integers containing the number of events per histo for the histos with a given offset after t0 
-        """
+    def get_histo_fromt0_minus_bckgrd_vector(self,k_histo,first_bkg,last_bkg,binning=1,offset=0):
+        """np.array of counts for k_histo-th detectori from t0 bin with background subtraction from t<t0 mean"""
 
-        hist = np.array(self._histos()[histogram].counts())[self.get_t0_int(histogram)+offset:]
-        if binning == 1:
-            return hist
-        else:
-            return self._rbn(hist,binning)
-
-    def get_histo_fromt0_minus_bckgrd_vector(self,histogram,first_bkg,last_bkg,binning=1,offset=0):
-        """
-        numpy array of counts for histogram from t0 bin with background subtraction from t<t0 mean
-
-        .. code::
-
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          h = run.get_histo_vector(histogram,offset)
-          # histogram in range(self.get_numberHisto_int())
-          # h is a column of numpy row array (not list!) of integers containing the number of events per histo for the histos with a given offset after t0
-          # with background subrtaction as estimated between first_bkg and last_bkg included
-        """
-
-        hist = np.array(self._histos()[histogram].counts())[self.get_t0_int(histogram)+offset:]
-        background = np.array(self._histos()[histogram].counts())[first_bkg:last_bkg+1].sum()/(last_bkg+1-first_bkg)
-        if binning == 1:
-            return hist
-        else:
-            return self._rbn(hist,binning)-background   
+        hist = self.get_vector(k_histo)
+        background = hist[first_bkg:last_bkg+1].sum()/(last_bkg+1-first_bkg)
+        hist = self.get_histo_fromt0_vector(k_histo,binning=binning,offset=offset)
+        return hist-background*binning   
     
     def get_instrument(self):
-        """
-        instrument from header
+        """instrument from run header"""
 
-        """
-
-        return self._header_dictionary['Instrument']
+        return self._header_dict['Instrument'].strip()
 
     def get_title(self):
-        """
-        title
-        """
+        """title from run header"""
 
-        return self._header_dictionary['Run Title']
+        return self._header_dict['Run Title']
 
     def get_runNumber_int(self):
-        """
-        run number
-        """
+        """integer run number"""
 
-        return self._header_dictionary['Run Number']
+        return int(self._header_dict['Run Number'])
 
     def get_beamline(self):
-        """
-        beamline from header
-        """
+        """beamline from run header"""
 
-        return self._header_dictionary['Muon Source']
+        return self._header_dict['Muon Source']
 
     def get_transport_energy(self):
-        """
-        transport energy from header (LEM)
-        """
+        """transport energy from header (LEM)"""
 
-        if self._header_dictionary['Instrument']=='LEM':
-            return self._header_dictionary['Moderator HV']
+        if self._header_dict['Instrument']=='LEM':
+            return self._header_dict['Moderator HV']
+        else: return "" 
 
     def get_sample_HV(self):
-        """
-        HV from header (LEM)
-        """
+        """sample HV from header (LEM)"""
 
-        if self._header_dictionary['Instrument']=='LEM':
-           return self._header_dictionary['Sample HV']
+        if self._header_dict['Instrument']=='LEM':
+           return self._header_dict['Sample HV']
+        else: return "" 
 
     def get_implantation_energy(self):
         """
         Implantation Energy from header (LEM)
         """
 
-        if self._header_dictionary['Instrument']=='LEM':
-            return self._header_dictionary['Implantation Energy']
+        if self._header_dict['Instrument']=='LEM':
+            return self._header_dict['Implantation Energy']
+        else: return "" 
 
     def get_spin_angle(self):
-        """
-        spin rotator angle (LEM)
-        """
+        """spin rotator angle"""
 
-        if self._header_dictionary['Instrument']=='LEM':
-            return self._header_dictionary['Muon Spin Angle']
+        return self._header_dict['Muon Spin Angle']
 
     def get_proposal_number(self):
-        """
-        Proposal number
-        """
+        """Proposal number"""
 
-        return self._header_dictionary['Proposal Number']
+        return self._header_dict['Proposal Number']
         
     def get_proposer(self):
-        """
-        PI
-        """
+        """PI (LEM)"""
 
-        if self._header_dictionary['Instrument']=='LEM':
-            return self._header_dictionary['Main Proposer']
+        if inst=='LEM' or not self._oldroot:
+            return self._header_dict['Main Proposer']
+        else: return "" 
  
     def get_comment(self):
-        """
-        comment
+        """comment"""
 
-        usage: 
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          run.red(path2file)
-          comment = run.get_comment()
-          # comment is now a string with the run comment
-        """
-
-        return self._header_dictionary['Comment']
+        return self._header_dict['Comment']
 
     def get_temp(self):
-        """
-        temperature with error (string)
+        """temperature without error (string)"""
 
-        .. code::
- 
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          T = run.get_temp()
-          # T is now a string with error
-        """
-
-        return self._header_dictionary['Sample Temperature string'].split(' +- ')[0]+'K'
+        return self._header_dict['Sample Temperature'].split(' +-')[0]
 
     def get_temperature(self):
-        """
-        temerature (float)
+        """temperature (float)"""
 
-        .. code::
- 
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          T = run.get_temperature()
-          # T is now a float
-        """
+        return float(self._header_dict['Sample Temperature'].split(' +-')[0])
 
-        return self._header_dictionary['Sample Temperature']
+    def get_t0_int(self, k_histo):
+        """t0 bin from run histo k-histo header, IF you trust it"""  
 
-    def get_t0_int(self, histogram):
-        """
-        t0 bin 
+        return int(self._histo_dicts[k_histo]['Time Zero Bin'])
 
-        .. code::
+    def get_t0_double(self, k_histo):
+        """t0 float as float"""
 
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          t0 = run.get_t0_double()
-          # t0 is now a float with the t0 bin 
-        """
-
-        return int(self._histo_dictionary['Time Zero Bin '+str(histogram)])
-
-    def get_t0_double(self, histogram):
-        """
-        t0 float as string
-
-        .. code::
-
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          t0 = run.get_t0_double()
-          # t0 is now a float with the t0 bin 
-        """
-
-        return self._histo_dictionary['Time Zero Bin '+str(histogram)]
+        return float(self._histo_dicts['Time Zero Bin '+str(histogram)])
 
     def get_sample(self):
-        """
-        sample 
+        """sample"""
 
-        .. code::
- 
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          samplename = run.get_sample()
-          # samplename is now a string with the sample name
-
-        """
-
-        return self._header_dictionary['Sample Name']
+        return self._header_dict['Sample Name']
 
     def get_orient(self):
-        """
-        orientation
+        """orientation"""
 
-        .. code::
- 
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          orient = run.get_orient()
-          # orient is now a string with the sample orientation info
-
-        """
-
-        if 'Sample Orientation' in self._header_dictionary.keys():
-            return self._header_dictionary['Sample Orientation']
+        if 'Sample Orientation' in self._header_dict.keys():
+            return self._header_dict['Sample Orientation']
         else:
-            return 'n/a'
+            return ''
 
     def get_field_str(self):
-        """
-        field value string
+        """field value string"""
 
-        .. code::
-
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          fieldstr = run.get_field()
-          # fieldstr is now a string with the field value 
-        """
-
-        return self._header_dictionary['Sample Magnetic Field string']
+        return self._header_dict['Sample Magnetic Field'].split(' G')[0].split(' G')[0].split(' +-')[0]
 
     def get_field(self):
-        """
-        field float
+        """field float"""
 
-        .. code::
-
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          field = run.get_field()
-          # field is now a float field value 
-        """
-
-        return self._header_dictionary['Sample Magnetic Field']
+        return float(self._header_dict['Sample Magnetic Field'].split(' G')[0].split(' +-')[0])
 
     def get_timeTemperature_vector(self):
-        """
-        temperature time log
+        """temperature time log 
 
         .. code::
 
@@ -601,229 +398,40 @@ class muroot2py():                        # defines the python class
             T = T[:n]
         return t,T
         
-    def get_nameHisto(self,histogram):
-        """
-        histogram descriptor
+    def get_nameHisto(self,k_histo):
+        """k_histo-th histogram descriptor"""
 
-        .. code::
-
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          # histogram in range(self.get_numberHisto_int()*len(self.get_RedGreen_offsets())-1
-          name = run.get_nameHisto(histogram)
-          # name is now a string descriptor of the detector
-        """
-
-        if histogram<0 or histogram>=self.get_numberHisto_int()*len(self.get_RedGreen_offsets()):
-            return 'Histogram {} does not exist. Max histogram is {}'.format(histogram,self.get_numberHisto_int()*len(self.get_RedGreen_offsets())-1)
-        else:
-            return self._histo_dictionary['Name '+str(histogram)]
+        return self._histo_dicts['Name '+str(k_histo)]
    
     def get_histoNames_vector(self):
-        """
-        list of histogram descriptors
+        """list of histogram descriptors"""
 
-        .. code::
-
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          # histogram in range(self.get_numberHisto_int()*len(self.get_RedGreen_offsets())-1
-          name = run.get_histoNames_vector()
-          # name is now a list of string descriptors of the detectors
-        """
-
-        return [self._histo_dictionary['Name '+str(k)] for k in range(self.get_numberHisto_int()*len(self.get_RedGreen_offsets()))]
+        return [self.get_nameHist(k) for k in range(self.get_numberHisto_int()*len(self.get_RedGreen_offsets()))]
    
     def get_numberTemperature_int(self):
-        """
-        number of T sensors
-
-        .. code::
-
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          num = run.get_numberTemperature_int()
-          # num is now the number of temperature sensors, 1 for root files and 4 for bin files
-          # use self.Show() lines 127 ... for more info on sensors
-        """
+        """number of T sensors (fixed to 1 arbitrarily)"""
 
         return 1
     
     def get_temperatures_vector(self):
-        """
-        list of T sensor values
+        """list of T sensor values"""
 
-        .. code::
-
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          T = run.get_temperatures_vector()
-          # T is now a list of temperature sensor values, 1 for root files and 4 for bin files (only first 2 non zero)
-        """
-
-        return [self._header_dictionary['Sample Temperature']]
+        return [float(self._header_dict['Sample Temperature'].split(' +-')[0])]
     
     def get_devTemperatures_vector(self):
-        """
-        list of T sensor stds
+        """list of T sensor stds"""
 
-        .. code::
-
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          T = run.get_devTemperatures_vector()
-          # T is now a list of temperature sensor std values, 1 for root files and 4 for bin files (only first 2 non zero)
-        """
-
-        return [self._temperature_error_float()]
+        tempstr = self._header_dict['Sample Temperature']
+        eT = 0 if '+-' not in tempstr else float(tempstr.split(' +- ')[1].split(' K')[0])
+        return [eT]
     
+
     def get_timeStart_vector(self):
-        """
-        run start time
+        """run start time"""
 
-        .. code::
-
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          timeStart = run.get_timeStart_vector()
-          # timeStart is the start run yyyy-mm-dd hh:mm:ss string 
-
-        """
-
-        return self._header_dictionary["Run Start Time"].strip().split()
+        return self._header_dict["Run Start Time"].strip().split()
       
     def get_timeStop_vector(self):
-        """
-        run stop time
+        """run stop time"""
 
-        .. code::
-
-          from mujpy.muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          timeStop = run.get_timeStop_vector()
-          # timeStop is the stop run yyyy-mm-dd hh:mm:ss string
-
-        """
-
-        return self._header_dictionary["Run Stop Time"].strip().split()
-
-# commented methods below work for lem only
-#    def _filename(self):
-#        return str(self._extract(6,'File Name: '))
-
-#    def _runtitle(self):
-#        return str(self._extract(7,'Run Title: '))
-
-#    def _runnumber(self):
-#        return str(self._extract(8,'Run Number: '))
-
-#    def _starttime(self):
-#        return str(self._extract(9,'Start Time: '))
-
-#    def _stoptime(self):
-#        return str(self._extract(10,'Stop Time: '))
-
-#    def _instrument(self):
-#        return str(self._extract(13,'Instrument: '))
-
-#    def _setup(self):
-#        return str(self._extract(17,'Setup: '))
-
-#    def _sample(self):
-#        return str(self._extract(19,'Sample Name: '))
-
-#    def _temperature_str(self):
-#        return str(self._extract(20,'Sample Temperature: '))
-
-#    def _temperature_float(self):
-#        return float(self._temperature_str().partition(' +- ')[0])
-
-#    def _temperature_unit_str(self):
-#        return self._temperature_str().partition(' +- ')[2].partition(' ')[2]
-
-#    def _magfield_str(self):
-#        return str(self._extract(21,'Sample Magnetic Field: '))
-
-#    def _magfield_float(self):
-#        return float(self._magfield_str().partition(' +- ')[0])
-
-#    def _magfield_error_float(self):
-#        return float(self._magfield_str().partition(' +- ')[2].partition(' ')[0])
-
-#    def _magfield_unit_str(self):
-#        return self._magfield_str().partition(' +- ')[2].partition(' ')[2]
-
-#    def _nhisto_int(self):
-#        return int(str(self._extract(22,'No of Histos: ')).partition[2].partition(' -@'))
-
-#    def _tres_nsec(self):
-#        return float(str(self._extract(23,'Time Resolution: ')).partition(' ns')[0])
-
-#    def _redgreen_offset(self):
-#        return np.array([int(x) for x in str(self._extract(24,'RedGreen Offsets: ')).partition('RedGreen Offsets: ')[2].partition(' -@')[0].split(';')])
-
-#    def _trasport_energy_keV(self):
-#        return float(self._extract(27,'Moderator HV: ').partition(' keV')[0])
-
-#    def _sample_keV(self):
-#        return float(self._extract(28,'Sample HV: ').partition(' keV')[0])
-
-#    def _implant_energy_keV(self):
-#        return float(self._extract(29,'Implantation Energy: ').partition(' keV')[0])
-
-#    def _spin_angle_deg(self):
-#        return float(self._extract(30,'Muon Spin Angle: ').partition(' degree')[0])
-       
-#    def _detector_label(self,histogram):
-#        return str(self._runheader()[1][histogram][0]).partition('Name: ')[2].partition(' -@')[0]
-
-#    def _detector_number(self,histogram):
-#        return int(str(self._runheader()[1][histogram][1]).partition('Number: ')[2].partition(' -@')[0])
-
-#    def _detector_t0(self,histogram):
-
-#    def _proposal_number(self): 
-#    def _main_proposer(self): # only lem 
-       
-if __name__ == '__main__':
-    """
-    test of muroot2py 
-
-    .. code::
-
-      from mujpy.muroot2py import muroot2py as muld
-      path2file = 'path and filename'
-      run = muld()  # this is the instance
-      
-      # reads many things from a PSI root data file 
-
-    """
-    m2p = muroot2py()
-    m2p.read("../../data/root/lem24_his_0662.root")
-    print(str(m2p.get_numberHisto_int())+' histograms in this run')
-    print(m2p.get_histo_array_int(0))
-    print(m2p.get_histo_array_int(1))
-    print(m2p.get_histo_array_int(2))
-    print(m2p.get_histo_array_int(3))
-    print(str(m2p.get_binWidth_ns())+' ns/bin')
-    print(str(m2p.get_numberTemperature_int())+' recorded temperature logs')
-    np.set_printoptions(precision=3)
-    print(m2p.get_temperatures_vector()) 
-    print(m2p.get_sample()+' '+m2p.get_temp()+' K'+m2p.get_field()+' G  ')
-    print('Comment: '+m2p.get_comment())
-    print('Start run '+m2p.get_timeStart_vector())
-    print('Stop run '+m2p.get_timeStop_vector())
-    print('Number of events per histo  = {}'.format(m2p.get_eventsHisto_vector()))
-
+        return self._header_dict["Run Stop Time"].strip().split()

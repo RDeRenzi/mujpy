@@ -618,47 +618,19 @@ class mufit(object):
                 par_err_str += print_csv_components(v,e)
             nch = sumlength - 2
             header, row = self.prepare_csv_row(par_err_str,krun=krun,kgroup=kgroup) 
-            string1, string_out = write_csv(header,row,the_run,file_csv,filespec,scan=scan)
+            string1, string_out = write_csv(header,row,the_run,file_csv,filespec,scan=self.scan)
             run='+'.join(self.suite.runs[krun])
-            get_value = the_run.get_temp() if scan == 'T' else the_run.get_field() if scan == 'B' else the_run.get_orient() if scan == 'θ' else ''
-            string = '|    Run '+run+': '+scan+'='+get_value
+            get_value = the_run.get_temp() if (
+                            self.scan[0] == 'T') else the_run.get_field() if (
+                            self.scan[0] == 'B') else the_run.get_orient() if (
+                            self.scan[0] == 'O') else ''
+            string = '|    Run '+run+': '+self.scan+'='+get_value
             f.write(string+'\n')
             self.log(string+'  '+string_out)
             if self.last_summary:
                 f.write('|'+(nch-4)*'_'+'|\n')
                 self.log('|'+nch*'_'+'|')
                 self.if_not_converged(f)
-            #string2.append(string)
-
-    #       close f
-
-            #if self.last_summary: # only last summary_global call  
-
-        # now write Minuit parameter csv
-  
- #           else: # C1 or C2 # write a global log/'U_'+file_log
- #               file = self.suite.__cachepath__+'U_'+modelname+'.'+strun+strgrp+version+'.log'
- #               if os.path.isfile(file_log): # create prev version 
- #                   os.rename(file_log,file_log+'~')
- #               with open(file,'w',encoding='utf-8') as ff:
- #                   ff.write(' '+96*'_'+'\n')
- #                   nch = sumlength - 2
- #                   string = '| Run {}: {}    Global fit of {}'.format(nrun,title,dt_string)
- #                   ff.write(string+21*' '+'|\n')
- #                   string = '| χᵣ² = {:.3f}({:.3f},{:.3f}) ,    on [{:.2f}ns, {:.2}µs, {:.2f}ns/bin]'.format(chi,lowchi,highchi,start,stop,dt*1000)
- #                   ff.write(string+33*' '+'|\n')
- #                   nch = sumlength - 1 - len(string) if sumlength-len(string) - 1 >=0 else sumlength - 1
- #                   string = 'Run: '+run+'  '+scan + ' = ' + get_value
- #                   string = ' on group: {} - {}   α = {:.3f}   |'.format(fg,bg,al)
- #                   nch = sumlength - 1 - len(string) if sumlength-len(string) - 1 >=0 else sumlength - 1
- #                   ff.write('|'+(nch-3)*'-'+string+'\n'+'|'+nch*'_'+'|\n')
- #                   for nam,val,err in zip(n,v,e): # one line per Minuit parameter
- #                       ff.write('| {}:  {} '.format(n,value_error(v,e)))
- #                       if not self.lastfit.valid:
- #                           ff.write('')
- #                           ff.write(27*'*'+' Minuit did not converge! '+27*'*')
- #                           ff.write('')
- #                   ff.write('|'+nch*'_'+'|\n')
         return 
 
     def if_not_converged(self,f):

@@ -71,13 +71,17 @@ class suite(object):
         from mujpy._version import __version__
         self.__version__ = __version__
         # print('__init__ now ...')
+        self.offset = int(offset) # offset belongs to suite, that needs it for asymmetries
+        self.groups = grp_calib
+        self.console_method = console # either 'print' for scripts or 'self.log' for mudashed calls, eg. from jupyter-lab or ipython
+        self.mplot = mplot
+
         self.firstbin = 5 # common to all data file specs, to evaluate background for subtraction 
         self.loadfirst = False  # non initialized trivialities in the present instance of self.suite
         self._the_runs_ = [] # initialized to empty
 #        with open(suite_input_file,"r") as f:
 #            suite_input_json = f.read()
 #            suite_input = json.loads(suite_input_json)
-        self.console_method = console # either 'print' for scripts or 'self.log' for mudashed calls, eg. from jupyter-lab or ipython
         try:
             if self.console_method == 'print': # not a call from a mudash instance
                 self.console('******************* SUITE *********************')
@@ -89,6 +93,7 @@ class suite(object):
         except ValueError as e:
             print('Except: {}\nno suite.console!'.format(e))
             return  # with no console error message, it means no console
+
         # determine number of runs, filenames etc.
             #######################
             # decode the run string
@@ -99,6 +104,7 @@ class suite(object):
             return  # with console error message
 
         self.nruns = len(self.runs) # vanished on 23 July 2026 at 17:00 ?!??!  reinserted here
+        
         if os.path.isfile(datafile):
             self.datafile = datafile
             self.__datapath__ = os.path.dirname(os.path.abspath(datafile))
@@ -106,18 +112,14 @@ class suite(object):
                 self.thermo = 0 # sample thermometer is always a single value list
             elif self.datafile[-3:]=='bin': 
                 self.thermo = 1 # sample thermometer is 1 on gps (check or adapt to other instruments)
-                self.prepostpk = [50, 50]
             elif self.datafile[-3:]=='mdu':
                 self.thermo = 1 # sample thermometer is 1 on gps (check for hifi)
-                self.prepostpk = [70, 70]
             self.loadfirst = True
         else:
             self.console('* File {} not found'.format(datafile))
-#            self.console('* CHECK YOUR ACCESS (e.g. klog)')
             self.console('**************************************')
             return None  # with console error message
         self.__startuppath__ = os.getcwd()
-        # implement new folder policy, see https://musr-nmr.unipr.it/dispense/pmwiki.php?n=Mujpy.Dashboard
 
         # REMEMBER! ../ does not work if it points outside the directory where jupyterlab is launched from
         if not os.path.exists(self.__startuppath__+os.sep+'fit'+os.sep):
@@ -130,30 +132,10 @@ class suite(object):
             os.mkdir(self.__startuppath__+os.sep+'cache'+os.sep)
         self.__cachepath__ = self.__startuppath__+os.sep+'cache'+os.sep
         # reverse of tools get_grouping is tools get_group
-        self.offset = int(offset) # offset belongs to suite, that needs it for asymmetries
+        
 
-        self.loadfirst = self.load_runs()
-        self.groups = grp_calib
-        self.grouping = [] # reproduce the same with arrays of histogram numbers, done by tools get_grouping
-        if self.loadfirst: #           load data instances in self._the_runs_
-            # grp_calib is a list of dictionaries, one per group, with keys 'forward,'backward','alpha'
-            # where groups may be in shorthand notation
-            self.LEM_back_subt = False
-            if self._the_instrument_ == 'LEM' and self._the_runs_[0][0].get_histo_fromt0_vector(15)[0]:
-                # in single_for_back_count use next eight background subtracted histo
-                self.console('                            using corrected LEM histograms 8,9,10,11,12,13,14,15') 
-                self.LEM_back_subt = True
-                #        in self.grouping        self.promptfit(mplot)   #    to be done: make switch for isis
-            if self.store_groups():
-                self.promptfit(mplot)   #    to be done: switch for isis broken and root lem wip
-                self.timebase()
-            else:
-                self.loadfirst = False
-                self.console('*************  suite exits without data for group issues ****************************')
-        # self.console('... end of initialize suite')
-        else:
-            self.loadfirst = False
-            self.console('*********************** suite exits without loading data ****************************')
+        # now create the suite 
+        self.load_runs()
 
     def console(self, string):
         """Write through the supplied console callback, or print."""
@@ -165,18 +147,21 @@ class suite(object):
 
     def add_runs(self,k):
         """
-        Tries to load one or more runs to be added together::
+        loads one or more runs to be added together
 
         input::
             
             k is index in self.runs, a list of lists
                      of integer-run-number strings
+                     
 
         output::
 
                 -1      and quits if musr2py, muroot2py or muisis2py complain, 
                 bool    otherwise
-            by means of murs2py, muisis2py or muroot2py. 
+            by means of murs2py, muisis2py or muroot2py.
+
+        checks each datafile in the internal list 
         """
 
         from mujpy.muroot2py.muroot2py import muroot2py as rootload 
@@ -188,60 +173,80 @@ class suite(object):
         
         def instrument(run_): # used by 'PSI' bin and mdu files
             # datafilename, e.g. deltat_tdc_gps_0001.bin, contains '_instrument name_'
-            instrument_set = set(['gps','gpd','dolly','flame','ltf','hifi','vms'])
-            return list(set(run_.Filename().split('_')).intersection(instrument_set))[0].upper()
+            instruments = ['gps','gpd','dolly','flame','ltf','hifi','vms','lem',
+                           'mus','emu','hif','arg','chr']
+            for instr in instruments: 
+                if instr in run_.Filename():
+                    instrument = instr.upper()
+                    break
+            return instrument
 
-        read_ok = True
-        runadd = []
-        for j,run in enumerate(self.runs[k]): # run is a single run number
+        runadd = [] # will contain either a single run or more runs to be added 
+        for j,run in enumerate(self.runs[k]): # run is a single run number string
             path_and_filename =  get_datafilename(self.datafile,run)
             if not isfile(path_and_filename): 
-                self.console('{path_and_filename} does not exist!')
+                self.console(f'"{path_and_filename}" does not exist!')
                 return False
             # PSI cases
             facility = 'PSI'
             if self.datafile[-4:]=='root': # 
                 run_ = rootload(path_and_filename)
-                read_ok = run_readingOK
+                if not run_.readingOK: return False
             elif self.datafile[-3:]=='bin' or self.datafile[-3:]=='mdu':
                 run_ = psiload()
-                read_ok = run_.read(path_and_filename) == 0           
+                if not run_.read(path_and_filename): return False           
             elif self.datafile[-3:]=='nxs': 
                 try: 
                     run_ = isisload(path_and_filename,'r')
                     read_ok = True
                     facility = 'ISIS'
                 except:
-                    read_ok = False
+                    return False
 
-            if read_ok:
-                if '_the_instrument_' in self.__dir__():
-                    numhis = run_.get_numberHisto_int()
-                    binwidth = run_.get_binWidth_ns()
-                    his = numhis != self._the_runs_[0][0].get_numberHisto_int()
-                    bwt = binwidth != self._the_runs_[0][0].get_binWidth_ns()
-                    same_t0 = self.promptfit(False,check=True)
-                    if his:
-                        self.console(f'File {path_and_filename} has wrong histoNumber {numhis}')
-                    elif bwt:
-                        self.console('File {} has wrong binWidth {:.2f}'.format(path_and_filename,binwidth))
-                    elif not same_t0 : 
-                        self.console(f'File {path_and_filename} has different t0!')
-                    if his or bwt or not same_t0:
-                    #    self.runs.pop(-1)
-                        return
-                    else:
-                        runadd.append(run_) # opens one run in the list
+            if j or k: # not the first in runadd list, or not the first run in runlist
+                dif_nhs = ( self.numhis != runs_.get_numberHisto_int() )
+                dif_bwt = ( self.binwidth != run_.get_binWidth_ns() )
+                dif_t0 = not self.promptfit(run_,check=True)
+                if dif_nhs:
+                    self.console(f'File {path_and_filename} has wrong histoNumber {numhis}')
+                elif dif_bwt:
+                    self.console('File {} has wrong binWidth {:.2f}'.format(path_and_filename,binwidth))
+                elif dif_t0 : 
+                    self.console(f'File {path_and_filename} has different t0!')
+                if dif_nhs or dif_bwt or dif_t0:
+                    return
                 else:
-                    runadd.append(run_)
-                    self._the_instrument_ = instrument(run_) 
-                    self._the_facility_ = facility
-                self._the_runs_.append(runadd) # 
-                
-                filename_short = short_path(path_and_filename,self.__startuppath__) 
-                title = get_title(self._the_runs_[-1][0])
-                self.console(f'{filename_short} loaded, run {run}: {title}')
-                return True
+                    runadd.append(run_) # appends another run to runadd
+                    runs_added += ' '+run 
+            else: # this is j==0 and k==0 # first run in run list and inner list
+                self.numhis = run_.get_numberHisto_int()
+                self.histperiods = len(run_.get_RedGreen_offsets()) # are there RedGreen copies (self.histperiods>1)?
+                self._the_instrument_ = instrument(run_) # creates _the_instrument_
+                self._the_facility_ = facility # creates _the_facility_
+                self.grouping = [] # reproduce the same with arrays of histogram numbers, done by tools get_grouping
+                    # grp_calib is a list of dictionaries, one per group, with keys 'forward,'backward','alpha'
+                    # where groups may be in shorthand notation
+                self.LEM_back_subt = False
+                if self._the_instrument_ == 'LEM' and run_.get_histo_fromt0_vector(self.numhis-1)[0]:
+                    # in single_for_back_count use next eight background subtracted histo
+                    self.console('                            using corrected LEM histograms 8,9,10,11,12,13,14,15') 
+                    self.LEM_back_subt = True
+                if self.store_groups():   # checks that grp dicts are consistent with datafile
+                    if self.promptfit(run_): # j=0 and k=0, first promptfit, first run in first runadd list
+                        runadd.append(run_)   # appends first run to runadd
+                        runs_added = run
+                    else:
+                        self.console('  Unexpected wrong first promptfit')
+                        return False
+                else:
+                    self.console('*************  suite exits without data, incompatible grp and datafile  **************')
+                    return False
+
+        self._the_runs_.append(runadd) # appends a runadd list to the list
+        filename_short = short_path(path_and_filename,self.__startuppath__) 
+        title = get_title(run_)
+        self.console(f'{filename_short} loaded, run {runs_added}: {title}')
+        return True
 
     def load_runs(self):
         """
@@ -258,15 +263,15 @@ class suite(object):
                 # this and the following two statements load data
                 if the_suite.store_groups():     
                     #   define groups
-                    the_suite.promptfit(mplot=False)    
+                    the_suite.promptfit()    
                         #   fit t0 = 0
         """
 
-        read_ok = True
         for k in range(len(self.runs)):#  self.runs is a list of lists of run number stringsto add
             if not self.add_runs(k):
                 if k==0: 
-                    read_ok = False
+                    self.console('*********************** suite exits without loading data ****************************')
+                    return
                 else:
                     string = ', '.join([self.runs[k][0] for k in range(k-1)])
                     self.console('**************************')
@@ -274,8 +279,8 @@ class suite(object):
                     self.runs.pop(k)
                     break
                   # this code reads and returns a read_ok code
-        
-        return read_ok # False with console error message in add_runs
+        self.loadfirst = True
+        #return read_ok # False with console error message in add_runs
    
 
     def check_group(self,group):
@@ -289,12 +294,7 @@ class suite(object):
         # MusrRoot instead has offsets, typically [0,20,40,80] or [0,10,20,30], reflected in the label Histo No
         # whereas the list self._histo.counts() has two indices: histogram, bin, and histogram numbers are contiguous
         # e.g. on lem for numberHisto_int = 8 and offsets [0,10] indices 0,...,7 are the original histos and 8,...,15 are PPC
-        numberHisto = self._the_runs_[0][0].get_numberHisto_int()
-        periods = 1
-        if 'get_RedGreen_offsets' in self._the_runs_[0][0].__dir__(): # RedGreen may be present
-            periods = len(self._the_runs_[0][0].get_RedGreen_offsets()) # are there RedGreen copies (periods>1)?
-        if 'get_beamline' in self._the_runs_[0][0].__dir__(): # PSI only
-            numberHisto = numberHisto*periods           
+        numberHisto = self.numhis*self.histperiods           
         return (group>=0).all()*(group<numberHisto).all()
 
     def store_groups(self):
@@ -319,6 +319,7 @@ class suite(object):
               
     def t_value_error(self,k):
         """
+        deprecated? not in grep t_value_error *.py [/tools/*.py, /mucomponents/*.py]
         calculates T and eT values also for runs to be added::
         
             sillily, but it works also for single run
@@ -339,18 +340,21 @@ class suite(object):
             t_value, t_error = 0, 0
         return t_value, t_error
 
-    def promptfit(self,mplot, mprint = True, check=False):
+    def promptfit(self,the_run, mprint = True, check=False):
         """
         indentifies t0 and stores self.nt0 array (all intruments) [ISIS check]
 
         input::
 
-            mplot           False, by suite default, if Tuue produces plost 
+            the_run         single run instance for which t=0 is required
             ``*mprint``     True sets Minuit.print.level = 1, False 0
             ``*check``      False, saves output thorugh self
                             True, for all subsequent instances,
-                                does nothing if nt0 == self.nt0 conforms:
-                                    np.all(nt0==self.nt0), dt0
+                                does nothing if the_run checks with
+                                    self.numhis
+                                    self.nt0
+                                writes to self.console and returns False 
+                                if it does not
 
         output::
 
@@ -372,9 +376,9 @@ class suite(object):
         from mujpy.mucomponents.muedge import muedge
         from mujpy.tools.tools import TauMu_mus, scan_hifi_t0_step, step
         from mujpy.tools.plot import set_fig 
-    
-        if mplot:  # setup figure window if a plot of the prompt peak or edge fits is required
-            font = {'family' : 'Ubuntu','size'   : 8}
+
+        if self.mplot and not check:  # setup figure window if a plot of the prompt peak or edge fits is required
+            font = {'size'   : 8}
             P.rc('font', **font)
             dpi = 100. # conventional screen dpi
             num = 0 # unique window number
@@ -382,7 +386,7 @@ class suite(object):
                 nrow, ncol = 2,3
                 kwargs = {'figsize':(7.5,5),'dpi':dpi}
                 title = 'Prompts t0 fit'
-                prompt_fit_text = [None]*self._the_runs_[0][0].get_numberHisto_int()
+                prompt_fit_text = [None]*self.numhis
             elif self.datafile[-3:] =='mdu': # PSI HIFI        
                 nrow, ncol = 3,3
                 ###################
@@ -404,7 +408,8 @@ class suite(object):
         if self._the_instrument_  == 'LEM':
             # t0 calibration encoded in file, override only by setting self.nt0 by hand
             # self.nt0 and self.dt0 are independent of self.LEM_back_subt
-            nt0 = array([int(self._the_runs_[0][0].get_t0_int(k)) for k in range(self._the_runs_[0][0].get_numberHisto_int())])
+
+            nt0 = array([int(the_run.get_t0_int(k)) for k in range(self.numhis)])
             if 'nt0' in self.__dir__(): 
                 if any(nt0 != self.nt0):
                     return False
@@ -413,22 +418,20 @@ class suite(object):
                 self.dt0 = zeros_like(self.nt0) # fraction of bin, ignored with tdc resolution of 195 pds  
                 self.lastbin = self.nt0.min() # unused for lem
             
-        elif self._the_instrument_ in ['GPS','GPD','DOLLY','FLAME','LTF']: # self.datafile[-3:] == 'bin': # PSI gps, flame, ltf, dolly, gpd
-            second_plateau = 100
-            peakheight = 100000.
-            peakwidth = 1.
+        elif self._the_instrument_ in ['GPS','GPD','DOLLY','FLAME','LTF','VSM']: # self.datafile[-3:] == 'bin': # PSI gps, flame, ltf, dolly, gpd
+           
             ###################################################
             # fit a peak with different left and right plateaus
             ###################################################
 
-            #############################
-            # guess prompt peak positions
-            ############################# 
+            second_plateau = 100
+            peakheight = 100000.
+            peakwidth = 1.
+            self.prepostpk = [50, 50]
+
             npeaks = []
-            for counter in range(self._the_runs_[0][0].get_numberHisto_int()):
-                histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
-                for k in range(len(self._the_runs_[0])): # may add runs
-                    histo += array(self._the_runs_[0][k].get_histo_vector(counter,1))
+            for counter in range(self.numhis):
+                histo = the_run.get_histo_vector(counter,1)
                 binpeak = where(histo==histo.max())[0][0]
                 npeaks.append(binpeak)
             npeaks = array(npeaks)
@@ -440,19 +443,17 @@ class suite(object):
             x = arange(0,nbin,dtype=int) # nbin bins from 0 to nbin-1
             self.lastbin, np3s = npeaks.min() - self.prepostpk[0], int(npeaks.max() + self.prepostpk[1])
             # final bin for background average, first bin for right plateau estimate (last is nbin)
+    
+            x0 = zeros(self.numhis) # for center of peaks
 
-            x0 = zeros(self._the_runs_[0][0].get_numberHisto_int()) # for center of peaks
-
-            if mplot:
-                for counter in range(self._the_runs_[0][0].get_numberHisto_int(),sum(ax_counters.shape)):
+            if self.mplot and not check:
+                for counter in range(self.numhis,sum(ax_counters.shape)):
                     ax_counters[divmod(counter,3)].cla()
                     ax_counters[divmod(counter,3)].axis('off')
 
-            for counter in range(self._the_runs_[0][0].get_numberHisto_int()):
+            for counter in range(self.numhis):
                 # prepare for muprompt fit
-                histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
-                for k in range(len(self._the_runs_[0])): # may add runs
-                    histo += self._the_runs_[0][k].get_histo_vector(counter,1)
+                histo = the_run.get_histo_vector(counter,1) # 1 is binning
                 p = [ peakheight, float(npeaks[counter]), peakwidth, 
                       mean(histo[self.firstbin:self.lastbin]), 
                       mean(histo[np3s:nbin])]
@@ -470,31 +471,31 @@ class suite(object):
                 A,X0,Dx,Ak1,Ak2 = m.values
                 x0[counter] = X0 # store float peak bin position (fractional)  
 
-                if mplot:    # do plot
-                    n1 = npeaks[counter]-50
-                    n2 = npeaks[counter]+50
-                    x3 = arange(n1,n2,1./10.)
-                    ax_counters[divmod(counter,3)].cla()
-                    ax_counters[divmod(counter,3)].plot(x[n1:n2],y[n1:n2],'.')
-                    ax_counters[divmod(counter,3)].plot(x3,mm.f(x3,A,X0,Dx,Ak1,Ak2))
-                    x_text,y_text = npeaks[counter]+10,0.8*max(y)
-                    prompt_fit_text[counter] = ax_counters[
-                                                  divmod(counter,3)].text(x_text,y_text,
-                     r'Det #{}\nt0={}bin\n$\delta$t0={:.2f}'.format(counter+1,
-                     x0.round().astype(int)[counter],x0[counter]-x0.round().astype(int)[counter]))
+            if self.mplot and not check:    # do plot
+                n1 = npeaks[counter]-50
+                n2 = npeaks[counter]+50
+                x3 = arange(n1,n2,1./10.)
+                ax_counters[divmod(counter,3)].cla()
+                ax_counters[divmod(counter,3)].plot(x[n1:n2],y[n1:n2],'.')
+                ax_counters[divmod(counter,3)].plot(x3,mm.f(x3,A,X0,Dx,Ak1,Ak2))
+                x_text,y_text = npeaks[counter]+10,0.8*max(y)
+                prompt_fit_text[counter] = ax_counters[
+                                              divmod(counter,3)].text(x_text,y_text,
+                 r'Det #{}\nt0={}bin\n$\delta$t0={:.2f}'.format(counter+1,
+                 x0.round().astype(int)[counter],x0[counter]-x0.round().astype(int)[counter]))
 
-                ##############################################################################
-                # Simple cases:                                                              #
-                # 1) Assume the prompt is entirely in bin nt0.                               #
-                #   (python convention, the bin index is 0,...,n,...                         #
-                # The content of bin nt0 will be the t=0 value for this case and dt0 = 0.    #
-                # The center of bin nt0 will correspond to time t = 0,                       #
-                #         time = (n-nt0 + mufit.offset + mufit.dt0)*mufit.binWidth_ns/1000.  #
-                # 2) Assume the prompt is equally distributed between n and n+1.             #
-                #    Then nt0 = n and dt0 = 0.5, the same formula applies                    #
-                # 3) Assume the prompt is 0.45 in n and 0.55 in n+1.                         #
-                #    Then nt0 = n+1 and dt0 = -0.45, the same formula applies.               #
-                ##############################################################################
+            ##############################################################################
+            # Simple cases:                                                              #
+            # 1) Assume the prompt is entirely in bin nt0.                               #
+            #   (python convention, the bin index is 0,...,n,...                         #
+            # The content of bin nt0 will be the t=0 value for this case and dt0 = 0.    #
+            # The center of bin nt0 will correspond to time t = 0,                       #
+            #         time = (n-nt0 + mufit.offset + mufit.dt0)*mufit.binWidth_ns/1000.  #
+            # 2) Assume the prompt is equally distributed between n and n+1.             #
+            #    Then nt0 = n and dt0 = 0.5, the same formula applies                    #
+            # 3) Assume the prompt is 0.45 in n and 0.55 in n+1.                         #
+            #    Then nt0 = n+1 and dt0 = -0.45, the same formula applies.               #
+            ##############################################################################
 
                 # these three are the sets of parameters used by other methods
             nt0 = x0.round().astype(int) # bin of peak, nd.array of shape run.get_numberHisto_int()
@@ -509,20 +510,19 @@ class suite(object):
         elif self._the_instrument_ == 'HIFI' and self._the_facility_ == 'PSI': # self.datafile[-3:] =='mdu': # PSI HIFI
             first_plateau = - 500
             second_plateau = 1500
+            self.prepostpk = [70, 70]
             #############################
             # very rough guess of histo start bin
             # then 
             # fit a step
             ############################# 
-            ncounters = self._the_runs_[0][0].get_numberHisto_int()
+            ncounters = the_run.get_numberHisto_int()
             npeaks = []
             a = 0.5*ones(ncounters)
             b = 30*ones(ncounters)
             dn = 5*ones(ncounters)
             for counter in range(ncounters):
-                histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
-                for k in range(len(self._the_runs_[0])): # may add runs
-                    histo += self._the_runs_[0][k].get_histo_vector(counter,1)
+                histo = the_run.get_histo_vector(counter,1)
                 npeakguess = scan_hifi_t0_step(histo,100) # simple search for a step pattern
                 if npeakguess>0:
                     npeaks.append(npeakguess)
@@ -557,16 +557,14 @@ class suite(object):
             ############################
             # just show where this is and save parameters
             ############################
-            if mplot:     # do plot
+            if self.mplot and not check:     # do plot
                 prompt_fit_text = [None]*ncounters   
                 n2 = x0.max() + second_plateau # counter independent bin interval
                 n1 = x0.min() + first_plateau
                 for counter in range(ncounters):
                     ax_counters[divmod(counter,3)].cla()
                     # ax_counters[divmod(counter,3)].axis('off')
-                    histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
-                    for k in range(len(self._the_runs_[0])): # may add runs
-                        histo += self._the_runs_[0][k].get_histo_vector(counter,1)
+                    histo = the_runs.get_histo_vector(counter,1)
                     x = arange(n1,n2+1,dtype=int) # n2-n1+1 bins from n1 to n2 included for plotting
                     y = histo[n1:n2+1]
                     x3 = arange(n1,n2)
@@ -586,15 +584,12 @@ class suite(object):
                 self.lastbin = self.nt0.min() # unused for hifi
 
         elif self._the_facility_ == 'ISIS': # self.datafile[-3:]=='nxs': # ISIS
-            histo = zeros(self._the_runs_[0][0].get_histoLength_bin())
-            for counter in range(self._the_runs_[0][0].get_numberHisto_int()):
-                for k in range(len(self._the_runs_[0])): # may add runs
-                    histo += self._the_runs_[0][k].get_histo_vector(counter,1)
+            histo = the_run.get_histo_vector(counter,1)
             error = sqrt(histo)
             error[where(error==0)]=1
             dh = histo[1:]-histo[:-1]
             kt0 = where(dh==dh.max())[0] # [0]
-            musbin = float(self.nsbin.value)/1e3
+            musbin = the_run.get_binWidth_us()
             t0 = kt0*musbin
             N = histo[int(kt0)+10]*TauMu_mus()
             D = 0.080
@@ -610,12 +605,12 @@ class suite(object):
             t0,N,D = m.values
             
             
-            if mplot:    # do plot
+            if self.mplot and not check:    # do plot
                 ax_counters.plot(t,histo[n1:n2],'.')
                 ax_counters.plot(t,mm.f(t,t0,N,D))
                 x_text,y_text = t[int(2*n2/3)],0.2*max(histo[n1:n2])
                 ax_counters.text(x_text,y_text,'t0 = {:.1f} mus'.format(t0))
-            nt0 =  array([t0/float(self.nsbin.value)]).round().astype(int) # bin of peak, 
+            nt0 =  array([t0/the_run.get_binWidth_ns()]).round().astype(int) # bin of peak, 
             if 'nt0' in self.__dir__(): 
                 if any(nt0 != self.nt0):
                     return False
@@ -623,14 +618,13 @@ class suite(object):
                 self.nt0 = nt0
                 self.dt0 = array(t0-self.nt0) # fraction of bin, in ns
 
-        if mplot:   # show results                  
-            fig_counters.canvas.manager.window.tkraise()
-            P.draw()
-#            self.console('Succesfully completed prompt Minuit fit, check plots')
-        else:
-            pass
-#            self.console('Succesfully completed prompt Minuit fit, check nt0, dt0 ')
-#        self.console('****************END OF SUITE*****************')
+        
+        if not check:
+            self.timebase(the_run)
+            if self.mplot:    # show results                  
+                fig_counters.canvas.manager.window.tkraise()
+                P.draw()
+
         return True
 
 ##########################
@@ -651,7 +645,7 @@ class suite(object):
                 # a list of np.arrays
         return mean(self.dt0[histos])
 
-    def timebase(self):
+    def timebase(self,the_run):
         """
         generates self.time::
 
@@ -682,10 +676,10 @@ class suite(object):
         # needed to set a
         ##################################################################################################
 
-        time_bins = np.arange(self.offset,self._the_runs_[0][0].get_histoLength_bin() - 
+        time_bins = np.arange(self.offset,the_run.get_histoLength_bin() - 
                                self.nt0.max())   # 1D np.array
-        binwidth_mus = self._the_runs_[0][0].get_binWidth_ns()/1000.
-        self.histoLength = self._the_runs_[0][0].get_histoLength_bin() - self.nt0.max() - self.offset
+        binwidth_mus = the_run.get_binWidth_ns()/1000.
+        self.histoLength = the_run.get_histoLength_bin() - self.nt0.max() - self.offset
 
         self.time = time_bins*binwidth_mus 
         
@@ -1024,7 +1018,6 @@ class suite(object):
             True if more groups (fits A2, B2, C2)
             False if just one group (fits A1, B1, C1)
         """
-        # print('multi_group suite debug: self.grouping {} len {}'.format(self.grouping,len(self.grouping)))
         return len(self.grouping)>1     
         
     def multirun(self):
