@@ -3110,7 +3110,7 @@ def show_hide_tab(overlay,display_change,tabs):
     tabs.children = kiddos
     return tabs
 
-def ipyw_select(title,select,callback):
+def ipyw_select(select,callback):
     """select instrument at psi"""
 
     finished= False

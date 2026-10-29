@@ -27,6 +27,7 @@ class dashed(object):
         '''
  
         from mujpy.tools.tools import make_copy
+        from ipywidgets.widgets import Output
         from os import getcwd, mkdir, symlink, listdir
         from os.path import isdir, join 
 
@@ -51,35 +52,42 @@ class dashed(object):
         self.fig_fft = None
         writeable_folder = make_copy(test) # if test returns data_dir(acting also as True)
         if writeable_folder: # normal and test mode
+            self._gui_output = Output()
+            display(self._gui_output)
             self.test = test # needed in self.board
+
             if test: self.data_dir = writeable_folder # if test make_copy returns data_dir
             else: # create data if not there already
                 datafile = join(self.startuppath,'data')
                 if not isdir(datafile): mkdir(datafile)
-                psi_yyyy = '/psi.ch/group/public/data/' # if running at psi make link to /psi.ch
+                psi_yyyy = '/psi.ch/group/lmu/public/data/' # if running at psi make link to /psi.ch
                 if isdir(psi_yyyy): # this mujpy is run at psi
                     content = listdir(datafile)
+                    psilink = False
                     for b in [a for a in content if 'psi' in a]:
-                        if isdir(b): pass # a link already exists
-                        else:
-                            from ipywidgets.widgets import Select
-                            from datetime import datetime
-                            from mujpy.tools.tools import ipyw_select
-                            options=['cancel','gps','gpd','vms','hal','flame','lem']
-                            select = Select(description = 'Which instrument are you running on?', 
-                                            options = options, 
-                                            value = None) 
-                            options.pop(0)
-                            def on_RB(answer):
-                                instrument = answer
-                                yyyy = datetime.now().year
-                                source = join(psi_yyyy,instrument,'his',yyyy)
-                                destination = join(datafile,'psi-'+instrument+'-'+yyyy)
-                                if instrument in options: 
-                                    symlink(source,destination)
-                                self.start_gui() # starting at psi but do not want the link
+                        if isdir(join(datafile,b)): psilink = True  # a link already exists
+                    if not psilink:
+                        from ipywidgets.widgets import Select
+                        from datetime import datetime
+                        from mujpy.tools.tools import ipyw_select
+                        options=['cancel','gps','gpd','vms','hal','flame','lem']
+                        select = Select(description = 'Which instrument are you running on?', 
+                                        options = options, 
+                                        value = None) 
+                        options.pop(0)
+                        def on_RB(answer):
+                            instrument = answer
+                            yyyy = str(datetime.now().year)
+                            source = join(psi_yyyy,instrument,'his',yyyy)
+                            destination = join(datafile,'psi-'+instrument+'-'+yyyy)
+                            if instrument in options: 
+                                symlink(source,destination)
+                            self.start_gui() # starting at psi but do not want the link
+                        ipyw_select(select,on_RB) # launch the selection, only activating on_RB will proceed with start_gui
+                        with self._gui_output:
                             display(select)
-                            ipyw_select(select,on_RB) # launch the selection, only activating on_RB will proceed with start_gui
+                    else: 
+                        self.start_gui()
                 else: self.start_gui() # start anyway, not running at psi
         else: # start outside %HOME
             print('please start from a writeable folder')
@@ -1419,7 +1427,8 @@ class dashed(object):
         
         # 2. Inietta il CSS nel notebook tramite un widget HTMLi
         css_widget = HTML(value=custom_css)
-        display(css_widget)
+        with self._gui_output:
+            display(css_widget)
         command_width = ['38%','18%','10%','12%','7%','7%']
         self.figure_box = Output(layout=Layout(width='100%',height='410px'))# width='900px'
         self.board_box = Output(layout=Layout(width='100%',height='650px',overflow_y='auto'))
@@ -1545,6 +1554,7 @@ class dashed(object):
         self.tab.add_class(custom_css)
         self.tab.titles = ['Fit','Fetch data','Log','Dialogs','Help','About']
         self.tab.selected_index = 0
-        display(self.tab)
+        with self._gui_output:
+            display(self.tab)
         # Button( icon = 'fa-trash' #, <i class="fa-thin fa-trash"></i>
         #https://stackoverflow.com/questions/60116974/what-is-the-icon-argument-for-ipywidgets-button
