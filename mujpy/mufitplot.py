@@ -169,13 +169,20 @@ class mufitplot(object):
             run_title = [title + ": "+string+"fit results" for title in run_title]
 
         t = self.suite.time
+        # rotating_frame needs unbinned asymm, asyme, stored in model._a_ model._ea_ for non calib
+        # needs the same with the fit alphas for calib
+        # rebin_plot uses fit alphas but rebins!
+        # model._ asymmetry_plot uses rebin_plot, 
+        # suite.asymmetry_slice(-1,-1) uses grp alpha (rewritten after fit, should be ok)
+        a,ea = self.suite.asymmetry_slice(-1,-1) # should be ok for calib and non calib
+
         if self.rotating_frame_frequencyMHz: 
         # preload unbinned rotating frame data in self.rrf_y self.rrf_e
         # all other rrf frames obtained by rebinning rrf_y, rrf_e
-            time = tile(t,self.model._a_.shape[0:]+(1,)) if len(self.model._a_.shape)>len(self.model._t_.shape) else t
+            time = tile(t,a.shape[0:]+(1,)) if len(a.shape)>len(self.model._t_.shape) else t # self.model._a_ -> a 
             # tiles self.model._t_ to the shape of self.model._a_
-            self.rrf_y = mixer(time,self.model._a_,self.rotating_frame_frequencyMHz)
-            self.rrf_e = mixer(time,self.model._ea_,self.rotating_frame_frequencyMHz)
+            self.rrf_y = mixer(time,a,self.rotating_frame_frequencyMHz) # self.model._a_ -> a
+            self.rrf_e = mixer(time,ea,self.rotating_frame_frequencyMHz) # self.model._ea_ -> ea
             # self.rrf_y, self.rrf_e are rotating frame unbinned data, stds
         fittup,errmsg = derange(self.dashboard["fit_range"],self.suite.histoLength)# range as tuple
         if errmsg: # this can happen only from script, mudashed checks in mufit
@@ -191,7 +198,7 @@ class mufitplot(object):
         t_fit,y_fit,ey_fit = rshp(self.model._x_), rshp(self.model._y_), rshp(self.model._e_) # for dy_fit = (y_fit-y_fit)/ey_fit
 
         if self.rotating_frame_frequencyMHz:
-            time = tile(t_fit,f_fit.shape[0:]+(1,)) if len(self.model._a_.shape)>len(self.model._t_.shape) else t_fit
+            time = tile(t_fit,f_fit.shape[0:]+(1,)) if len(a.shape)>len(self.model._t_.shape) else t_fit # self.model._a_ -> a
             # tiles
             _, y_fit, ey_fit = rebin(self.suite.time,self.rrf_y,[fittup[0],fittup[1]],fittup[2],e=self.rrf_e)  # y_fit ey_fit in rot frame
             f_fit = mixer(time,f_fit,self.rotating_frame_frequencyMHz)                    # fit in rot frame
@@ -227,7 +234,7 @@ class mufitplot(object):
             #plotfit = (start, stop, packfit)
             #_, fl, _ = self.chi(plotfit) # fl for plotting function  
             if self.rotating_frame_frequencyMHz: # (t_late,y_late,f_late_res,ey_late) the last three must be transformed to rrf
-                if len(self.model._a_.shape)>len(self.model._t_.shape):
+                if len(a.shape)>len(self.model._t_.shape): # self.model._a_ _> a
                     time = tile(t_late,f_fit.shape[0:]+(1,)) # tiles
                     timf = tile(tfl,f_fit.shape[0:]+(1,)) # tiles
                 else:

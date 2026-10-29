@@ -3110,6 +3110,30 @@ def show_hide_tab(overlay,display_change,tabs):
     tabs.children = kiddos
     return tabs
 
+def ipyw_select(title,select,callback):
+    """select instrument at psi"""
+
+    finished= False
+    def finish(answer): # 
+        """when finished, hide overlay, then callback(choice), then is inactive"""
+
+        nonlocal finished
+        if finished:
+            return
+        finished = True
+        #select.unobserve(on_selection, names="value") # avoids self generated retriggers
+        select.close()
+        # Detach first while unobserved: hiding the dialog may trigger other observers
+        callback(answer) # call mudahed._on_air(choice), passes on the choice as value
+
+    def on_select(change):
+        """true observed callback, calls finish(choice) only if choice is not None"""
+
+        if change["new"] is not None: # when a choice was done
+            finish(change["new"])
+        
+    select.observe(on_select,names='value')
+
 def ipyw_yes_no_dial(title, message, callback):
     """ 
     ask yes or no input

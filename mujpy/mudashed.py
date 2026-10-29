@@ -27,8 +27,8 @@ class dashed(object):
         '''
  
         from mujpy.tools.tools import make_copy
-        from os import getcwd
-        from matplotlib import get_backend 
+        from os import getcwd, mkdir, symlink, listdir
+        from os.path import isdir, join 
 
         self.startuppath = getcwd()
         self.facility = facility
@@ -53,17 +53,48 @@ class dashed(object):
         if writeable_folder: # normal and test mode
             self.test = test # needed in self.board
             if test: self.data_dir = writeable_folder # if test make_copy returns data_dir
-
-            # self._qt_dispatcher = QtDispatcher() # needed if the backend is Qt, relocated to 
-            backend = get_backend().lower()
-            self._qt_dispatcher = None 
-            if backend in {"qtagg", "qt5agg", "qtcairo", "qt5cairo"}:
-                from mujpy.tools.qt_dispatcher import QtDispatcher
-                # this new Qt dispatcher can also divert erro messages to the Log tab. Not nice but more certain to be seen
-                self._qt_dispatcher = QtDispatcher(log=self.log)
-            self.board()
+            else: # create data if not there already
+                datafile = join(self.startuppath,'data')
+                if not isdir(datafile): mkdir(datafile)
+                psi_yyyy = '/psi.ch/group/public/data/' # if running at psi make link to /psi.ch
+                if isdir(psi_yyyy): # this mujpy is run at psi
+                    content = listdir(datafile)
+                    for b in [a for a in content if 'psi' in a]:
+                        if isdir(b): pass # a link already exists
+                        else:
+                            from ipywidgets.widgets import Select
+                            from datetime import datetime
+                            from mujpy.tools.tools import ipyw_select
+                            options=['cancel','gps','gpd','vms','hal','flame','lem']
+                            select = Select(description = 'Which instrument are you running on?', 
+                                            options = options, 
+                                            value = None) 
+                            options.pop(0)
+                            def on_RB(answer):
+                                instrument = answer
+                                yyyy = datetime.now().year
+                                source = join(psi_yyyy,instrument,'his',yyyy)
+                                destination = join(datafile,'psi-'+instrument+'-'+yyyy)
+                                if instrument in options: 
+                                    symlink(source,destination)
+                                self.start_gui() # starting at psi but do not want the link
+                            display(select)
+                            ipyw_select(select,on_RB) # launch the selection, only activating on_RB will proceed with start_gui
+                else: self.start_gui() # start anyway, not running at psi
         else: # start outside %HOME
             print('please start from a writeable folder')
+
+    def start_gui(self):
+        """check matplotlib backend and launch dashed gui"""
+
+        from matplotlib import get_backend 
+        backend = get_backend().lower()
+        self._qt_dispatcher = None 
+        if backend in {"qtagg", "qt5agg", "qtcairo", "qt5cairo"}:
+            from mujpy.tools.qt_dispatcher import QtDispatcher
+            # this new Qt dispatcher can also divert erro messages to the Log tab. Not nice but more certain to be seen
+            self._qt_dispatcher = QtDispatcher(log=self.log)
+        self.board() # dashed gui
 
     def log(self, string):
         """Append log text directly to the dashboard Output widget."""
