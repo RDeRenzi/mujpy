@@ -53,6 +53,7 @@ class dashed(object):
         writeable_folder = make_copy(test) # if test returns data_dir(acting also as True)
         if writeable_folder: # normal and test mode
             self._gui_output = Output()
+            display(self._gui_output)
             self.test = test # needed in self.board
 
             if test: self.data_dir = writeable_folder # if test make_copy returns data_dir
@@ -85,16 +86,17 @@ class dashed(object):
                         ipyw_select(select,on_RB) # launch the selection, only activating on_RB will proceed with start_gui
                         with self._gui_output:
                             display(select)
-                    else: 
-                        self.start_gui()
-                else: self.start_gui() # start anyway, not running at psi
+                    else: # at psi and /psi.ch link exists already
+                        self.start_gui() 
+            self.start_gui() # start anyway, not running at psi
+
         else: # start outside %HOME
             print('please start from a writeable folder')
 
     def start_gui(self):
         """check matplotlib backend and launch dashed gui"""
 
-        from matplotlib import get_backend 
+        from matplotlib import get_backend
         backend = get_backend().lower()
         self._qt_dispatcher = None 
         if backend in {"qtagg", "qt5agg", "qtcairo", "qt5cairo"}:

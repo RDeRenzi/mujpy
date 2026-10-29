@@ -192,9 +192,10 @@ class suite(object):
             if self.datafile[-4:]=='root': # 
                 run_ = rootload(path_and_filename)
                 if not run_.readingOK: return False
-            elif self.datafile[-3:]=='bin' or self.datafile[-3:]=='mdu':
+            elif self.datafile[-3:] in ['bin','mdu']:
                 run_ = psiload()
-                if not run_.read(path_and_filename): return False           
+                readOK = run_.read(path_and_filename)
+                if readOK: return False           
             elif self.datafile[-3:]=='nxs': 
                 try: 
                     run_ = isisload(path_and_filename,'r')
@@ -220,7 +221,8 @@ class suite(object):
                     runs_added += ' '+run 
             else: # this is j==0 and k==0 # first run in run list and inner list
                 self.numhis = run_.get_numberHisto_int()
-                self.histperiods = len(run_.get_RedGreen_offsets()) # are there RedGreen copies (self.histperiods>1)?
+                self.histperiods = 1 if ( facility == 'ISIS' or 
+                                         self.datafile[-3:] in ['bin','mdu']) else len(run_.get_RedGreen_offsets()) # are there RedGreen copies (self.histperiods>1)?
                 self._the_instrument_ = instrument(run_) # creates _the_instrument_
                 self._the_facility_ = facility # creates _the_facility_
                 self.grouping = [] # reproduce the same with arrays of histogram numbers, done by tools get_grouping
@@ -431,7 +433,7 @@ class suite(object):
 
             npeaks = []
             for counter in range(self.numhis):
-                histo = the_run.get_histo_vector(counter,1)
+                histo = array(the_run.get_histo_vector(counter,1))
                 binpeak = where(histo==histo.max())[0][0]
                 npeaks.append(binpeak)
             npeaks = array(npeaks)
@@ -453,7 +455,7 @@ class suite(object):
 
             for counter in range(self.numhis):
                 # prepare for muprompt fit
-                histo = the_run.get_histo_vector(counter,1) # 1 is binning
+                histo = array(the_run.get_histo_vector(counter,1)) # 1 is binning, must be array because some loads are not
                 p = [ peakheight, float(npeaks[counter]), peakwidth, 
                       mean(histo[self.firstbin:self.lastbin]), 
                       mean(histo[np3s:nbin])]
