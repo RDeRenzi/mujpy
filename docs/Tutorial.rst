@@ -11,6 +11,7 @@ Basic GUI editor usage
 ----------------------
 Get a GUI
 ~~~~~~~~~
+* If you have access to lmu resources though hop.psi.ch, see below `A gui from PSI`_ 
 * Linux:
 
   * activate the venv.  Choose the root of your data analysis, say ``mujpy/sample1``. Create subfolder ``data`` and download your data files in it. [1]_  
@@ -124,5 +125,84 @@ in the terminal. Execute e.g. test 0 (A1 almgml) by
 
 .. warning::
         the test timings includes your watch time on the plot! It is not very significant.
+
+Instructions for `mujpy` on a PSI host will follow
+
+..
+        A gui from PSI
+        --------------
+        At PSI
+        ~~~~~~
+
+        If you have the following:
+
+        * updated credentials on PSI linux hosts, say with user `ext-fmly_f`
+        * `nemu` credentials (ask your local contact at PSI)
+
+        Connect to `pc16885` from any lmu machine with `nemu` credentials, open an xterm and type (line by line, edit according to comments) 
+
+        .. code::
+
+           source ./mujpy-env-312/bin/activate
+           mkdir mygroup # use your group name 
+           cd mygroup 
+           mkdir myproject # e.g. sample family name
+           cd myproject
+           jupyter lab
+
+        Leave the xterm for the (long) jupyter lab log. A browser tab will open withe the jupyter lab dashboard. Operate from that according to `Use it`_ instructions.
+
+
+        Outside PSI
+        ~~~~~~~~~~~
+        You can work from your laptop if you additionally have
+
+        * a PSI accepted 2-step Authenticator
+        * ssh on your laptop 
+
+
+
+        Then you can add this snippet to your .ssh/config
+
+        .. code::
+
+               ControlMaster auto
+               ControlPath ~/.ssh/tmp/%h_%p_%r
+               Protocol 2
+               ForwardX11 yes
+               ForwardX11Trusted yes
+               ForwardAgent yes
+               host hop hopx.psi.ch
+                hostname hopx.psi.ch
+                user ext-fmly_f
+                DynamicForward 8118
+               host mujpy
+                hostname pc16885.psi.ch
+                user nemu
+                ProxyJump hop
+                LocalForward 127.0.0.1:8890 127.0.0.1:8888
+                ExitOnForwardFailure yes 
+
+        From a terminal in your laptop
+
+        * ``ssh hop``, use your `ext-fmly_f` password, confirm by two-step authentication, and leave the terminal open
+        * ``ssh mujpy``, use `nemu` password, and repeat these commands. Notice, when the ssh session times out (8 hours) restart the whole procedure. The jupyter lab command is replaced by
+
+        .. code::
+
+           jupyter lab --no-browser --ip=127.0.0.1 --port=8888
+          
+        The browser does not open on the PSI machine. In the PSI terminal log, last screen, find two successive lines: 
+
+        * `[I 20yy-mm-dd hh:mm:ss.mil ServerApp] Jupyter Server 2.21.1 is running at:`
+        * same prompt and the url `http://127.0.0.1:8888/lab?token=` with a very long hexadecimal word. 
+          
+        Copy the url, carefully including the hexadecimal
+
+        * go to your favourite browser, open a tab and paste the url (without Enter!) 
+        * correct the port in the url `:8888` to `8890` and then press Enter. 
+          
+        You get the PSI jupyter dashboard and you can `Use it`_!
+
 
   

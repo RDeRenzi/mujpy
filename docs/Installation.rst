@@ -48,10 +48,30 @@ Wait for completion and follow the linux instructions to install `mujpy` under a
 Macos
 -----
 
-Should work as in linux, but never checked
+Should work as in linux (never checked, though)
 
 
 To check your mujpy installation see :doc:`Tutorial`
+
+From git
+--------
+
+mujpy is not released very often to PyPI.  If you need the latest developments use git.
+Both Linux and WSL2 on Windows have it natively. From `$HOME`
+
+.. code::
+
+   mkdir git
+   cd git
+   git clone https://github.com/RDeRenzi/mujpy.git
+
+then activate your mujpy venv, as explained in `Linux`_, make sure you are in `git/mujpy` and run
+
+.. code::
+
+   pyton -m pip install --upgrade .
+
+and continue with the Tutorial instructions
 
 .. rubric:: Footnotes
 

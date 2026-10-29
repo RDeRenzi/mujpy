@@ -53,7 +53,6 @@ class dashed(object):
         writeable_folder = make_copy(test) # if test returns data_dir(acting also as True)
         if writeable_folder: # normal and test mode
             self._gui_output = Output()
-            display(self._gui_output)
             self.test = test # needed in self.board
 
             if test: self.data_dir = writeable_folder # if test make_copy returns data_dir

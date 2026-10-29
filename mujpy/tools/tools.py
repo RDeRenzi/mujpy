@@ -3521,7 +3521,7 @@ def make_copy(test):
             if isdir(data_dir):  # clean it up
                 for file in listdir(data_dir):
                     pathfil = join(data_dir,file) 
-                    remove(pathfil)
+                    if isfile(pathfil): remove(pathfil)
             else: # make it
                 mkdir(data_dir)
             for file in listdir(resources.files("mujpy.tests").joinpath(data)):
