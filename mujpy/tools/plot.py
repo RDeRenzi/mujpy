@@ -1,5 +1,5 @@
 def plot_parameters(nsub,labels,fig=None): 
-    """
+    r"""
     standard plot of fit parameters vs B,T (or X to be implemente)
     
     input::
@@ -8,7 +8,7 @@ def plot_parameters(nsub,labels,fig=None):
        labels,      dict of labels, 
                         e.g. {title:title, 
                             xlabel:'T [K]', 
-                            ylabels: ['asym',r'$\lambda$',r'$\sigma$,...]}
+                            ylabels: ['asym','$\lambda$','$\sigma$,...]}
        fig          standard fig e.g self.fig_pars
        
     output::
