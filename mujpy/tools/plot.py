@@ -279,7 +279,14 @@ def set_single_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_la
         P.suptitle(string+run_title,x=-0.125,ha='right')    
     else:
         P.suptitle(run_title)                           
+
     P.draw()
+
+    if out is not None:  # ipympl; Qt receives out=None
+        from IPython.display import display
+        with out:
+            display(fig.canvas)
+
     return fig
 
 def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):
