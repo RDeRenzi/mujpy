@@ -56,7 +56,9 @@ class dashed(object):
             display(self._gui_output)
             self.test = test # needed in self.board
 
-            if test: self.data_dir = writeable_folder # if test make_copy returns data_dir
+            if test: 
+                self.data_dir = writeable_folder # if test make_copy returns data_dir
+                self.start_gui() # start anyway, not running at psi
             else: # create data if not there already
                 datafile = join(self.startuppath,'data')
                 if not isdir(datafile): mkdir(datafile)
@@ -88,7 +90,6 @@ class dashed(object):
                             display(select)
                     else: # at psi and /psi.ch link exists already
                         self.start_gui() 
-            self.start_gui() # start anyway, not running at psi
 
         else: # start outside %HOME
             print('please start from a writeable folder')

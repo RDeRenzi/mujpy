@@ -82,4 +82,5 @@ MANIFEST
 mujpy/_version.py
 mujpy/muisis2py/muisis2py.plan.txt
 mujpy/tests/oldies/
+docs/sphinx-build.log
 mujpy/muroot2py/muroot.plan.txt
