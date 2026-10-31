@@ -43,6 +43,21 @@ Then move to the second cell and type
   
 Rename this notebook, e.g. `Mudashed.ipynb`. From now on you can use this same notebook to run all your fits. 
 
+Voila option
+~~~~~~~~~~~~
+Once you have this notebook you can also invoke it with `voila`. Create a tmp dir, for instance ``mkdir -p "$HOME/mujpy/tmp"``
+
+.. code::
+
+   export TMPDIR="$HOME/mujpy/tmp" 
+   voila "$HOME/mujpy" # assumes mujpy as the root of mujpy analysis projects
+   # chosen notebook must use widget (ipympl) backend, qt fails with voila
+
+A tab with the gui opens in your browser. [1]_
+
+.. [1] Voilà may miss error messages due to untracked bugs, try out on juypiterlab or notebook before reporting unexpected behavior
+
+
 .. _dashed-tutorial:
 
 Use it
@@ -203,6 +218,20 @@ Instructions for `mujpy` on a PSI host will follow
         * correct the port in the url `:8888` to `8890` and then press Enter. 
           
         You get the PSI jupyter dashboard and you can `Use it`_!
+
+        voila outside PSI
+        ~~~~~~~~~~~~~~~~~
+
+        See `Voila option`_ changing the ``voila Mudashed.ipynb`` command into
+
+        .. code::
+
+               voila "$HOME/mujpy" \
+                --no-browser --Voila.ip=127.0.0.1 --port=8888 \
+                --Voila.port_retries=0
+
+              
+
 
 
   

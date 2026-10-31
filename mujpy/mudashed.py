@@ -51,6 +51,7 @@ class dashed(object):
         self.fig_fit = None
         self.fig_fft = None
         writeable_folder = make_copy(test) # if test returns data_dir(acting also as True)
+        #print(f'writeable {writeable}')
         if writeable_folder: # normal and test mode
             self._gui_output = Output()
             display(self._gui_output)
@@ -58,10 +59,10 @@ class dashed(object):
 
             if test: 
                 self.data_dir = writeable_folder # if test make_copy returns data_dir
-                self.start_gui() # start anyway, not running at psi
+                self.start_gui() # start anyway, no link required
             else: # create data if not there already
                 datafile = join(self.startuppath,'data')
-                if not isdir(datafile): mkdir(datafile)
+                if not isdir(datafile): mkdir(datafile) # now data/ exists for sure
                 psi_yyyy = '/psi.ch/group/lmu/public/data/' # if running at psi make link to /psi.ch
                 if isdir(psi_yyyy): # this mujpy is run at psi
                     content = listdir(datafile)
@@ -91,6 +92,8 @@ class dashed(object):
                     else: # at psi and /psi.ch link exists already
                         self.start_gui() 
 
+                else: # this is not test and it is run outside psi
+                    self.start_gui()
         else: # start outside %HOME
             print('please start from a writeable folder')
 
@@ -414,6 +417,8 @@ class dashed(object):
                 self._qt_dispatcher.submit(
                             partial(self._draw_qt, plot_range, rotfreq)
                             )
+
+            self.tab.selected_index = 2
 
 
     def _on_FFT(self,b):
