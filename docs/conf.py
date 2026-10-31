@@ -81,7 +81,7 @@ language = 'en'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
-exclude_patterns = ['_build']
+exclude_patterns = ['_build','oldies/**',]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -215,9 +215,20 @@ def skip_grad_members(app, what, name, obj, skip, options):
     member = name.rsplit(".", 1)[-1]
     if "grad" in member or member.lstrip("_").startswith("derivative"):
         return True
-    return None  # Keep Sphinx's normal decision.
 
+import inspect
+import re
+
+def skip_deprecated(app, what, name, obj, skip, options):
+    doc = inspect.getdoc(obj) or ""
+    if re.search(r"\bdeprecat\w*\b", doc, re.IGNORECASE):
+        return True
+ 
 def setup(app):
     app.connect("autodoc-process-docstring", clean_musr2py_docstring)
     app.connect("autodoc-skip-member", skip_grad_members)
+    app.connect("autodoc-skip-member", skip_deprecated)
+
+
+    return None  # Keep Sphinx's normal decision.
 

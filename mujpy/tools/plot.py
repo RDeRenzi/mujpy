@@ -217,9 +217,9 @@ def set_single_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_la
         ncols, width_ratios = 2,[4,1]
 
     if fig:
-        fig.clf()
         fig, ax  = P.subplots(2,ncols,sharex = 'col', 
                      gridspec_kw = {'height_ratios':[3,1],'width_ratios':width_ratios},
+                                    clear=True,
                                     num=fig.number)
         fig.subplots_adjust(hspace=0.05,top=0.90,bottom=0.12,right=0.97,wspace=0.03)
     else: # handle does not exist, make one
@@ -280,7 +280,7 @@ def set_single_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_la
     else:
         P.suptitle(run_title)                           
 
-    P.draw()
+    #P.draw()
 
     if out is not None:  # ipympl; Qt receives out=None
         from IPython.display import display

@@ -306,7 +306,7 @@ class dashed(object):
         if dashbd and OK: # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
             with open(str(dashboard_file),'w',encoding='utf-8') as f:
-                json.dump(self.dashboard,f) # mufit wants to read this from a file
+                json.dump(self.dashboard,f, indent=4) # mufit wants to read this from a file
 
             # TEMPORARY COMMENT TO KEEP ALL DEBUG LOGS
             self.board_box.outputs = ()
@@ -393,7 +393,7 @@ class dashed(object):
         if self.build_dashboard_from_widgets(): # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
             with open(str(dashboard_file),'w',encoding='utf-8') as f:
-                json.dump(self.dashboard,f) # mufit wants to read this from a file
+                json.dump(self.dashboard,f,indent=4) # mufit wants to read this from a file
             guess = self.command_1.children[6].value=='Guess'
             if 'fit' not in self.__dir__() or guess: # do only if not done before
                  self.fit = mufit(self.suite,dashboard_file,no_fit = guess, dash_log = self.log, dashed = True) # writes text to board_box

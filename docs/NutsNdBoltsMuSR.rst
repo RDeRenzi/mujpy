@@ -31,9 +31,10 @@ Fitting the asymmetry
 
 The time dependence of the asymmetry :math:`A(t)` during a run is thus due to the ensemble spin evolution of the implanted muons, 100% spin polarized at :math:`t=0`. The evolution provides chemical and physical information on your sample, the implanted muon environment.
 In many instances a classical description is sufficient: the average muon spin coherently *precesses* in the local magnetic field :math:`B_\mu` at the muon site (see below) and *relaxes* toward thermodynamic equilibrium (zero spin polarization). So typically the asymmetry contains 
-   * damped oscillating functions for coherent precessions, typically :math:`\cos(\gamma_\mu B_\mu t+\phi) g(t)`, where :math:`g(t)` is a relaxation function
-   * pure relaxation functions, the simplest being Lorentzian :math:`\exp(-\lambda t)` or Gaussian :math:`\exp(-\sigma^2t^2)`
-   * further more complex intermediate or quantum cases
+
+* damped oscillating functions for coherent precessions, typically :math:`\cos(\gamma_\mu B_\mu t+\phi) g(t)`, where :math:`g(t)` is a relaxation function
+* pure relaxation functions, the simplest being Lorentzian :math:`\exp(-\lambda t)` or Gaussian :math:`\exp(-\sigma^2t^2)`
+* further more complex intermediate or quantum cases
 
 In all cases the model asymmetry may then be written as 
 
@@ -44,8 +45,8 @@ In all cases the model asymmetry may then be written as
 
 where
 
-    * :math:`A_0` is the maximum asymmetry, due to sample geometry and other experimental conditions; it must be **calibrated** after mounting each sample.
-    *  :math:`f_i` is the fraction of the muon ensemble experiencing the same chemical, physical and geometrical environment (call it improperly **muon site**), i.e. providing the same :math:`G_i(t)` 
+* :math:`A_0` is the maximum asymmetry, due to sample geometry and other experimental conditions; it must be **calibrated** after mounting each sample.
+*  :math:`f_i` is the fraction of the muon ensemble experiencing the same chemical, physical and geometrical environment (call it improperly **muon site**), i.e. providing the same :math:`G_i(t)` 
 
 Basic implementation
 --------------------

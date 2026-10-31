@@ -30,7 +30,7 @@ Now launch a Python3 notebook. Write
 
 in the first cell (hover the green box for a code copy widget). This activates the `qt` backend for graphic popup windows, fine for smallish screens. If you prefer tabbed graphics type instead
 
-.. code-blgTock::
+.. code-block::
 
     %matplotlib ipympl
     
@@ -43,6 +43,8 @@ Then move to the second cell and type
   
 Rename this notebook, e.g. `Mudashed.ipynb`. From now on you can use this same notebook to run all your fits. 
 
+.. [1] If you do not, the GUI creates the ``data`` subfolder in your `mujpy` root folder and it can directly download any PSI datafiles into it.
+
 Voila option
 ~~~~~~~~~~~~
 Once you have this notebook you can also invoke it with `voila`. Create a tmp dir, for instance ``mkdir -p "$HOME/mujpy/tmp"``
@@ -50,12 +52,12 @@ Once you have this notebook you can also invoke it with `voila`. Create a tmp di
 .. code::
 
    export TMPDIR="$HOME/mujpy/tmp" 
-   voila "$HOME/mujpy" # assumes mujpy as the root of mujpy analysis projects
-   # chosen notebook must use widget (ipympl) backend, qt fails with voila
+   voila "$HOME/mujpy" # assumes ~/mujpy is the root of all mujpy analysis projects
+   # chosen notebook must use ipympl (aka widget) backend, qt fails with voila
 
-A tab with the gui opens in your browser. [1]_
+A tab with the gui opens in your browser. [2]_
 
-.. [1] Voilà may miss error messages due to untracked bugs, try out on juypiterlab or notebook before reporting unexpected behavior
+.. [2] Voilà may miss error messages due to untracked bugs, try out on juypiterlab or notebook before reporting unexpected behavior
 
 
 .. _dashed-tutorial:
@@ -81,8 +83,6 @@ Type your chosen model acronym in the box, e.g. ``almg``, calibrate :math:`\alph
 * `mg` is a precessing component with Gaussian damping. Parameter names are self evident, `B` is mT, :math:`\phi` degrees. The figure has easonable guess values. Chech the FR box, fit range and binning, and press Fit to get your minimization. 
 
 The gui switched to the log tab to show a printed log and a plot appeared. Notice that one `mg` component is not good enough, explore the plot and the log! Read below and see :ref:`Reference` for more details on the model editor (but be patient, it's WIP!)
-
-.. [1] If you do not, the GUI creates the ``data`` subfolder in your `mujpy` root folder and it can directly download any PSI datafiles into it.
 
 .. _demos:
 
@@ -141,42 +141,42 @@ in the terminal. Execute e.g. test 0 (A1 almgml) by
 .. warning::
         the test timings includes your watch time on the plot! It is not very significant.
 
-Instructions for `mujpy` on a PSI host will follow
 
-..
-        A gui from PSI
-        --------------
-        At PSI
-        ~~~~~~
+A gui from PSI
+--------------
+At PSI
+~~~~~~
 
-        If you have the following:
+If you have the following:
 
-        * updated credentials on PSI linux hosts, say with user `ext-fmly_f`
-        * `nemu` credentials (ask your local contact at PSI)
+* updated credentials on PSI linux hosts, say with user `ext-fmly_f`
+* `nemu` credentials (ask your local contact at PSI)
 
-        Connect to `pc16885` from any lmu machine with `nemu` credentials, open an xterm and type (line by line, edit according to comments) 
+Connect to a lmu host with python (ask your Instrument scientist) with `nemu` credentials, open an xterm and type (line by line, edit according to comments) 
 
-        .. code::
+.. code::
 
-           source ./mujpy-env-312/bin/activate
-           mkdir mygroup # use your group name 
-           cd mygroup 
-           mkdir myproject # e.g. sample family name
-           cd myproject
-           jupyter lab
+   source ./mujpy-env-312/bin/activate
+   mkdir mygroup # use your group name 
+   cd mygroup 
+   mkdir myproject # e.g. sample family name
+   cd myproject
+   jupyter lab
 
-        Leave the xterm for the (long) jupyter lab log. A browser tab will open withe the jupyter lab dashboard. Operate from that according to `Use it`_ instructions.
+Leave the xterm for the (long) jupyter lab log. A browser tab will open with the jupyter lab dashboard. Operate from that according to `Use it`_ instructions.
 
 
-        Outside PSI
-        ~~~~~~~~~~~
-        You can work from your laptop if you additionally have
+Outside PSI
+~~~~~~~~~~~
+You can work from your laptop if you additionally have
 
-        * a PSI accepted 2-step Authenticator
-        * ssh on your laptop 
+* a PSI accepted 2-step Authenticator
+* ssh on your laptop
+
+Detailed instruction on this open documentations are not allowed by PSI security policy. Ask the author if you are interested.  
 
 
-
+..        
         Then you can add this snippet to your .ssh/config
 
         .. code::

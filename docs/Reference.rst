@@ -24,7 +24,7 @@ musuite
 * offset ``str`` an integer
 * startuppath (``str``) unused.
 
-The class methods are described in :doc:`Source``, under ``suite`` . N groups and M runs generate multidimensional vectors of MxN asymmetries. Time `t=0` is `automatically <t = 0>`_ determined. 
+The class methods are described in :ref:`Source`, under ``suite`` . N groups and M runs generate multidimensional vectors of MxN asymmetries. Time `t=0` is `automatically <t = 0>`_ determined. 
 
 mufit
 *****
@@ -41,9 +41,8 @@ mufit
   * initialize_only = False, if mufit is used just to load parameters for a guess plot 
   * grad = False, a dead branch option
   * scan = None, options are ['T','B','['], tells mufit to order csv file in increasing order of run number, temperatures, fields or angles, as extracted by `musuite`_ from the datafile headers.
-chain=True,dash_log=None,no_fit=False, grad=False, scan = None, verbose = False
 
-The class performs any fit, single asymmetry, sequential or global on several asymmetries (see `fit`_). 
+The class performs any fit, single asymmetry, sequential or global on several asymmetries (see `Global fits`_). 
 Single and global fit minimize one chi square. Internally `mufit` distinguishes:
 
  * *A1*, single asymmetry
@@ -58,16 +57,35 @@ Single and global fit minimize one chi square. Internally `mufit` distinguishes:
 json fit file
 *************
 
-Contains the full description of any legal fit model in a dict. Must agree with the MxN asymmetry vector provided by `musuite`. Contains  (see `fit_model`_) 
-It consists of a python dict, with a few plain keys, and crucial ones containing further structure:
+Contains the full description of any legal fit model in a dict. Must agree with the MxN asymmetry vector provided by `musuite`. 
+It consists of a python dict, with a few plain keys, and crucial ones containing further structure, exemplified below:
 
  *  "version": "1", a label, 
  *  "fit_range": "0,20000,40", 
  *  "offset": 20,  first good bin relative to t = 0.
- *  "globpardicts_guess": [],  optional, describes global fits and contains a dict per global parameter.
- *  "model_guess": [], the most fundamental one, contains a dictionary per model component.   
+ *  "globpardicts_guess": only global fits, a list with a dict per global parameter, with keys:
+   
+    * "name":"A" 
+    * "value":0.2
+    * "flag":"~"
+    * "error":0.001 
+    * "limits":{None,None]
+    * "positive_parity":True (optional)
+
+ *  "model_guess": the most fundamental one, contains a list of a dict per model component, with keys: 
+
+   * "name":"ml"
+   * "label":"0"
+   * "pardicts", a list of parameter dicts with keys:
+
+     * "name":"A"
+     * "error":0.001
+     * "limits":[None,None]
+     * "value":0.1
+     * "flag":"~"
+     * either "function":"p[0]" or "function_multi":["p[0]","p[1]"]
  
-The only reasonable way to edit a json file is by the `mudashed`_ GUI editor in either Jupyterlab or Voilà.
+The easier way to edit a json file is by the `mudashed`_ GUI editor in either Jupyterlab or Voilà.
 
 mufitplot
 *********
@@ -76,11 +94,12 @@ mufitplot
     from mujpy.muplotfit_ import muplotfit
     the_plot = muplotfit(plot_range,the_fit,**kwargs)
     
-* plot_range described  in `fit`_, the_fit is a `mufit`_ instance, and relevant kwargs are: 
+* plot_range described  in `A1, single run fit`_, the_fit is a `mufit`_ instance, and relevant kwargs are: 
 
   * guess = False, if True, the plot shows the guess parameter values, to visualize how good the guess is before optimization.
   * rotating_frame_frequencyMHz = 0.0, when non-zero plots data in the rotating frame, a useful way to view high frequency precessions. 
   * fig_fit=None, at start. The figure handle is returned as the_plot.fig_fit and can be inserted here again to reuse it. 
+
 ..
  * fft_range = None, to pass the frequency range for the FFT plot
  * real=True, to produce an amplitude FFT plot
@@ -123,8 +142,9 @@ But a new widget line has also appeared. If you already have a suitable json fit
 
 * Leave the toggle button on Sequential and type your acronym in the ``ML`` box. Enter activates it. Say you did chose ``almg``.
 
-
-******************
+Sequential fit
+--------------
+                  
 A1, single run fit
 ******************
   
@@ -152,7 +172,6 @@ Before we leave this first fit, assume you had two components here with slightly
 .. [2] This works only if you remove one or add one component. If you alter by more than one at a time ``mujpy`` offers to rebuild an empty model or to cancel the change.
 .. [3] Always share with a previous parameter (never select ``=`` on parameter 3 to write ``p[7]`` in its Function: forward-sharing does not work).
 
-*******************
 A20, multigroup fit
 *******************
 Sequential fits of two groups are straightforward now. They use the same json file and you have it ready in your editor. You can reaload it by ``LF``, its name recall the ingredients: ``almg.822.3-4.1_A1.fit``. The name is model dor run dot group shorthand dot version underscore fit_type dot fit. Just load the second group:
@@ -168,7 +187,6 @@ Sequential fits of two groups are straightforward now. They use the same json fi
        Your browser does not suport video tags.
    </video>
 
-*****************
 B1, multirun fits
 *****************
 It's as easy as multigroup and you can have them both. Go back to the Fit tab, and add a new run to the ``runlist``: ``822,833`` and hit ``RL``, then ``Fit``. You now have four logs, four frames in your animation. This is a `B20`-type fit. If you remove ``2-1`` in ``Groups ...``, hit ``RL`` and ``Fit``, that's a ``B1`` fit. They are all sequential. Spend a minute on the plot.
@@ -178,7 +196,6 @@ It's as easy as multigroup and you can have them both. Go back to the Fit tab, a
 * Top left box, stats, musrfit-style :math:`\chi^2` std limits.
 * Bottom left: the :math:`\chi^2` histogram of deviations (residues). Nice, but not a better indicator than visual inspection  of the residues.
 
-******
 B2 fit
 ******
 Trivial: just insert a second group in the ``Groups ...`` box and fire the same model.
@@ -187,7 +204,6 @@ Global fits
 -----------
 Still from the gui... 
 
-*************
 A21, B21 fits
 *************
 type-`A21`: global fit of two groups, same run. Plan it carefully. Minuit parameters are **all** global parameters, model parameters can only be mapped. For `alml`.
@@ -221,7 +237,6 @@ Check the figure below for global parameters and model functions. This is an A21
 Details
 -------
 
-*******
 runlist
 *******
 
@@ -232,12 +247,11 @@ runlist
    * ``432,433, 435:437`` loads the *suite* of runs 432, 433, 435, 436, 437
    * ``432+433`` loads the sum of these two runs as a single run, etc.
 
-*****
 t = 0
 *****
 `musuite`_ automatically identifies the :math:`t_0=0` bin according to data provenance. 
 
-* PSI bulk: the beam *prompt peak* (positrons that bypass the veto logic) is a close proxy. A rough iminuit fit, minimizes :math:`\chi^2` of auto-detectedinitial data portion, see class  ``muprompt`` in :doc:`Source`, where 
+* PSI bulk: the beam *prompt peak* (positrons that bypass the veto logic) is a close proxy. A rough iminuit fit, minimizes :math:`\chi^2` of auto-detectedinitial data portion, see class  ``muprompt`` in :ref:`Source`, where 
 
   * *prepeak*  and *postpeak*, number of bins before and after the maximum, fix the fit interval;
 
@@ -246,9 +260,9 @@ t = 0
  \frac {A_1} {\sqrt{2\pi\sigma}}  \exp\left[-\frac 1 2 \left(\frac{t-t_0} \sigma\right)^2\right] + A_0 +\frac {A_2} 2 \left[1+\mathrm{erf} \left(\frac{t-t_0} {\sqrt 2 \sigma}\right)\right]
 
 
-* ISIS: the pulsed beam build-up of muon counts is fit, see class ``muedge`` in :doc:`Source`, modeling the integral of the beam provile convoluted with pion decays (a Mathematica analytic function, checked against data) where:
+* ISIS: the pulsed beam build-up of muon counts is fit, see class ``muedge`` in :ref:`Source`, modeling the integral of the beam provile convoluted with pion decays (a Mathematica analytic function, checked against data) where:
  
-  + Fit parameter: :math:`D,N`, :math:`t_{00}`, width of the ISIS pulse, count rate normalizer and :math:`t=0` fractional bin; `t=0` is the edge function time :math:`t_0 = - t_{00}+0.82\tau_\pi`.
+  * Fit parameter: :math:`D,N`, :math:`t_{00}`, width of the ISIS pulse, count rate normalizer and :math:`t=0` fractional bin; `t=0` is the edge function time :math:`t_0 = - t_{00}+0.82\tau_\pi`.
   * :math:`\tau_\mu` and :math:`\tau_\pi` are the muon and pion mean lifetimes.
 
 .. math::

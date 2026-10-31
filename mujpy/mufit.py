@@ -295,7 +295,7 @@ class mufit(object):
 
     def execute_fit(self,limits,pospar):
         """
-        Minuit execution, invoked by dofit_
+        Minuit execution, invoked by ``dofit_``
 
         input::
 
@@ -370,7 +370,7 @@ class mufit(object):
             saved in csv/file.csv 
             saved in fit/file.json
 
-        invoked by self.dofit_ inside a krun and/or kgroup loops
+        invoked by ``self.dofit_`` inside a krun and/or kgroup loops
         """
 
         from mujpy.tools.tools import get_title, chi2std, stringify_groups, version_flag

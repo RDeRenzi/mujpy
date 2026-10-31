@@ -335,7 +335,7 @@ class muroot2py():                        # defines the python class
         return int(self._histo_dicts[k_histo]['Time Zero Bin'])
 
     def get_t0_double(self, k_histo):
-        """t0 float as float"""
+        """t0 bin as float?"""
 
         return float(self._histo_dicts['Time Zero Bin '+str(histogram)])
 
@@ -345,7 +345,7 @@ class muroot2py():                        # defines the python class
         return self._header_dict['Sample Name']
 
     def get_orient(self):
-        """orientation"""
+        """orientation, string"""
 
         if 'Sample Orientation' in self._header_dict.keys():
             return self._header_dict['Sample Orientation']
@@ -353,9 +353,9 @@ class muroot2py():                        # defines the python class
             return ''
 
     def get_field_str(self):
-        """field value string"""
+        """field value string, with unit"""
 
-        return self._header_dict['Sample Magnetic Field'].split(' G')[0].split(' G')[0].split(' +-')[0]
+        return self._header_dict['Sample Magnetic Field'].split(' G')[0].split(' +-')[0]+' G'
 
     def get_field(self):
         """field float"""

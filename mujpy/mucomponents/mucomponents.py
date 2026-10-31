@@ -115,17 +115,20 @@ class mumodel(object):
         """
         mufit entry, initialized a mumodel instance for best fit and for plot
 
-        works for A1, A20, A21, B1, B20, B21, C1, C2 and calib
-        input: 
+        input::
+
             suite,          the fit suite instance (for mufitplot)
             components,     aka methods_keys 
                             a structure of methods and their list of lists ... of key
                                [[method,[key...]],...,[method,[key...]]], 
                             produced mujpy.tools.tools int2_[global_]method()
                             such that key(p) is a parameter for method component
-            krun, kgroup    determines fit slice <= suite (-1 for the suite span)
+            krun, kgroup,   for fit slice <= suite (-1 for the whole suite span)
             fit_types       A1...C2 = fit_types() passed to _alpha_plot_
-            detects calib fits, 'alxxyy', since the 'al' method is None
+        
+        detects calib fits, 'alxxyy', since the 'al' method is None
+
+        works for A1, A20, A21, B1, B20, B21, C1, C2 and calib
         """
 
         from mujpy.tools.tools import rebin
@@ -225,20 +228,29 @@ class mumodel(object):
 
     def _rebin_(self,tup,*argv):
         """
-        data frontend for mufit.dofit_ defines fit range from the unbinned _load_ slice
+        data frontend for ``mufit.dofit_`` defines fit range from the unbinned _load_ slice
         
         (self. is implied in front of _ variables)
-        input:
-            tup = (start, stop, pack)
-            *argv      = Minuit parameters, only for calib _set_alpha_
-            if self._calib
-                self._alpha = set_alpha(argv,self._nruns_,self._ngroups_)
-                a, ea = _asymmetry_() unbinned, uses
-                _yf_, _yb_, _eyf_, _eyb_ unbinned _load_ slice 
-            else
-                _a_, _ea_  unbinned _load_ slice
-        output:
-            rebinned _x_, _y_, _e_   _load_ slice
+        
+        input::
+
+            tup         (start, stop, pack)
+            ``*argv``   Minuit parameters, only for calib _set_alpha_
+
+
+        output::
+
+            _x_, _y_, _e_   rebinned _load_ slice
+                                if self._calib
+                                    self._alpha = set_alpha(argv,
+                                                            self._nruns_,
+                                                            self._ngroups_)
+                                    a, ea = _asymmetry_() unbinned, 
+                                        uses _yf_, _yb_, _eyf_, _eyb_ 
+                                        unbinned _load_ slice 
+                                else
+                                    _a_, _ea_  
+                                        unbinned _load_ slice
         """
         
         from mujpy.tools.tools import rebin, set_alpha
@@ -258,9 +270,10 @@ class mumodel(object):
 
     def _slice_runs_groups_(self):
         """
-        saves mufit self._slice_nruns_ self._slice_ngroups_
+        saves mufit self._slice_nruns_ self._slice_ngroups_::
 
-        the mumodel slice equivalents of suite self._nruns_ self._ngroups_ 
+            suite._nruns_ suite._ngroups_ equivalent 
+            for mumodel slice 
         """
         A1,A20,A21,B1,B20,B21,C1,C2 = self._fit_types()
         if A1 or A20 or B1 or B20:
@@ -277,13 +290,22 @@ class mumodel(object):
         """
         data frontend for muplotfit, used as follows
         
-        input:
-            tup = start, stop, pack
-            lastfits from Minuit (take also care of guess=True)
-        calls
-            _asymmetry_plot_ which calls _alpha_plot_, if _calib
-            suite.asymmetry_slice(-1,-1)  otherwise       
-        directly loads self._x_, self._y_, self._e_  for the suite 
+        input::
+
+            tup         start, stop, pack
+            lastfits    list of Minuit.lastfit instances
+                        (take also care of guess=True)
+
+        loads::
+
+            if _calib:
+                suite.slice_for_back_counts
+                self.rebin
+                self._asymmetry_plot_    which calls self._alpha_plot_
+            else:
+                suite.asymmetry_slice(-1,-1)
+                self.rebin
+            elf._x_, self._y_, self._e_  after rhsp squeeze
         """
         from mujpy.tools.tools import rebin, rshp
 
@@ -307,11 +329,20 @@ class mumodel(object):
 
     def _asymmetry_(self):
         """
-        mufit.dofit_ calib asymmetry, called by model._rebin_calib_
-        
-            self._alpha is preset by _set_alpha_ in _add_calib_
-        output unbinned asymm, asyme, slice according to _load_
-            from unbinned slice self._yf_ self._yb_ self._eyf_ self._eyb_
+        calculates basic asymmetries
+
+        uses::
+
+            self._alpha     preset by _set_alpha_ in _add_calib_
+
+        output:: 
+
+            asymm, 
+            asyme,   unbinned slices according to _load_
+                        from unbinned slices 
+                        self._yf_ self._yb_ self._eyf_ self._eyb_
+
+        ``mufit.dofit_`` calib asymmetry, called by model._rebin_calib_
         """
 
         from numpy import where
@@ -328,14 +359,19 @@ class mumodel(object):
 
     def _asymmetry_plot_(self,lastfits):
         """
-        mufitplot.chi calib _alpha_plot_ & asymmetry, called by model._rebin_plot_ 
+        asymmetry slice for mufitplot, may be a slice of the suite
 
-        input
-            lastfits     passed to _alpha_plot_ to produce alpha for the suite
-        output
-            asymm
-            asyme        unbinned, for the entire suite
-            from rebinned yf yb eyf eyb by _rebin_plot_
+        input::
+
+            lastfits        list of Minuit.lastfit structures, one per minuit call
+                            passed to _alpha_plot_ to produce alpha 
+
+        output::
+
+            y           rebinned asymmetry
+            e           rebinned asymmetry error
+            
+        from rebinned yf yb eyf eyb obtained by _rebin_plot_, works for calib as well
         """
 
         from numpy import where
@@ -367,7 +403,8 @@ class mumodel(object):
         """
         mock _add_plain_ (see) for debug print purposes
 
-        input
+        input::
+
             x       time array
             argv   Minuit parameters
         """
@@ -390,13 +427,14 @@ class mumodel(object):
         """
         overloads _add_ in cost function _chisquare_
 
-        input:
-            x       time array
-            *argv   passed as a variable number of parameter values 
-                    val1,val2,val3,val4,val5,val6, ... at this iteration 
-                    argv is a list of values [val1,val2,val3,val4,val5,val6, ...]
-        unique method for all non calib fits slice dimensions
-              asymmetry fit with fixed alpha
+        input::
+
+            x           time array
+            ``*argv``   passed as a variable number of parameter values 
+                        val1,val2,val3,val4,val5,val6, ... at this iteration 
+                        argv is a list of values [val1,val2,val3,val4,val5,val6, ...]
+        
+        unique method for all non calib fits slice dimensions, asymmetry fit with fixed alpha
         """
         
         set_printoptions(precision=2)
@@ -432,10 +470,12 @@ class mumodel(object):
         """
         produces suite f in mufitplot.chi for sequential fits A20, B1, B20, B21 (other fits call _add_)
 
-        input:
-            x is rebinned time vector
-            lastfits is mufit.lastfits, a list of mufit.lastfit instances
-                pars are mufit.lastfit.values (takes also care of guess)
+        input::
+
+            x           rebinned time vector
+            lastfits    mufit.lastfits, a list of mufit.lastfit instances
+                pars    mufit.lastfit.values (takes also care of guess)
+
             self._add_(x,*argv) returns the function used in the fit
                                             A20, B1, B20 a 1d array
                                             B21 a 2d array
@@ -483,16 +523,10 @@ class mumodel(object):
 
     def _load_multirun_grad_(self,minuit_ordered_grad_list):
         """
-        probably broken in 2026, grads are slower that numerical ones
+        broken in 2026, deprecated since analytic grads slower that numerical ones
         
-        maybe retry timing simplest fits
-        minuit_ordered_grad_list is
         self._glocals_ to loop (broken) 
-            over minuit parameters and calculate gradient components, 
-                over runs, whose number n = y.shape[0], for globals
-                on single run, for locals
-                    over component parameters that contain that minuit parameter, i
-                    including the derivative of the user function.
+
         constructed in mujpy.tools.tools  int2_multirun_grad_method_key
         """
 
@@ -503,24 +537,31 @@ class mumodel(object):
         """
         Deprecated
 
-        input:
-            *argv   passed as a variable number of parameter values 
-                    val0,val1,val2,val3,val4,val5, ... at this iteration 
-                    argv is a list of values [val0,val1,val2,val3,val4,val5, ...]
-           (here independent variable is self._x_ time array by default, no plots)
-        output:
-            np.array(grad) 
-              whose m-th value is the chisquare gradient 
-              with respect to internal minuit parameter p[m]
+        input::
+
+            ``*argv``       passed as a variable number of parameter values 
+                            val0,val1,val2,val3,val4,val5, ... at this iteration 
+                            argv is a list of values [val0,val1,val2,val3,val4,val5, ...]
+                            (here independent variable is self._x_ time array by default, no plots)
+        
+        output::
+
+            np.array(grad)  whose m-th value is the chisquare gradient 
+                            with respect to internal minuit parameter p[m]
+                
         requires previous calls to _load_data_multirun_grad_  to define self._minuit_grad_list_
-                       both constructed in int2_multirun_grad_method_key() from mujpy.tools.tools
+        both constructed in int2_multirun_grad_method_key() from mujpy.tools.tools
+        
         self._gradients_ used to store f values and g derivatives of all components, to minimize numpy array calculations;
-        self._glocals_ to loop 
+        
+        self._glocals_ to loop::
+
             over minuit parameters and calculate gradient components, 
                 over runs, whose number n = y.shape[0], for globals
                 on single run, for locals
                     over component parameters that contain that minuit parameter, i
                     including the derivative of the user function.
+        
         _add_multirun_grad_ (glob is implicit, no grads in sequential fit) 
         """
 
@@ -542,20 +583,22 @@ class mumodel(object):
 
     def _add_fft_(self,x,y,*argv,calib = False):
         """
-        Produces f for the fft of residues in mufitplot::
+        Produces f for the fft of residues in mufitplot
 
-        input:
+        input::
+
             x time array, 1d
             *argv Minuit parameters
           
             y - f
           
-          Components can be selectively added to f
-          i.e. subtracted in the residues::
+        Components can be selectively added to f, i.e. subtracted in the residues:
+
+        ..code::
    
             f += method(x,*pars) if self._include_components[j] else 0. 
             
-          For the time being only single run single group (f is 1d)
+        For the time being only single run single group (f is 1d)
         """
 
         f = zeros_like(y)  # initialize a 1D array
@@ -587,9 +630,10 @@ class mumodel(object):
         """
         Generates partial residues for FFT
 
-        input:
-          include_components 
-                True to subtract in residues  asymm - f
+        input::
+
+            include_components      True 
+                                    to subtract in residues  asymm - f
         """
 
         self._include_components = include_components 
@@ -603,10 +647,11 @@ class mumodel(object):
 
     def al(self,x,α):
         """
-        alpha calibration
+        alpha calibration::
 
-        x [mus], α
-        x dummy, for compatibility
+            x   α
+        
+        x   dummy, for compatibility
         """
         
         # empty method  (could remove x from argument list ?)
@@ -616,9 +661,11 @@ class mumodel(object):
            
     def bl(self,x,A,λ): 
         """
-        Lorentzian decay, A*exp(-x*λ)
+        Lorentzian decay, A*exp(-x*λ)::
         
-        x [mus], A, λ [mus-1]
+            x   [mus] 
+            A 
+            λ   [mus-1]
         """
         
         # x need not be self.x (e.g. in plot)
@@ -628,27 +675,33 @@ class mumodel(object):
 
     def _grad_bl_0_(self,x,A,λ): 
         """
-        derivative of bl with respect to A in terms of self.bl
+        derivative of bl with respect to A in terms of self.bl::
         
-        x [mus], A, λ [mus-1]  
+            x   [mus]
+            A
+            λ   [mus-1]  
         """
         
         return self.bl(x,A,λ)/A
 
     def _grad_bl_1_(self,x,A,λ): 
         """
-        derivative of bl with respect to λ in terms of self.bl
+        derivative of bl with respect to λ in terms of self.bl::
         
-        x [mus], A, λ [mus-1]  
+            x   [mus]
+            A
+            λ   [mus-1]  
         """
         
         return -x*self.bl(x,A,λ)
 
     def bg(self,x,A,σ): 
         """
-        Gaussian decay, A*exp(-0.5*(x*σ)**2)
+        Gaussian decay, A*exp(-0.5*(x*σ)**2)::
         
-        x [mus], A, σ [mus-1] (positive parity)
+            x   [mus]
+            A
+            σ   [mus-1] (positive parity)
         """
         
         # x need not be self.x (e.g. in plot)        
@@ -657,7 +710,6 @@ class mumodel(object):
 
     def _grad_bg_0_(self,x,A,σ): 
         """
-        
         derivative of bg with respect to A in terms of self.bg
         x [mus], A, σ [mus-1]  
         """
@@ -675,9 +727,12 @@ class mumodel(object):
 
     def ba(self,x,A,λ,σ): 
         """
-        Lorentzian times Gaussian decay, A*exp(-x*λ)*exp(-0.5*(x*σ)**2)
+        Lorentzian times Gaussian decay, A*exp(-x*λ)*exp(-0.5*(x*σ)**2);;
         
-        x [mus], A, λ [mus-1], σ [mus-1] (positive parity)
+            x       [mus]
+            A
+            λ       [mus-1]
+            σ       [mus-1] (positive parity)
         """
         
         # x need not be self.x (e.g. in plot)
@@ -713,9 +768,12 @@ class mumodel(object):
 
     def bs(self,x,A,Λ,β): 
         """
-        stretched decay A*exp(-(x*Λ)**β), 
+        stretched decay A*exp(-(x*Λ)**β):: 
         
-        x [mus], A, Λ [mus-1] (>0), β (>0)
+            x       [mus]
+            A
+            Λ       [mus-1] (>0)
+            β       (>0)
         """
         
         # x need not be self.x (e.g. in plot)
@@ -751,9 +809,13 @@ class mumodel(object):
 
     def ml(self,x,A,B,φ,λ): 
         """
-        precession A cos(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times Lorentzian decay, 
+        precession A cos(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times Lorentzian decay:: 
         
-        x [mus], A, B [mT], φ [deg], λ [mus-1]
+            x       [mus]
+            A
+            B       [mT]
+            φ       [deg]
+            λ       [mus-1]
         """
         
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)
@@ -761,6 +823,7 @@ class mumodel(object):
 
     def _derivative_ml_(self,x,A,B,φ,λ): 
         """
+        deprecated
         derivative of mlwith respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
         
         - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times Lorentzian decay
@@ -807,9 +870,13 @@ class mumodel(object):
 
     def mg(self,x,A,B,φ,σ): 
         """
-        precession A cos(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times Gaussian decay, 
-        
-        x [mus], A, B [mT], φ [degrees], σ [mus-1]  (positive parity)
+        precession A cos(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times Gaussian decay::
+
+            x       [mus]
+            A
+            B       [mT]
+            φ       [degrees]
+            σ       [mus-1]  (positive parity)
         """
         
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-0.5*(x*σ)**2)
@@ -817,6 +884,7 @@ class mumodel(object):
         
     def _derivative_mg_(self,x,A,B,φ,σ): 
         """
+        deprecated
         derivative of mg with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
         
         - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times Gaussian decay,
@@ -863,10 +931,14 @@ class mumodel(object):
         
     def mu(self,x,A,B,φ,λ,σ): 
         """
-        precession A cos(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times Gaussian times Lorentzian decays, 
+        precession A cos(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times Gaussian times Lorentzian decays::
         
-        x [mus], A, B [mT], φ [degrees], 
-        λ [mus-1], σ [mus-1]  (positive parity)
+            x       [mus]
+            A
+            B       [mT]
+            φ       [degrees] 
+            λ       [mus-1]
+            σ       [mus-1]  (positive parity)
         """
         
         # x need not be self.x (e.g. in plot)
@@ -875,7 +947,7 @@ class mumodel(object):
 
     def _derivative_mu_(self,x,A,B,φ,λ,σ): 
         """
-        
+        deprecated
         derivative of mu with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
         
         - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times Lorentzian times Gaussian decay,
@@ -931,9 +1003,14 @@ class mumodel(object):
 
     def ms(self,x,A,B,φ,Λ,β): 
         """
-        precession A cos(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times stretched decay, 
+        precession A cos(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times stretched decay::
         
-        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
+            x       [mus]
+            A
+            B       [mT]
+            φ       [degrees]
+            Λ       [mus-1] (>0)
+            β       (>0)
         """
         
         # x need not be self.x (e.g. in plot)
@@ -942,6 +1019,7 @@ class mumodel(object):
 
     def _derivative_ms_(self,x,A,B,φ,Λ,β): 
         """
+        deprecated
         derivative of ms with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
         
         - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times stretched decay
@@ -998,11 +1076,12 @@ class mumodel(object):
 
     def fm(self,x,A,B,λ):
         """
-        FmuF (powder average)
+        FmuF (powder average), S Blundell et al. Muon Spectroscopy, an iIntroduction, OUP::
         
-        according to Book  
-        x [mus], A, B [mT], λ [mus-1]
-        B is Bdip
+            x       [mus]
+            A       
+            B       [mT] is Bdip
+            λ       [mus-1]
         """
         
         # x need not be self.x (e.g. in plot)
@@ -1013,9 +1092,13 @@ class mumodel(object):
 
     def jl(self,x,A,B,φ,λ): 
         """
-        Bessel j0 precession times Lorentzian decay, 
+        Bessel j0 precession times Lorentzian decay:: 
         
-        x [mus], A, B [mT], φ [degrees], λ [mus-1]
+            x       [mus]
+            A
+            B       [mT]
+            φ       [degrees]
+            λ       [mus-1]
         """
         # x need not be self.x (e.g. in plot)
         
@@ -1024,6 +1107,7 @@ class mumodel(object):
 
     def _derivative_jl_(self,x,A,B,φ,λ): 
         """
+        deprecated
         derivative of jl with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
         
         - A J1(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times Lorentzian decay,
@@ -1071,9 +1155,13 @@ class mumodel(object):
 
     def jg(self,x,A,B,φ,σ): 
         """
-        Bessel j0 precession times Gaussian decay, 
+        Bessel j0 precession times Gaussian decay:: 
         
-        x [mus], A, B [mT], φ [degrees], σ [mus-1] (positive parity)
+            x       [mus]
+            A
+            B       [mT]
+            φ       [degrees]
+            σ       [mus-1] (positive parity)
         """
         
         # x need not be self.x (e.g. in plot)
@@ -1083,6 +1171,7 @@ class mumodel(object):
 
     def _derivative_jg_(self,x,A,B,φ,σ): 
         """
+        deprecared
         derivative of jg with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
         
         - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times Gaussian decay,
@@ -1129,10 +1218,14 @@ class mumodel(object):
         
     def j0(self,x,A,B,φ,λ,σ): 
         """
-        precession A j1(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times Gaussian times Lorentzian decays, 
+        precession A j1(2 pi _gamma_Mu_MHzper_mT B x+φ _radeg_) times Gaussian times Lorentzian decays::
         
-        x [mus], A, B [mT], φ [degrees], 
-        λ [mus-1], σ [mus-1]  (positive parity)
+            x       [mus]
+            A
+            B       [mT]
+            φ       [degrees] 
+            λ       [mus-1]
+            σ       [mus-1]  (positive parity)
         """
         
         # x need not be self.x (e.g. in plot)
@@ -1141,6 +1234,7 @@ class mumodel(object):
 
     def _derivative_j0_(self,x,A,B,φ,λ,σ): 
         """
+        deprecated
         derivative of j0 with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
         
         - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times Lorentzian times Gaussian decay,
@@ -1194,12 +1288,16 @@ class mumodel(object):
         
         return -x**2*σ*self.j0(x,A,B,φ,λ,σ)
 
-
     def js(self,x,A,B,φ,Λ,β): 
         """
-        Bessel j0 precession times stretched decay, 
+        Bessel j0 precession times stretched decay::
         
-        x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0)
+            x       [mus]
+            A
+            B       [mT]
+            φ       [degrees]
+            Λ       [mus-1] (>0)
+            β       (>0)
         """
         
         # x need not be self.x (e.g. in plot)
@@ -1208,6 +1306,7 @@ class mumodel(object):
 
     def _derivative_js_(self,x,A,B,φ,Λ,β): 
         """
+        deprecated
         derivative of js with respect to total phase alpha =  2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_,
         
         - A sin(2 pi _gamma_Mu_MHzper_mT B x + φ _radeg_) times stretched decay
@@ -1218,6 +1317,7 @@ class mumodel(object):
 
     def _grad_js_0_(self,x,A,B,φ,Λ,β): 
         """
+        deprecated
         derivative of js with respect to A in terms of self.mu and self._derivative_mu_
         
         x [mus], A, B [mT], φ [degrees], Λ [mus-1] (>0), β (>0) 
@@ -1265,11 +1365,13 @@ class mumodel(object):
 
     def _kg(self,t,w,Δ):
         """
-        auxiliary component for a static Gaussian Kubo Toyabe in longitudinal field, 
+        auxiliary component for a static Gaussian Kubo Toyabe in longitudinal field:: 
         
-        t [mus], w [mus-1], Δ [mus-1], 
-        w = 2*pi*gamma_mu*L_field
-        The first derivative of dawsn(x) is 1-2*x*dawsn(x)
+            t       [mus]
+            w       [mus-1] 2*pi*gamma_mu*L_field
+            Δ       [mus-1] Gaussian distribution width
+
+        first derivative of dawsn(x) is 1-2*x*dawsn(x)
         """
         
         # note that t can be different from self._x_
@@ -1292,10 +1394,11 @@ class mumodel(object):
 
     def _kl(self,t,w,Δ):
         """
-        static Lorentzian Kubo Toyabe in longitudinal field, 
+        static Lorentzian Kubo Toyabe in longitudinal field::
         
-        t [mus], w [mus-1], Δ [mus-1], 
-        w = 2*pi*gamma_mu*L_field
+            t       [mus]
+            w       [mus-1] 2*pi*gamma_mu*L_field
+            Δ       [mus-1], Gaussian distribution width
         """
         
         # note that t can be different from self._x_
@@ -1322,13 +1425,14 @@ class mumodel(object):
 
     def _kgdyn(self,x,w,Δ,ν,*argv):
         """ 
-        auxiliary dynamization of Gaussian Kubo Toyabe by G. Allodi 
+        auxiliary dynamization of Gaussian Kubo Toyabe by G. Allodi:: 
         
-        N: number of sampling points;
-        dt: time interval per bin [i.e. time base is t = dt*(0:N-1)]
-        w [mus-1], Δ [mus-1], ν [MHz] 
-        (longitudinal field freq, Gaussian distribution, scattering frequency 
-        % alphaN: [optional argument] weighting coefficient alpha times N. Default=10 
+            N       number of sampling points;
+            dt      time interval per bin [i.e. time base is t = dt*(0:N-1)]
+            w       [mus-1] 2*pi*gamma_mu*L_field
+            Δ       [mus-1] Gaussian distribution width
+            ν       [MHz] scattering frequency 
+            alphaN  [optional argument] weighting coefficient alpha times N. Default=10 
         """
         
         alphaN = 10. if not argv else argv[0] # default is 10.
@@ -1353,9 +1457,13 @@ class mumodel(object):
          
     def kg(self,x,A,BL,Δ,ν):
         """
-        Gauss Kubo Toyabe in (fixed) long field, static or dynamic
+        Gauss Kubo Toyabe in (fixed) long field, static or dynamic::
         
-        x [mus], A, BL [mT], Δ [mus-1] (positive parity), ν (MHz)
+            x       [mus]
+            A
+            BL      [mT]
+            Δ       [mus-1] (positive parity)
+            ν       (MHz)
         """
         
         # x need not be self.x (e.g. in plot)
@@ -1387,9 +1495,12 @@ class mumodel(object):
 
     def kl(self,x,A,BL,Γ):
         """
-        Lorent Kubo Toyabe in (fixed) long field, static 
+        Lorent Kubo Toyabe in (fixed) long field, static:: 
         
-        x [mus], A, BL [mT], Γ [mus-1] 
+            x       [mus]
+            A
+            BL      [mT]
+            Γ       [mus-1] 
         """
         
         # x need not be self.x (e.g. in plot)
@@ -1400,9 +1511,12 @@ class mumodel(object):
 
     def kd(self,x,A,Δ,λ):
         """
-        Gauss Kubo Toyabe static times Lorentz decay
+        Gauss Kubo Toyabe static times Lorentz decay::
         
-        x [mus], A, B [T], Δ [mus-1], ν (MHz)
+            x       [mus]
+            A
+            Δ       [mus-1]
+            λ       [mus-1]
         """
         
         # x need not be self.x (e.g. in plot)
@@ -1429,11 +1543,12 @@ class mumodel(object):
         Provides chisquares, partial over individual runs or groups if self._axis_ = 1 
         
         None is default and sum is over all indices::
-        Signature provided at Minuit invocation by 
-        optional argument forced_parameters=parnames
-        where parnames is a tuple of parameter names::
+        
+            Signature provided at Minuit invocation by 
+            optional argument forced_parameters=parnames
+            where parnames is a tuple of parameter names::
 
-           e.g. parnames = ('asym','field','phase','rate') 
+            e.g. parnames = ('asym','field','phase','rate') 
 
         Works also for global fits, 
         where sum (...,axis=None) yields the sum over all indices.
@@ -1452,11 +1567,12 @@ class mumodel(object):
         Provides chisquares calib, partial over individual runs or groups if self._axis_ = 1 
 
         None is default and sum is over all indices::
-        Signature provided at Minuit invocation by 
-        optional argument forced_parameters=parnames
-        where parnames is a tuple of parameter names::
+        
+            Signature provided at Minuit invocation by 
+            optional argument forced_parameters=parnames
+            where parnames is a tuple of parameter names::
 
-           e.g. parnames = ('asym','field','phase','rate') 
+            e.g. parnames = ('asym','field','phase','rate') 
 
         Works also for global fits, 
         where sum (...,axis=None) yields the sum over all indices.
@@ -1498,4 +1614,3 @@ class mumodel(object):
 #        if divergence.any():
 #            print('Warning: big numbers in chisquare {}'.format(normsquaredev[divergence]))
         return sum(normsquaredev,axis=self._axis_ )
-

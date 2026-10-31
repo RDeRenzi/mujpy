@@ -321,11 +321,12 @@ class suite(object):
               
     def t_value_error(self,k):
         """
-        deprecated? not in grep t_value_error *.py [/tools/*.py, /mucomponents/*.py]
+        deprecated?
         calculates T and eT values also for runs to be added::
         
             sillily, but it works also for single run
-                ignores self.LEM_back_subt, a negligible factor for weight
+                
+        ignores self.LEM_back_subt, a negligible factor for weight
         """
 
         from numpy import sqrt

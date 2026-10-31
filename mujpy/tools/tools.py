@@ -4,24 +4,20 @@ def autops(data, fn, p0=0.0, p1=0.0):
     """
     Automated phase correction from NMRglue by https://github.com/jjhelmus
 
-    These functions provide support for automatic phasing of NMR data. 
-    Automatic linear phase correction
+    support for automatic phasing of NMR data, linear phase correction
     
     Parameters::
 
-        data : ndarray
-             Array of NMR data.
-        fn : str or function
-             Algorithm to use for phase scoring. Built in functions can be
-             specified by one of the following strings: "acme", "peak_minima"
-        p0 : float
-            Initial zero order phase in degrees.
-        p1 : float
-            Initial first order phase in degrees.
-    Returns::
+        data        ndarray, array of NMR data.
+        fn          str or function, algorithm to use for phase scoring. 
+                    Built in functions can be specified by one of the following strings: 
+                        "acme", "peak_minima"
+        p0          float, initial zero order phase in degrees.
+        p1          float, initial first order phase in degrees.
 
-        ndata : ndarray
-            Phased NMR data.
+    output::
+
+        ndata       ndarray, phased NMR data.
     """
 
     import numpy as np
@@ -51,8 +47,8 @@ def _ps_acme_score(ph, data):
     
     Parameters::
 
-        pd : tuple, current p0 and p1 values
-        data : ndarray, array of NMR data.
+        pd      tuple, current p0 and p1 values
+        data    ndarray, array of NMR data.
     
     Returns::
 
@@ -134,6 +130,7 @@ def ps(data, p0=0.0, p1=0.0, inv=False):
             First order phase in degrees.
         inv : bool, optional
             True for inverse phase correction
+
     Returns::
 
         ndata : ndarray
@@ -1311,6 +1308,7 @@ def spec_prec(a):
     input::
 
         a,      float with finite number of decimal digits
+
     output::
         
         n,      format integer in {:.nf} 
@@ -1714,7 +1712,7 @@ def min2int(dashboard,values_in,errors_in,krun,kgroup,nruns,ngroups):
 
         A1 and calib
         A20, B1, B20 and their calib, 
-            iterated inside mufit.dofit_
+            iterated inside ``mufit.dofit_``
     
     Used by mufit
     """
@@ -1790,7 +1788,7 @@ def min2int_global(dashboard,p,e,krun,kgroup,nruns,ngroups):
         nonhash,    component list of parameter list True if 'flag'!='#'
 
     ready for print_components in summary_global,
-    iterated in mufit.dofit_ for A21 B21 C1 C2 & calib
+    iterated in ``mufit.dofit_`` for A21 B21 C1 C2 & calib
 
     Used by mufit
     """
@@ -2066,11 +2064,14 @@ def function_multi_in_components(dashboard):
     """
     list of True/False for model_guess components pardicts if they contain the 'function_multi' key
 
-    input full dashboard
-    output mask list, 
-        len is sum of number of parameters in components of "model_guess"
-        True where parameter pardict contains "function_multi" key
-        False otherwise
+    input:: 
+
+        full dashboard
+    
+    output:: 
+        mask        list, len is sum of number of parameters in components of "model_guess"
+                        True where parameter pardict contains "function_multi" key
+                        False otherwise
 
     Used in mufitplot, tools.min2int_global, tools.int2_global_method_key
     """
@@ -2103,10 +2104,16 @@ def rshp(y):
     '''
     reshape numpy array from suite to plot shape
 
-    returns a squeezed version, 3d is reshaped to 2d
-    any empty dimension is removed
+    input::
+        
+        y       a multidimensional np.array
 
-        suite array are 3d 2d or 1d::
+    output::
+
+        y_out   a squuezed version
+                    remove empty dimensions 
+
+        suite array are 3d 2d or 1d
         plot must be 1d, for static plot
                  2d, for anim
     
@@ -2338,21 +2345,24 @@ def transliterate(string_in):
         string_in = re.sub(r'p\['+indices[k]+r'\]',x,string_in)
     return string_in, indices
 
-def litertransate(string_in,indices):
+def litertransate(string,indices):
     """
     reverse of translitterate, reproduces a function string
 
     input::  
 
-        string_in,      error_propagation formula in terms of x, y, z, ...     
-        indices,        list of indices, [k] for 'p[k]' to substitute 'x', etc.
+        string      error_propagation formula in terms of 'x', 'y', 'z', ...  
+                        must become same formula with 
+                                    'x' -> 'p[k]', k = int(indices[0])
+                                    'y' -> 'p[k]', k = int(indices[1]) ...
+        indices     list of string indices in string, 
+                                    substituted by 'x', 'y', etc.
         
     output::
 
-            indices, list ['i',...] of 'p[i]' to be substituted to the above
-    output: substituted string
-
-        string_in,      after the substitution
+        string,      after the substitution
+                        e.g string = 'x*z**2', indices = ['0','2','5`]
+                        yields string = 'p[0]*p[5]**2'
 
     Used by mufit, tools.error_propagation
     """
@@ -2361,8 +2371,8 @@ def litertransate(string_in,indices):
     symbols = ['x','y','z','u','v','w']
     nind = len(indices) 
     for k,x in enumerate(symbols[:nind]):
-        string_in = re.sub(x,'p['+indices[k]+']',string_in)
-    return string_in
+        string = re.sub(x,'p['+indices[k]+']',string)
+    return string
 
 def error_propagation(string_in):
     """

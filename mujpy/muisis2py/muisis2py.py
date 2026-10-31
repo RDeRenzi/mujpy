@@ -7,6 +7,8 @@ class munxs2py():                        # defines the python class
         self.readingOOK = self.read(path_filename)  # reads data
 
     def read(self,path_filename):
+        """loads file at path_filename with nxload"""
+
         with nxload(path_filename) as run:
             try:
                	self.run = run
@@ -15,16 +17,24 @@ class munxs2py():                        # defines the python class
                 read_ok = False
         return read_ok
 
-    def _rbn(self,hist,binning):
-        return hist[:(hist.size//binning)*binning].reshape(hist.size//binning,binning).sum(axis=1)
+    def _rbn(self,hist,nbin):
+        """rebinned np.array hist (sums nbin contiguous bins)""" 
+
+        return hist[:(hist.size//nbin)*nbin].reshape(hist.size//nbin,nbin).sum(axis=1)
 
     def Filename(self):
+        """filename without path"""
+
         return str(self.run.file_name).split('\\')[-1]
         
     def readingOK(self):
+        """True if nxload successful"""
+
         return self.readingOOK
 
     def Show(self):
+        """RunHeader info print"""
+
         k1 = len(self.run["RunHeader;1"].members['fFolders'][:])
         for k in range(k1):
             k2 = len(self.run["RunHeader;1"].members['fFolders'][k][:])
@@ -32,115 +42,77 @@ class munxs2py():                        # defines the python class
                 print('{}'.format(self.run["RunHeader;1"].members['fFolders'][k][l][:]))
                 
     def get_proposal_number(self):
+        """proposal number string"""
+
         return 'RB{}'.format(self.run.raw_data_1.experiment_identifier)
         
     def get_proposer(self):
+        """PI name string"""
+
         return str(self.run.raw_data_1.user_1.name)
  
-    def get_facility(self): 
+    def get_facility(self):
+        """facility string"""
+
         return str(self.run.raw_data_1.instrument.source.name)
 
     def get_numberHisto_int(self):
-        """
-        .. code::
+        """number of histograms of the run, integer"""
 
-          from muisis2py import muisis2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file,'r')  # this is the run data nexus file
-          n = run.get_numberHisto_int()
-          # n is now an integer with the number of histrograms of this run
-        """
         return np.array(self.run.raw_data_1.detector_1.counts).shape[1]
     
     def get_histoLength_bin(self):
-        """
-        .. code::
+        """histograms bin length, integer"""
 
-          from muisis2py import muisis2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file,'r')  # this is the run data nexus file
-          n = run.get_histoLength_bin()
-          # n is now an integer with the number of bins in the histrograms of this run
-
-        """
         return np.array(self.run.raw_data_1.detector_1.counts).shape[2]
     
     
     def get_RedGreen_offsets(self):
-        """
-        .. code::
+        """list of integer offsets for REdGreen mode histo sets 
+        
+        example::
 
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          period = run.get_RedGreen_offsets() # offsets is now a list of integer imdices for the first dimension of the histo vector
-          # check on a RedGreenm mode data set
+            a RedGreen experiment has 
+                light off data in histos 0:8 named histo0, ..., histo7
+                light on data in histos 8:16 named histo20, ..., histo27
+            the output is [0,20]
        """
         return [int(self.run.raw_data_1.detector_1.period_index)-1] 
     
     def get_binWidth_us(self):
+        """bin width in microseconds, float"""
+
         return float(self.run.raw_data_1.detector_1.raw_time[1])
     
     def get_binWidth_ns(self):
+        """bin width in nanoseconds, float"""
+
         return float(self.run.raw_data_1.detector_1.raw_time[1]*1000)
     
-    def get_histo_int(self,histogram,nbin):
-        """
-        .. code::
+    def get_histo_int(self,k_histo,nbin):
+        """single integer count from histogram k_histo"""
 
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          # histogram in range(self.get_numberHisto_int())
-          h = run.get_histo_int(3,100)
-          # h is now the integer count of bin 100 in the 3rd histogram (PSI convention), python index 2
-        (remember python indices starts from 0)
-        """
-        return int(self.run.raw_data_1.detector_1.counts[0,histogram,nbin])
+        return int(self.run.raw_data_1.detector_1.counts[0,k_histo,nbin])
 
     def get_histo_vector(self,histogram,binning=1):
-        """
-        .. code::
+        """integer counts np.array from histogram k_histo, rebinned"""
 
-          from muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          # histogram in range(self.get_numberHisto_int())
-          h = run.get_histo_vector(offset)
-          # h is a column of numpy row array (not list!) of integers containing the number of events per histo for the histos with a given offset
-        """
         if binning == 1:
-            return np.array(self.run.raw_data_1.detector_1.counts[0,histogram,:])
+            return np.array(self.run.raw_data_1.detector_1.counts[0,k_histo,:])
         else:
-            return self._rbn(np.array(self.run.raw_data_1.detector_1.counts[0,histogram,:]),binning)
+            return self._rbn(np.array(self.run.raw_data_1.detector_1.counts[0,k_histo,:]),binning)
     
-    def get_histo_vector_no0(self,histogram,binning=1):
-        """
-        .. code::
+    def get_histo_vector_no0(self,k_histo,binning=1):
+        """float np.array from histogram k_histo, rebinned, with 0.1 replacing zero counts"""
 
-          from muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          # histogram in range(self.get_numberHisto_int())
-          h = run.get_histo_vector_no0(offset)
-          # h is a column of numpy row array (not list!) of integers containing the number of events per histo for the histos with zeros replaced by 0.1
-        """
-        hist = np.array(self.run.raw_data_1.detector_1.counts[0,histogram,:])
+        hist = np.array(self.run.raw_data_1.detector_1.counts[0,k_histo,:])
         if binning != 1:
             hist = self._rbn(hist,binning)
         return np.where(hist != 0, hist, 0.1)
     
     def get_histo_fromt0_vector(self,histogram,binning=1,offset=0):
-        """
-        .. code::
+        """histogram k_histo of integer counts, np.array from self.get_t0_int+offset, rebinned"""
 
-          from muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          # histogram in range(self.get_numberHisto_int())
-          h = run.get_histo_fromt0_vector(offset)
-          # h is a column of numpy row array (not list!) of integers containing the number of events per histo for the histos with a given offset after t0 
-        """
         hist = np.array(self.run.raw_data_1.detector_1.counts[0,histogram,:])[self.get_t0_int(histogram)+offset:]
         if binning == 1:
             return hist
@@ -148,121 +120,56 @@ class munxs2py():                        # defines the python class
             return self._rbn(hist,binning)
 
     def get_numberTemperature_int(self):
-        """
-        .. code::
- 
-          from muisis2py import muisis2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file,'r')  # this is the run data nexus file
-          n = run.get_numberTemperature_int()
-          # n is now an integer with the number of elements of the ISIS temperature log values
+        """returns 1, number of T sensors"""
 
-        """
         return 1
     
     def get_temperatures_vector(self):
-        """
-        .. code::
+        """returns a np.array of ISIS temperature log values"""
  
-          from muisis2py import muisis2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file,'r')  # this is the run data nexus file
-          T = run.get_temperatures_vector()
-          # T is now a numpy array of ISIS temperature log values
-        """
         return np.array(self.run.raw_data_1.selog.Temp_Sample.value_log.value)
     
     def get_binWidth_ns(self):
-        """
-        .. code::
- 
-          from muisis2py import muisis2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file,'r')  # this is the run data nexus file
-          dt = run.get_binWidth_ns()
-          # dt is now a float with the time resolution in ns
+        """bin width in nanoseconds"""
 
-        """
         return float(self.run.raw_data_1.instrument.detector_1.resolution)/1000.
   
     def get_binWidth_us(self):
-        """
-        .. code::
- 
-          from muisis2py import muisis2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file,'r')  # this is the run data nexus file
-          dt = run.get_binWidth_ns()
-          # dt is now a float with the time resolution in ns
+        """bin width in microseconds"""
 
-        """
         return float(self.run.raw_data_1.instrument.detector_1.resolution)/1.e6
   
-    def get_t0_int(self, histogram=0):
-        """
-        .. code::
-
-          from muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          t0 = run.get_t0_double()
-          # t0 is now a float with the t0 bin 
-        """
-        return round(self.get_t0_double(histogram))
+    def get_t0_int(self, k_histo=0):
+        """index of bin containing t=0. IF you trust it""" 
+ 
+        
+        return self.run.raw_data_1.detector_1.time_zero
         
     def get_t0_double(self, histogram=0):
-        """
-        .. code::
+        """t0 bin as a float?""" 
 
-          from muroot2py import muroot2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file)  # this is the class instance initiated on the data file
-          
-          t0 = run.get_t0_double()
-          # t0 is now a float with the t0 bin 
-        """
-        return float(self.run.raw_data_1.detector_1.time_zero)/float(self.run.raw_data_1.instrument.detector_1.resolution)*1e6
+        return float(self.run.raw_data_1.detector_1.time_zero)
 
 
     def get_sample(self):
-        """
-        .. code::
- 
-          from muisis2py import muisis2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file,'r')  # this is the run data nexus file
-          samplename = run.get_sample()
-          # samplename is now a string with the sample name
+        """sample"""
 
-        """
         return str(self.run.raw_data_1.sample.name)
 
-    def get_field(self):
-        """
-        .. code::
+    def get_field_str(self):
+        """field value string, with unit""" 
 
-          from muisis2py import muisis2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file,'r')  # this is the run data nexus file
-          fieldstr = run.get_field()
-          # fieldstr is now a string with the field value 
-
-        """
         return '{} {}'.format(str(self.run.raw_data_1.sample.magnetic_field),self.run.raw_data_1.sample.magnetic_field.units[0])
 
+    def get_field(self):
+        """field value, float""" 
+
+        return self.run.raw_data_1.sample.magnetic_field
+
     def get_orient(self):
-        """
-        .. code::
+        """orientation, string"""    
 
-          from muisis2py import muisis2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file,'r')  # this is the run data nexus file
-          orientstr = run.get_orient()
-          # orientstr is now a string with the sample orientation
-
-        """
-        return str(self.run.raw_data_1.sample.shape)
+        return self.run.raw_data_1.sample.shape
 
     def get_temp(self):
         """
@@ -276,17 +183,6 @@ class munxs2py():                        # defines the python class
 
         """
         return '{} {}'.format(str(self.run.raw_data_1.sample.temperature),self.run.raw_data_1.sample.temperature.units[0])
-
-    def get_comment(self):
-        """
-        usage: 
-          from muisis2py import muisis2py as muld
-          path2file = 'path and filename'
-          run = muld(path2file,'r')  # this is the run data nexus file
-          comment = run.get_comment()
-          # comment is now a string with the run comment
-        """
-        return str(self.run.raw_data_1.notes)
 
     def get_eventsHisto_vector(self):
         """
@@ -311,24 +207,6 @@ class munxs2py():                        # defines the python class
           # n is now an integer with the number of this run
         """
         return int(self.run.raw_data_1.run_number)
-
-#  def get_timeTemperature_vector(self):
-#    """
-#    .. code::
-
-#      from muisis2py import muisis2py as muld
-#      path2file = 'path and filename'
-#      run = muld(path2file,'r')  # this is the run data nexus file
-#      t = run.get_timeTemperature_vector()
-#      # timeStart is the start run yyyy-mm-ddThh:mm:ss string 
-#      
-#    """
-#    from datetime import datetime as DT
-#    from numpy import linspace
-#    t_format = "%Y-%m-%dT%H:%M:%S"
-#    delta = DT.strptime(self.get_timeStop_vector(),t_format) - DT.strptime(self.get_timeStart_vector(),t_format)
-#    nlogs = self.get_numberTemperature_int()
-#    return linspace(0,delta.total_seconds(),nlogs)
 
     def get_timeStart_vector(self):
         """
@@ -501,28 +379,14 @@ class muisis2py(): # broken since
     return self.readpath(b'shape').decode('utf-8')
 
   def get_temp(self):
-    """
-    .. code::
+    """temperature string, with unit"""
 
-      from muisis2py import muisis2py as muld
-      path2file = 'path and filename'
-      run = muld(path2file,'r')  # this is the run data nexus file
-      tempstr = run.get_temp()
-      # tempstr is now a string with the nominal temperature
-
-    """
     self.opengrouppath(b'/run/sample')
     return str(self.readpath(b'temperature'))+'K '
 
   def get_comment(self):
-    """
-    usage: 
-      from muisis2py import muisis2py as muld
-      path2file = 'path and filename'
-      run = muld(path2file,'r')  # this is the run data nexus file
-      comment = run.get_comment()
-      # comment is now a string with the run comment
-    """
+    """comment string"""
+
     self.opengrouppath(b'/run/instrument')
     comment = self.readpath(b'name').decode('utf-8')
     comment += ' '
@@ -534,42 +398,20 @@ class muisis2py(): # broken since
     return comment
 
   def get_eventsHisto_vector(self):
-    """
-    .. code::
+    """number of events per histo, np.array int"""
 
-      from muisis2py import muisis2py as muld
-      path2file = 'path and filename'
-      run = muld(path2file,'r')  # this is the run data nexus file
-      eventsHisto = run.get_eventsHisto_vector()
-      # eventsHisto is a numpy array of integers containing the number of events per histo
-
-    """
     self.opengrouppath(b'/run/histogram_data_1')
     return self.readpath(b'counts').sum(axis=1)
 
   def get_runNumber_int(self):
-    """
-    usage: 
-      from muisis2py import muisis2py as muld
-      path2file = 'path and filename'
-      run = muld(path2file,'r')  # this is the run data nexus file
-      nrun = run.get_runNumber_int()
-      # n is now an integer with the number of this run
-    """
+    """run number, integer"""
+
     self.opengrouppath(b'/run')
     return self.readpath(b'number')
 
   def get_timeTemperature_vector(self):
-    """
-    .. code::
-
-      from muisis2py import muisis2py as muld
-      path2file = 'path and filename'
-      run = muld(path2file,'r')  # this is the run data nexus file
-      t = run.get_timeTemperature_vector()
-      # timeStart is the start run yyyy-mm-ddThh:mm:ss string 
-      
-    """
+    """not trustworthy, check"""
+     
     from datetime import datetime as DT
     from numpy import linspace
     t_format = "%Y-%m-%dT%H:%M:%S"
@@ -578,30 +420,14 @@ class muisis2py(): # broken since
     return linspace(0,delta.total_seconds(),nlogs)
 
   def get_timeStart_vector(self):
-    """
-    .. code::
+    """run start time yyyy-mm-ddThh:mm:ss string"""
 
-      from muisis2py import muisis2py as muld
-      path2file = 'path and filename'
-      run = muld(path2file,'r')  # this is the run data nexus file
-      timeStart = run.get_timeStart_vector()
-      # timeStart is the start run yyyy-mm-ddThh:mm:ss string 
-
-    """
     self.opengrouppath(b'/run')  
     return self.readpath(b'start_time').decode('utf-8')
       
   def get_timeStop_vector(self):
-    """
-    .. code::
+    """run stop time yyyy-mm-ddThh:mm:ss string"""
 
-      from muisis2py import muisis2py as muld
-      path2file = 'path and filename'
-      run = muld(path2file,'r')  # this is the run data nexus file
-      timeStop = run.get_timeStop_vector()
-      # timeStop is the stop run yyyy-mm-ddThh:mm:ss string
-
-    """
     self.opengrouppath(b'/run')
     return self.readpath(b'stop_time').decode('utf-8')
 
