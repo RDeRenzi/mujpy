@@ -238,6 +238,27 @@ class dashed(object):
                                 message = the_plot.warn_msg[1])
             show_hide_tab(overlay,self.on_modal_display_change,self.tab)   
 
+    def _draw_qt_ft(self, plot_range, fft_range, real):
+        """required only to display fft animation with the Qt backend GUI thread"""
+
+        from mujpy.mufitplot import mufitplot
+        from mujpy.tools.tools import ipyw_warning_dial, show_hide_tab
+        the_plot = mufitplot(
+            plot_range,
+            self.fit,
+            fft_range = fft_range,
+            real = real,
+            plot_out=None,
+            fig_fit=self.fig_fit,
+            fig_fft=self.fig_fft,
+        )
+        self.fig_fit = the_plot.fig
+        self.fig_fft = the_plot.fig_fft
+        if the_plot.warn_msg:
+            overlay = ipyw_warning_dial(title = the_plot.warn_msg[0],
+                                message = the_plot.warn_msg[1])
+            show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+
     def _on_Fit(self,b):
         """
         invokes mufit and muplotfit extracting their args from the widgets
@@ -261,7 +282,7 @@ class dashed(object):
         from matplotlib import get_backend 
         from matplotlib.pyplot import ioff
         from mujpy.mufit import mufit
-        from mujpy.tools.tools import check_function, ipyw_warning_dial, show_hide_tab
+        from mujpy.tools.tools import check_function, ipyw_warning_dial, show_hide_tab, derange
         from functools import partial
 
         dashbd = self.build_dashboard_from_widgets()
@@ -305,14 +326,18 @@ class dashed(object):
                 return
         if dashbd and OK: # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
+            plot_range = self.command_1.children[8].value
+            p, errmsg = derange(plot_range, self.suite.histoLength)
+            if errmsg:
+                self.log(f'\n***************\n* no fit yet, correct plot range:\n'+errmsg)
+                self.tab.selected_index = 2
+                return
+
             with open(str(dashboard_file),'w',encoding='utf-8') as f:
                 json.dump(self.dashboard,f, indent=4) # mufit wants to read this from a file
 
             # TEMPORARY COMMENT TO KEEP ALL DEBUG LOGS
             self.board_box.outputs = ()
-            # self.board_box.clear_output()
-            # debug
-            #self._board_capture_before_fit = self.board_box.msg_id
 
             scan = self.model_box.children[0].children[0].value
             self.fit = mufit(self.suite,dashboard_file,dash_log = self.log,scan=scan,dashed=True) # writes text to board_box
@@ -321,11 +346,7 @@ class dashed(object):
                                             message = self.fit.abort_msg[1])
                 show_hide_tab(overlay,self.on_modal_display_change,self.tab)
                 return
-            plot_range = self.command_1.children[8].value
             rotfreq = self.command_1.children[9].value
-            fft_range = self.command_1.children[12].value # not yet in use 
-            lb = self.command_1.children[13].value # not yet in use 
-
             is_ipympl = "ipympl" in get_backend() or get_backend() == 'widget'
 
             self.figure_box.outputs = ()
@@ -346,8 +367,6 @@ class dashed(object):
                                             message = the_plot.warn_msg[1])
                         show_hide_tab(overlay,self.on_modal_display_change,self.tab)
             else:
-                # debug
-                #self._board_capture_before_plot = self.board_box.msg_id
 
                 self._qt_dispatcher.submit(
                             partial(self._draw_qt, plot_range, rotfreq)
@@ -384,11 +403,12 @@ class dashed(object):
         """
         
         import json
-        from matplotlib import get_backend 
+        from matplotlib import get_backend
         from matplotlib.pyplot import ioff
         from mujpy.mufit import mufit
         from mujpy.mufitplot import mufitplot
         from functools import partial
+        from mujpy.tools.tools import derange
 
         if self.build_dashboard_from_widgets(): # creates self.dashboard and returns True if no validation raise occurred
             dashboard_file = self.suite.__fitpath__+'dashed.json'
@@ -398,8 +418,13 @@ class dashed(object):
             if 'fit' not in self.__dir__() or guess: # do only if not done before
                  self.fit = mufit(self.suite,dashboard_file,no_fit = guess, dash_log = self.log, dashed = True) # writes text to board_box
             plot_range = self.command_1.children[8].value
+            p, errmsg = derange(plot_range, self.suite.histoLength)
+            if errmsg:
+                self.log(f'\n***************\n* no plot, unclear plot range:\n'+errmsg)
+                self.tab.selected_index = 2
+                return
             rotfreq = self.command_1.children[9].value
-            self.figure_box.clear_output()
+            self.figure_box.outputs = ()
 
             is_ipympl = "ipympl" in get_backend() or get_backend() == 'widget'
 
@@ -422,9 +447,75 @@ class dashed(object):
 
 
     def _on_FFT(self,b):
-        # later
-        self.log('Nothing yet!')
+        """FFT of residues, selected components only"""
 
+        from matplotlib import get_backend
+        from matplotlib.pyplot import ioff
+        from mujpy.mufit import mufit
+        from mujpy.mufitplot import mufitplot
+        from functools import partial
+
+        # later
+        # check that a fit was performed
+        if "lastfits" in self.fit.__dir_():
+            # select FFT checkbox for each components for the residues
+            i_left,i_right = 0,0
+            include_components = []
+            for k,compdict in enumerate(self.dashboard["model_guess"]):
+                # when k=0 is 'al' automatically 'False' (see tools.comp2widgets)
+                j = k%2 # left or right column
+                i = i_left if j==0 else i_right # navigate widget rows
+                include_components.append(self.model_box.children[1]
+                                            .children[j]
+                                            .children[i]
+                                            .children[1]
+                                            .children[5]
+                                            .value
+                                         )
+                if j==0:
+                    i_left += len(compdict["pardicts"])+2 # number of parameters + legend +1 
+                else:
+                    i_right += len(compdict["pardicts"])+2 # number of parameters + legend +1
+
+            # load include_components into fit.the_model
+            self.fit.the_model._fft_init(self,include_components)
+            fft_range = self.command_1.children[12].value # range
+            fft_range += ','+'{:.2f}'.format(self.command_1.children[13].value)
+            dt = self.fit.the_model._x_[1] - self.fit.the_model._x_[0]
+            max_freq = 1/(2*dt)
+            _, errmsg = derange(fft_range, max_freq)
+            if errmsg:
+                self.log(f'\n***************\n* no fft, uncleari fft range:\n'+errmsg)
+                self.tab.selected_index = 2
+                return
+
+            real = True
+
+            self.figure_box.outputs = ()
+
+            is_ipympl = "ipympl" in get_backend() or get_backend() == 'widget'
+
+            if is_ipympl:
+                with ioff():
+                    the_plot = mufitplot(
+                            plot_range,
+                            self.fit,
+                            fft_range = fft_range,
+                            real=real,
+                            fig_fit=self.fig_fit,
+                            fig_fft=self.fig_fft,
+                            plot_out=self.figure_box,
+                            )
+                    self.fig_fit = the_plot.fig
+                    self.fig_fft = the_plot.fig_fft
+            else:
+                self._qt_dispatcher.submit(
+                            partial(self._draw_qt_ft, plot_range, fft_range, real)
+                            )
+
+        else:
+            self.log('FFT of residues, please perform a fit first.')
+            self.tab.selected_index = 2
 
     def build_or_rebuild_commad_2ndrow(self):
         """
@@ -767,9 +858,20 @@ class dashed(object):
             self.add_remove(value) # knows self._radio, self._add, self._change_component
                               # adds/removes in self.dahshboard
             self.build_model_editor_widgets() # builds from self.dashboard
-            self.__dict__.pop('fit',None) # semoves self.fit instance if obtained with different model
+            self.__dict__.pop('fit',None) # semoves self.fit mufit instance if obtained with different model
 
     def add_remove(self, value):
+        """
+        adds index=value component, or removes it from self.dashboard["model_guess"]
+
+        input::
+        
+            value   integer index
+                        self.add dictates add or remove
+
+        add by tools._available_components_ (["globpardicts_guess"] in self.dashboard)
+        """
+
         from mujpy.tools.tools import _available_components_
         from copy import deepcopy as cp
 
@@ -890,7 +992,7 @@ class dashed(object):
 
         if indices is None:
             self.build_model_editor_widgets()
-            self.__dict__.pop('fit',None) # semoves self.fit instance if obtained with different model
+            self.__dict__.pop('fit',None) # removes self.fit mufit instance if obtained with different model
             return
 
         if isinstance(indices, list) and not indices:
@@ -902,7 +1004,7 @@ class dashed(object):
                 self.dashboard["model_guess"] = []
                 self.model_box.children = ()
                 self.build_model_editor_widgets()
-                self.__dict__.pop('fit',None) # semoves self.fit instance if obtained with different model
+                self.__dict__.pop('fit',None) # semoves self.fit mufit instance if obtained with different model
 
             overlay = ipyw_yes_no_dial(
                                 title="Complex model edit",
@@ -930,7 +1032,13 @@ class dashed(object):
                 title = 'Choose which {} to remove from {}'.format(self._change_component,indexed_old)
 
         if len(indices) == 1:
-            self._on_air(indices[0])
+            # no action to wait, remove directly and call
+
+            self.add_remove(indices[0]) # knows self._radio, self._add, self._change_component
+                              # adds/removes in self.dahshboard
+            self.build_model_editor_widgets() # builds from self.dashboard
+            self.__dict__.pop('fit',None) # removes self.fit mufit instance, obtained with different model
+            #self._on_air(indices[0]) # no good it expects undefined self._overlay 
         else:
             self._radio = RadioButtons(
                                 options=indices,
@@ -975,22 +1083,16 @@ class dashed(object):
         datafile = self.suite_box.children[2].children[2].value  # path Text value
         #self.log('runlist = {}'.format(runlist))
 
-        try:
-            grp = self.suite_box.children[1].children[1].value
-            forward, backward = grp.split('-')
-            if all(get_grouping(forward)>=0) and all(get_grouping(backward)>=0):
-                grp_calib = [{'forward':forward, 
-                          'backward':backward, 
-                          'alpha':float(self.suite_box.children[1].children[2].value)}]
-            else:
-                raise NameError('No Group0')
-        except ValueError as e:
-            text = 'Exception {}'.format(e)
-            text += '\nGroup0 syntax error: {}'.format(grp)
+        numhis = 1000 if suite not in self.__dir__() else self.suite.numhis
+        group = self.suite_box.children[1].children[1].value
+        alpha = self.suite_box.children[1].children[2].value
+        grp_c = check_multigroup(group,alpha,numhis)
+        if isinstance(grp_c, str):
             overlay = ipyw_warning_dial(title = "Watch Group0 syntax",
                                         message = text)
             show_hide_tab(overlay,self.on_modal_display_change,self.tab)
             return
+        grp_calib = [grp_c]
         grp = self.suite_box.children[1].children[4].value
         alph = self.suite_box.children[1].children[5].value 
         if grp:
@@ -999,7 +1101,7 @@ class dashed(object):
             alphas = alph.split(';')
             #for group, alpha in zip(groups,alphas):
             for group, alpha in zip(groups,alphas):
-                grp_c = check_multigroup(group,alpha)
+                grp_c = check_multigroup(group,alpha,numhis)
                 if isinstance(grp_c, str):
                     overlay = ipyw_warning_dial(title = "Watch Groups ... syntax",
                                                 message = grp_c)
@@ -1155,8 +1257,9 @@ class dashed(object):
             grp = self.suite_box.children[1].children[4].value
         run_list = self.suite_box.children[2].children[5].value
         OK = len(grp.split(';'))==len(alph.split(';'))
+        numhis = 1000 if suite not in self.__dir__() else self.suite.numhis
         if grp and run_list and OK:
-            grp_c = check_multigroup(grp,alph) # simply a syntax pre check 
+            grp_c = check_multigroup(grp,alph,numhis) # syntax check 
             if isinstance(grp_c, str) and remind:
                 overlay = ipyw_warning_dial(title = 'Warning, group syntax',
                                             message = grp_c)
@@ -1198,8 +1301,8 @@ class dashed(object):
         run_start = self.fetch_box.children[0].children[2].value
         run_stop = self.fetch_box.children[0].children[3].value
         run_stop = run_stop if run_stop>=run_start else run_start
-        datapath = Path(self.suite_box.children[2].children[2].value)
-        if datapath.is_file(): datapath = datapath.parent()
+        datapath = Path(self.suite_box.children[2].children[2].value) # suite_bos [2][2] is path
+        if datapath.is_file(): datapath = datapath.parent
         elif not datapath.exists(): datapath.parent.mkdir(parents=True, exist_ok=True) 
         self.log(datapath)
         error = fetch_PSI_data(year,area,run_start,run_stop,datapath)
@@ -1269,7 +1372,8 @@ class dashed(object):
 
         self.suite_box [^ disabled, Buttons all on_click, * observe]
         """
-
+        
+        box_layout = Layout(width=self.mudashed_width,border='1px solid CadetBlue')
 
         info_width = ['16%','16%','27%','27%','6%','8%']
         SD_drop = Dropdown(options = ['Run start times'], value='Run start times',
@@ -1428,8 +1532,10 @@ class dashed(object):
                         .custom-grey-dropdown select option {
                             color: grey !important;
                         } 
+                        .no-combo-arrow input::-webkit-calendar-picker-indicator {
+                            display: none !important;
+                        }
                     </style>
-
                     """
         
         # 2. Inietta il CSS nel notebook tramite un widget HTMLi
@@ -1484,22 +1590,22 @@ class dashed(object):
                 title = '<b>1-click select</b>')
         self.LF_modal.layout.observe(self.on_modal_display_change, names = 'display')
 
-        layout = Layout(width=self.mudashed_width,border='1px solid CadetBlue')
         board_width='930px'
-        command_0 = HBox([])
-        self.command_0 = HBox([fit_type,self.NG_int,MN_label,self.MN_text,LM_button,LL_button,self.LF_button],layout={'width':self.mudashed_width})
-        self.command_1 = HBox([],layout={'width':self.mudashed_width})
-        self.command_box = VBox([command_0,self.command_1],layout=layout)
-        #self.command_box.add_class("command_box_style",layout=layout)
-        self.global_box = VBox([],layout=Layout(width=self.mudashed_width,border='1px solid Coral'))
+        command_0 = HBox([]) # for initial gui, empty command
+        self.command_1 = HBox([],layout={'width':'100%'})#self.mudashed_width}) # initial gui, empty command
+        self.command_box = VBox([command_0,self.command_1],layout=box_layout) # initial gui, empty command
+
+        # the next command box will contain self.command_0
+        self.command_0 = HBox([fit_type,self.NG_int,MN_label,self.MN_text,LM_button,LL_button,self.LF_button],layout={'width':'100%'})#layout={'width':self.mudashed_width})
+        self.global_box = VBox([],layout={'width':'100%','border':'1px solid Coral'})#})layout=Layout(width=self.mudashed_width
         #self.global_box.add_class("global_box_style",layout=layout)
-        self.model_box = VBox([],layout=Layout(width=self.mudashed_width,border='1px solid RosyBrown')) # filled with neft and right columns
+        self.model_box = VBox([],layout={'width':self.mudashed_width,'border':'1px solid RosyBrown'})#layout=Layout(width=self.mudashed_width, # filled with neft and right columns
         #self.model_box.add_class("model_box_style",layout=layout)
         dash = VBox([self.suite_box,
                      self.command_box,
                      self.global_box,
                      self.model_box],
-                    layout={'width':'100%','border':self.model_button_color}) # 'width':board_width
+                    layout={'width':self.mudashed_width,'border':self.model_button_color}) # 'width':board_width
         #panels = HBox([dash,VBox([self.figure_box,self.board_box])],layout={'width':'100%'})
         dash.add_class("inter-font-container")
         #now = datetime.now()

@@ -168,7 +168,7 @@ def set_fig(num,nrow,ncol,title,**kwargs):
     fig.canvas.manager.set_window_title(title)
     return fig, ax  
 
-def set_single_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):#,canvas=None):
+def set_single_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0,rf_factor=1):#,canvas=None):
     """
     call single mufitplot, static
 
@@ -266,6 +266,9 @@ def set_single_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_la
                                  chi_fit_early,
                                  chi_fit_late,
                     fgroup[0],bgroup[0],alpha[0],[-5,ym])
+
+    #nu_fit = nu_fit * rf_factor
+
     # (ax,dy_fit,nu_fit,dy_early,w_early,dy_late,w_late)
     _,_,_,_,_,_,_,_ = plot_chi2(ax_chi,
                                       dy_fit,
@@ -274,13 +277,12 @@ def set_single_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_la
                                       w_early,
                                       dy_fit_late,
                                       w_late)   
+
     if rrf:
         string = r'$\nu_R=$'+'{:.1f}MHz   '.format(rrf)
-        P.suptitle(string+run_title,x=-0.125,ha='right')    
+        P.suptitle(string+run_title[0],x=-0.125,ha='right')
     else:
         P.suptitle(run_title)                           
-
-    #P.draw()
 
     if out is not None:  # ipympl; Qt receives out=None
         from IPython.display import display
@@ -289,7 +291,7 @@ def set_single_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_la
 
     return fig
 
-def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0):
+def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_late,chi_dof_late,rrf=0, rf_factor= 1):
     """
     call sequence mufitplot, with animation
 
@@ -497,14 +499,7 @@ def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_
 #        # chi_dof packed by mufitplot: 
 
     t, y, ey, f_res, tf, f, dy_fit = data
-#    print('tools plot debug: max, min t {}, y {}, ey {}, f_res {}, tf {}, f {}, dy_fit {}'.format(
-#                                                                                 [t.min(),t.max()],
-#                                                                                 [y.min(),y.max()],
-#                                                                               [ey.min(),ey.max()],
-#                                                                         [f_res.min(),f_res.max()],
-#                                                                               [tf.min(),tf.max()],
-#                                                                                 [f.min(),t.max()],
-#                                                                      [dy_fit.min(),dy_fit.max()]))
+
     fgroup, bgroup, alpha = group
     nu_fit, chi_fit = chi_dof
     for k in range(len(chi_fit)):
@@ -531,7 +526,6 @@ def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_
         t_late, y_late, ey_late, f_late_res, tfl, fl, dy_fit_early, dy_fit_late = data_late
         nu_fit_early,nu_fit_late, chi_fit_early,chi_fit_late,w_early,w_late = chi_dof_late
         [[ax_early,ax_late,ax_txt],[ax_early_res,ax_late_res,ax_chi]] = ax
-        #print('debug-plot: shape dy_fit_late {}, w_late {}'.format(dy_fit_late.shape, w_late.shape))
 
         now = datetime.now()
         dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
@@ -566,6 +560,7 @@ def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_
                                                             dy_fit_early[0],w_early,
                                                             dy_fit_late[0],w_late)
             #(ax,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,bgroup,alpha,ylim)
+
         text1, lc, hc, text2, lce, hce, text3, lcl, hcl  = plot_txt(
                                                                     ax_txt,model,
                                                                     nu_fit,
@@ -609,6 +604,7 @@ def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_
                                                  dy_fit[0],nu_fit,
                                                  None,None,
                                                  None,None)
+        #nu_fit = nu_fit * rf_factor
 
         # (ax,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,bgroup,alpha,ylim)
         text1, lc, hc,_,_,_,_,_,_ = plot_txt(ax_txt,model,nu_fit,None,None,
@@ -618,7 +614,6 @@ def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_
     ax_0 = ax_early if early_late else ax_fit
     title = run_title
     supti = P.suptitle(run_title[0]) # 'large','small'
-    # print('set_sequence plot debug: next launcing animations')
     anim = display_anim(animate_fit,run_title,init_animate_fit, anim_delay, out, fig)
     if rrf:
         stringrrf = r'$\nu_R=$'+'{:.1f}MHz   '.format(rrf)
@@ -679,7 +674,6 @@ def set_figure_fft(out,fig,model_name,ylabel,f,ap,apf,ep,group,run_title):
         ax_fft.set_title(run_title[0])
         marks.set_ydata(ap[0,:])
         segs = [array([[q,w-a],[q,w+a]]) for q,w,a in zip(f,ap[0],ap[0]-ap[0]+ep[0])]
-        # print('plot init_animate_fft debug: ye = {}'.format(ye))
         ye[0].set_segments(segs)
         fline.set_ydata(apf[0,:])
         return marks, ye, fline 
@@ -698,7 +692,7 @@ def set_figure_fft(out,fig,model_name,ylabel,f,ap,apf,ep,group,run_title):
     ########################
     # build or recall Figure
     ########################
-    font = {'family':family,'size':10}
+    font = {'size':10} # 'family':family,
     P.rc('font', **font)
     anim_delay = 1000.
 
@@ -715,7 +709,6 @@ def set_figure_fft(out,fig,model_name,ylabel,f,ap,apf,ep,group,run_title):
 
 
     yM = 1.02*max(ap.max(),apf.max())
-    # print('plot set_figure_fft debug: ap.min()={}, apf.min()={}'.format(ap.min(),apf.min())) 
     ym = min(0,1.02*ap.min(),1.02*apf.min())
     if len(ap.shape)==1: # single 
         ax_fft.errorbar(f,ap,'o',yerr=ep,ms=2,alpha=0.8)
@@ -724,7 +717,6 @@ def set_figure_fft(out,fig,model_name,ylabel,f,ap,apf,ep,group,run_title):
     # animation initial plot #
     ##########################
     else: # multigroup and/or multirun
-        # print('plot set_figure_fft debug: ep = {}'.format(ep[0]))
 
         marks, xe, ye, = ax_fft.errorbar(f,ap[0,:],fmt='o',yerr=ep[0],ms=2,alpha=0.8)
         fline, = ax_fft.plot(f,apf[0,:],'-',lw=1,alpha=0.8)
@@ -883,6 +875,7 @@ def decorate_res(ax,t,ey,rm,rM):
     linesm, = ax. plot(t,-ey,'-',lw=1.0,alpha=0.3,zorder=2,color=color[1]) # residues
     line2sp, = ax. plot(t,2*ey,'-',lw=1.0,alpha=0.3,zorder=2,color=color[2]) # residues
     line2sm, = ax. plot(t,-2*ey,'-',lw=1.0,alpha=0.3,zorder=2,color=color[2]) # residues
+    print(f'mean(ey) = {ey.mean():.6f}')
     ax.plot([0,t.max()],[0.,0.],'k-',lw=0.5,alpha=0.3,zorder=0) # zero line
     ax.set_xlim(0,t.max())
     ax.set_ylim(rm,rM)
@@ -965,7 +958,7 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
     string1 += r'$\alpha=$ {:.4f}'.format(alpha)
     string1 += '\n'
     string1 += r'$\chi^2_r=$ {:.3f}'.format(chi_fit)
-    string1 += '\n ({:.2f}-{:.2f})\n{} dof'.format(lc,hc,nu_fit)
+    string1 += '\n ({:.2f}-{:.2f})\n{:.1f} dof'.format(lc,hc,nu_fit)
     text1 = ax.text(xtxt,ylim[0]+0.55*dylim,string1,bbox={'facecolor': 'white', 'pad': pad}) 
     ax.axis('off')
     ax.set_ylim(ylim)
@@ -973,7 +966,6 @@ def plot_txt(ax,model,nu_fit,nu_early,nu_late,chi_fit,chi_early,chi_late,fgroup,
     dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
     if chi_late is None:
         text5 = ax.text(xtxt-dx,ylim[0]+dyl,dt_string,fontsize='small')
-    # print('plot_txt in tools.plot debug: chi_late = {}'.format(chi_late))
     if chi_late is not None: 
         mm = round(nu_early/4)
         hb = linspace(-mm,mm,2*mm+1)

@@ -23,22 +23,8 @@ class QtDispatcher(QtCore.QObject):
             QtCore.Qt.QueuedConnection,
         )
 
-#    @QtCore.pyqtSlot(object)
-#    def _execute(self, callback):
-#        try:
-#            callback()
-#        except Exception:
-#            message = traceback.format_exc()
-#            if self._log is not None:
-#                self._log(message)
-#            else:
-#                traceback.print_exc()
-
     def submit(self, callback):
         self.requested.emit(callback)
-
-
-
 
     @QtCore.pyqtSlot(object)
     def _execute(self, callback):

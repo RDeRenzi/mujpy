@@ -20,7 +20,7 @@ class mumodel(object):
         _load_(suite, methods_keys)     unique entry point for any mufit specific model
                                         selects a suite data slice 
                                         overloads _add_ as _add_plain or _add_calib_ 
-        _rebin_(tup)                    mufit data frontend, rebins the slice
+        _rebin_(tup)                    mufit data frontend, rebins the slice and resets by _include_all_
                                         calls _set_alpha_, _asymmetry_ if _calib else suite.asymmetry_slice in _load_
         _rebin_plot_(tup,lastfits)      mufitplot data frontend, rebins the entire suite
                                         allows for suite > slice (sequential fits A20, B1, B20, B21)
@@ -228,7 +228,7 @@ class mumodel(object):
 
     def _rebin_(self,tup,*argv):
         """
-        data frontend for ``mufit.dofit_`` defines fit range from the unbinned _load_ slice
+        data frontend for ``mufit.dofit_`` defines fit range from the unbinned _load_ slice, resets _include_all
         
         (self. is implied in front of _ variables)
         
@@ -433,19 +433,25 @@ class mumodel(object):
             ``*argv``   passed as a variable number of parameter values 
                         val1,val2,val3,val4,val5,val6, ... at this iteration 
                         argv is a list of values [val1,val2,val3,val4,val5,val6, ...]
+        output::
+
+            f       squeezed model function, sum of self._methods_[k]
+                        if _include_components[k] 
         
-        unique method for all non calib fits slice dimensions, asymmetry fit with fixed alpha
+        unique method for all non calib fits slice dimensions, asymmetry fit with fixed alpha, fft of residues
         """
         
-        set_printoptions(precision=2)
+        # set_printoptions(precision=2)
         n0 = self._n0component
         f = zeros((self._slice_nruns_,self._slice_ngroups_,x.shape[0]))
         #print('mumodel _add_plain_ f.shape= {}'.format(f.shape))
         p = argv
-        for component,lambdapars,keys in (zip(self._methods_[n0:],self._lambdakeys_[n0:],self._keys_[n0:])):
+        for j,zippo in enumerate(zip(self._methods_[n0:],self._lambdakeys_[n0:],self._keys_[n0:])):
+            component,lambdapars,keys = zippo
             pars = lambdapars(p,keys)
             #print('mumodel _add_plain_ pars = {}'.format(pars))
-            f += component(x,*pars)
+            f += component(x,*pars) if self._include_components[j] else 0. # new 2.0
+
         return f.squeeze()
 
     def _add_calib_(self,x,*argv):
@@ -466,9 +472,9 @@ class mumodel(object):
         #self._x_,self._y_,self._e_ = rebin(self._t_,y,[self._start_,self._stop_],self._pack_,e=e)
         return self._add_plain_(x,*argv) 
 
-    def _add_plot_(self,x,lastfits):
+    def _add_plot_(self,x,lastfits,fft=False):
         """
-        produces suite f in mufitplot.chi for sequential fits A20, B1, B20, B21 (other fits call _add_)
+        produces mufitplot.chi slice f, all fits (A1-C2 and calib)
 
         input::
 
@@ -483,6 +489,10 @@ class mumodel(object):
                                             A20             _ngroups_
                                             B1, B21 _nruns_
                                             B20     _nruns_,_ngroups_
+
+        output::
+            
+            f       
         """
 
         from numpy import array # , set_printoptions
@@ -490,11 +500,11 @@ class mumodel(object):
         # distinguishes A20, B1, B21, B20 
         # by _nruns_, _ngroups_ and list_depth(_add_(x,*argv))
         mufit_f = self._add_plain_(x,*lastfits[0]) # this lastfit surely exists, this is the function used in mufit
-        if isinstance(mufit_f, list): # never a list!
+        if isinstance(mufit_f, list): # never a list! never happens
             f_depth = list_depth(mufit_f) # all fits have same f_depthi
-            print('mumodel _add_plot_ f_depth = {}'.format(f_depth))
-        else:
-            f_depth = len((rshp(mufit_f)).shape) # this is always 2 at most
+            print(f'mumodel _add_plot_ f_depth = {f_depth}')
+        else: # rhsp is redundant, _add_plain_ returns a squeezed np.array
+            f_depth = len(rshp(mufit_f).shape) # this is always 2 at most
             #set_printoptions(precision = 2)
             #print('mumodel _add_plain_plot_ f {}'.format(mufit_f))
         if f_depth == 1: # A20 and B20 
@@ -506,9 +516,9 @@ class mumodel(object):
             f = array([self._add_plain_(x,*par) for par in lastfits])
         elif f_depth == 2 and self._ngroups_ > 1: # B21 and C1
             if self._nruns_ == self._slice_nruns_: # C2
-                f = rshp(mufit_f)
+                f = rshp(mufit_f) # also redundant, f is squuezed
             else: # B21
-                f = array([rshp(self._add_plain_(x,*par))[k,:] for par in lastfits for k in range(self._ngroups_)])
+                f = array([rshp(pself._add_plain_(x,*par))[k,:] for par in lastfits for k in range(self._ngroups_)])
         # self._add_ = self._add_plain_ # self._add_calib_ if self._calib else
         # self._add_ = self._add_plain_ # self._add_calib_ if self._calib else 
         #else: # B20 and C2
@@ -521,68 +531,9 @@ class mumodel(object):
         #        print('mumodel _add_  reshaped f.shape {}'.format(f.shape))
         return f
 
-    def _load_multirun_grad_(self,minuit_ordered_grad_list):
-        """
-        broken in 2026, deprecated since analytic grads slower that numerical ones
-        
-        self._glocals_ to loop (broken) 
-
-        constructed in mujpy.tools.tools  int2_multirun_grad_method_key
-        """
-
-        self._minuit_grad_list_ = minuit_ordered_grad_list
-
-
-    def _add_multirun_grad_(self,*argv):
-        """
-        Deprecated
-
-        input::
-
-            ``*argv``       passed as a variable number of parameter values 
-                            val0,val1,val2,val3,val4,val5, ... at this iteration 
-                            argv is a list of values [val0,val1,val2,val3,val4,val5, ...]
-                            (here independent variable is self._x_ time array by default, no plots)
-        
-        output::
-
-            np.array(grad)  whose m-th value is the chisquare gradient 
-                            with respect to internal minuit parameter p[m]
-                
-        requires previous calls to _load_data_multirun_grad_  to define self._minuit_grad_list_
-        both constructed in int2_multirun_grad_method_key() from mujpy.tools.tools
-        
-        self._gradients_ used to store f values and g derivatives of all components, to minimize numpy array calculations;
-        
-        self._glocals_ to loop::
-
-            over minuit parameters and calculate gradient components, 
-                over runs, whose number n = y.shape[0], for globals
-                on single run, for locals
-                    over component parameters that contain that minuit parameter, i
-                    including the derivative of the user function.
-        
-        _add_multirun_grad_ (glob is implicit, no grads in sequential fit) 
-        """
-
-        p = argv 
-        grad = zeros(len(p))
-        dcdf = 2*(self._add_(self._x_,*argv) - self._y_)/self._e_**2
-        # print('debug grad: shape dcdf = {}'.format(dcdf.shape))
-        pars = [[[key(p) for key in component_run]  for component_run in component_runs] for _,component_runs in self._components_]
-        for m, grad_list in enumerate(self._minuit_grad_list_):
-            gg = zeros((self._y_.shape[0],self._x_.shape[0]))
-            for [k,n,j,dkndj,djdm] in grad_list:
-                par = pars[n][k]
-                dk,dj = dkndj(self._x_,*par),djdm(p)
-                #print ('debug grad: m= {}, k = {}, n = {}, j = {}, par = {}'.format(m,k,n,j,    par))
-                #print ('debug: dkddj shape = {}, djdm = {}'.format(dk.shape,dj))
-                gg[k] +=  dk*dj
-            grad[m] = sum(dcdf*gg,axis=None)           
-        return grad     
-
     def _add_fft_(self,x,y,*argv,calib = False):
         """
+        deprecated
         Produces f for the fft of residues in mufitplot
 
         input::
@@ -606,7 +557,7 @@ class mumodel(object):
             # print('mucomponent _add_fft_ debug: p {}'.format(p[-1]))
             ntruecomp = 1 if calib else 0
             # print('add_single mucomponents debug: p = {}'.format(p))
-            for j in range(ntruecomp,self._ntruecomponents_): # all components in model excluding da
+            for j in range(ntruecomp,self._ntruecomponents_): # all components in model excluding al
                 component = self._components_[j][0]
                 keys = self._components_[j][1] 
                 # print('mucomponent _add_fft_ debug: component {}, keys {}'.format(component,keys))
@@ -1590,6 +1541,11 @@ class mumodel(object):
 #            print('Warning: big numbers in chisquare {}'.format(normsquaredev[divergence]))
         return sum(normsquaredev,axis=self._axis_ )
 
+############
+# grad stuff
+# deprecated
+############
+
     def _grad_chisquare_(self,*argv):
         """
         option for global multirun fits, sum (...,axis=None) yields the sum over all indices.
@@ -1614,3 +1570,65 @@ class mumodel(object):
 #        if divergence.any():
 #            print('Warning: big numbers in chisquare {}'.format(normsquaredev[divergence]))
         return sum(normsquaredev,axis=self._axis_ )
+
+    def _load_multirun_grad_(self,minuit_ordered_grad_list):
+        """
+        broken in 2026, deprecated since analytic grads slower that numerical ones
+        
+        self._glocals_ to loop (broken) 
+
+        constructed in mujpy.tools.tools  int2_multirun_grad_method_key
+        """
+
+        self._minuit_grad_list_ = minuit_ordered_grad_list
+
+
+    def _add_multirun_grad_(self,*argv):
+        """
+        Deprecated
+
+        input::
+
+            ``*argv``       passed as a variable number of parameter values 
+                            val0,val1,val2,val3,val4,val5, ... at this iteration 
+                            argv is a list of values [val0,val1,val2,val3,val4,val5, ...]
+                            (here independent variable is self._x_ time array by default, no plots)
+        
+        output::
+
+            np.array(grad)  whose m-th value is the chisquare gradient 
+                            with respect to internal minuit parameter p[m]
+                
+        requires previous calls to _load_data_multirun_grad_  to define self._minuit_grad_list_
+        both constructed in int2_multirun_grad_method_key() from mujpy.tools.tools
+        
+        self._gradients_ used to store f values and g derivatives of all components, to minimize numpy array calculations;
+        
+        self._glocals_ to loop::
+
+            over minuit parameters and calculate gradient components, 
+                over runs, whose number n = y.shape[0], for globals
+                on single run, for locals
+                    over component parameters that contain that minuit parameter, i
+                    including the derivative of the user function.
+        
+        _add_multirun_grad_ (glob is implicit, no grads in sequential fit) 
+        """
+
+        p = argv 
+        grad = zeros(len(p))
+        dcdf = 2*(self._add_(self._x_,*argv) - self._y_)/self._e_**2
+        # print('debug grad: shape dcdf = {}'.format(dcdf.shape))
+        pars = [[[key(p) for key in component_run]  for component_run in component_runs] for _,component_runs in self._components_]
+        for m, grad_list in enumerate(self._minuit_grad_list_):
+            gg = zeros((self._y_.shape[0],self._x_.shape[0]))
+            for [k,n,j,dkndj,djdm] in grad_list:
+                par = pars[n][k]
+                dk,dj = dkndj(self._x_,*par),djdm(p)
+                #print ('debug grad: m= {}, k = {}, n = {}, j = {}, par = {}'.format(m,k,n,j,    par))
+                #print ('debug: dkddj shape = {}, djdm = {}'.format(dk.shape,dj))
+                gg[k] +=  dk*dj
+            grad[m] = sum(dcdf*gg,axis=None)           
+        return grad     
+
+

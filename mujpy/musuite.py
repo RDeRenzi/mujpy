@@ -205,7 +205,7 @@ class suite(object):
                     return False
 
             if j or k: # not the first in runadd list, or not the first run in runlist
-                dif_nhs = ( self.numhis != runs_.get_numberHisto_int() )
+                dif_nhs = ( self.numhis != run_.get_numberHisto_int() )
                 dif_bwt = ( self.binwidth != run_.get_binWidth_ns() )
                 dif_t0 = not self.promptfit(run_,check=True)
                 if dif_nhs:
@@ -218,9 +218,10 @@ class suite(object):
                     return
                 else:
                     runadd.append(run_) # appends another run to runadd
-                    runs_added += ' '+run 
+                    runs_added = run 
             else: # this is j==0 and k==0 # first run in run list and inner list
                 self.numhis = run_.get_numberHisto_int()
+                self.binwidth = run_.get_binWidth_ns()
                 self.histperiods = 1 if ( facility == 'ISIS' or 
                                          self.datafile[-3:] in ['bin','mdu']) else len(run_.get_RedGreen_offsets()) # are there RedGreen copies (self.histperiods>1)?
                 self._the_instrument_ = instrument(run_) # creates _the_instrument_
@@ -893,20 +894,22 @@ class suite(object):
 
     def asymmetry_single(self,the_run,kgroup):
         """
-        basic method for plain asymmetry and errors arrays
+        unbinned asymmetry and errors arrays, with grouping[kgroup]['alpha'] 
 
         input::
 
-            the_run = list containing the instance[s] of the run[s to be added]
-            k = index of self.grouping, a list of dicts 
-                self.grouping[k]['forward'] and ['backward'] (py-index, i.e "counter 1-Backw" is  0)
-                containing the respective lists of detectors
+            the_run     list containing the instance[s] of the run[s to be added]
+                            musr2py/muroot2py/muisis2py  (psi or isis load routines) 
+            kgroup      index of self.grouping, list of dicts, where 
+                        self.grouping[kgroup]['forward'] and ['backward'] 
+                            each contains a list of detector indices i
+                                                ("counter 1" -> i=0)
 
-        * run instances from musr2py/muroot2py/muisis2py  (psi/isis load routine) 
-        
         outputs:: 
             
-            asymmetry and asymmetry error (1d)
+            asymm        asymmetries
+            asyme        errors  
+                            both 1 dimensional
         """
 
         from numpy import exp, sqrt, where
@@ -941,16 +944,19 @@ class suite(object):
 
     def asymmetry_slice(self,krun,kgroup):
         """
-        asymmetry for mufit (-1 index lingo), can yield slice <= suite
+        unbinned asymmetry, with -1 index lingo, yields slice <= suite
 
         input::
 
-            krun = index in range(len(self._the_runs_)) or -1 for [:len(self._the_runs_)]
-            kgroup = index in range(len(self.groups)) or -1 for [:len(self.groups)]
+            krun        index in range(len(self._the_runs_)) or
+                            -1 for [:len(self._the_runs_)]
+            kgroup      index in range(len(self.groups))
+                            -1 for [:len(self.groups)]
         
         output::
 
-            the corresponding asymmetry slice 
+            asymm       asymmetries slice, defined by index
+            asyme       errors slice 
         
         cases::
 
@@ -962,6 +968,8 @@ class suite(object):
                           B1  1d: slice(krun,0), 
                           B20 1d: slice(krun,kgroup), 
                           B21 2d: slice(krun,-1)
+
+        used by mufitplot and mucomponents
         """
 
         from numpy import array, vstack
@@ -1005,12 +1013,8 @@ class suite(object):
             False if there are many runs (fit types B and C)
         """
 
-        try:
-            test = len(self._the_runs_)==1
-            
-        except:
-            self.console('Warning: data are not available: access expired?')
-        return test
+        if "_the_runs_" in self.__dir__():
+            return len(self._the_runs_)==1
             
     def multi_groups(self):
         """

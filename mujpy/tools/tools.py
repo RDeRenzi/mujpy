@@ -189,22 +189,23 @@ def derange(string,vmax,pack=1):
         errmsg = f'{string} is not a bin range (lacks separators)'
     if not errmsg:
         try: # three items are they integers floats or misprints?
-            if isinstance(vmax,(int,integer)): # should be three floats
+            if isinstance(vmax,(int,integer)): # should be three integers
                 x_range = [int(chan) for chan in x_range] # breaks if non digits in x_range 
-            else: # should be three integers
+            else:  # should be three floats
                 x_range = [float(chan) for chan in x_range] # breaks if non digits in x_range 
-            if len(x_range)==2: # guarantees three items
-                x_range.append(pack)
-            elif len(x_range)==4: raise ValueError('4 items, a typo?')
-            elif len(x_range)>5: raise ValueError('too many items, a typo?')
-            if x_range[0]<0: raise ValueError(' start < 0')
-            if x_range[1]<x_range[0]: raise ValueError('start < stop')
-            if x_range[2]>(x_range[1]-x_range[0])//2: raise ValueError('pack too large')
+            if len(x_range)==2:
+                x_range.append(pack) # guarantees three items
+            elif len(x_range)==4: raise ValueError(f'{string}: 4 items, a typo?')
+            elif len(x_range)>5: raise ValueError(f'{string}: too many items, a typo?')
+            if x_range[0]<0: raise ValueError(f'{string}: start < 0')
+            if x_range[1]<x_range[0]: raise ValueError(f'{string}: start < stop')
+            if x_range[2]>(x_range[1]-x_range[0])//2: raise ValueError(f'{string}: pack too large')
+            if x_range[1]>vmax: raise ValueError(f'{string}: exceeds histo lenght {vmax}')
             if len(x_range)==5:
-                if x_range[4]>(x_range[3]-x_range[1])//2: raise ('wrong late pack of limits') 
-        except Exception as e:
-            
-            errmsg = f'{string} '+str(e)
+                if x_range[4]>(x_range[3]-x_range[1])//2: raise (f'{string}: late pack too large')
+                if x_range[3]>vmax: raise (f'{string} exceeds histo lenght {vmax}')
+        except ValueError as e:
+            errmsg = str(e)
     return x_range, errmsg # a list of values (int or float as appropriate)
     
 def derun(string):
@@ -400,7 +401,7 @@ def get_grouping(groupcsv):
 
         grouping -=1 # this is counter index, remove 1 for python 0-based indexing 
     except Exception as e:
-        grouping = e # np.array([-1]) # error flag
+        grouping = str(e) # np.array([-1]) # error flag
         
     return grouping
 
@@ -1968,11 +1969,11 @@ def print_csv_components(values,errors):
     from mujpy.tools.tools import value_error_csv
     return ''.join(value_error_csv(values[k],errors[k]) for k in range(len(values)))
 
-def mixer(t,y,f0):
+def mixer(t, y, f0, e=None):
     """
-    returns rotating frame version of input t at frequency f0 [MHz]
+    y transformed to rotating frame at frequency f0 [MHz]
 
-    Mixer of y(t) with a reference cos(2*pi*f0*t)
+    mixer of y(t) with a reference cos(2*pi*f0*t)
 
     input::
 
@@ -1982,83 +1983,78 @@ def mixer(t,y,f0):
 
     output::
 
-        y_rrf = 2*y*cos(2*pi*f0*t)
-            t is 1d, y is 1d, 2d or 3d 
-                t.shape[0] == y.shape[-1]
-        t   vstack-ed to same shape as y
+        y_rrf = 2*y*cos(2*pi*f0*t), low-passband filtered
         
-    Used in mufitplot
+    Used in mufitplot, mix, zero-pad, filter and return an array shaped like y.
     """
-
-    from mujpy.tools.tools import fft_filter
-    from numpy import pi, cos, vstack, fft, delete
-    ydim, tdim = len(y.shape), len(t.shape)
-    if tdim == 1: # must replicate t to the same dimensions as y 
-        if ydim ==2:
-            for k in range(ydim):
-                if k:
-                    time = vstack((time,t))
-                else:
-                    time = t
-            t = time
-        elif ydim==3: # max is ydim = 3
-            for j in range(len.shape[-1]):
-                for k in len.shape[-2]:
-                    if k:
-                        time = vstack((time,t))
-                    else:
-                        time = t
-                if j:
-                    for l in len.shape[-1]:
-                        tim = vstack((tim,time))
-                    else:
-                        tim = time
-            t = tim 
-    n = t.shape[-1] # apodize by zero padding to an even number
-    yf = fft.irfft(fft_filter(t,fft.rfft(2*y*cos(2*pi*f0*t),n=n+1),f0),n=2*n)
-    # now delete padded zeros 
-    mindex = range(n,2*n)
-    yf =delete(yf,mindex,-1)
-    return yf
     
-def fft_filter(t,fy,f0):
+    from numpy import asarray, cos, pi, fft, sqrt, abs as nabs
+    from mujpy.tools.tools import fft_filter
+
+    y = asarray(y)
+    if e is not None: e = asarray(e)
+    t = asarray(t).reshape(-1)
+    n = y.shape[-1]
+
+    if t.size != n:
+        raise ValueError("t must contain one time value per last-axis sample")
+
+    nfft = 2 * n
+    mixed = 2 * y * cos(2 * pi * f0 * t)
+    spectrum = fft.rfft(mixed, n=nfft, axis=-1)
+    if e is not None:
+        e2mixed = 2 * e**2 * cos(2 * pi * f0 * t)
+        emixed = 2 * e * cos(2 * pi * f0 * t)
+        e2spectrum = fft.rfft(e2mixed, n=nfft, axis=-1)
+        espectrum = fft.rfft(emixed, n=nfft, axis=-1)
+
+    else:
+        e2spectrum = None
+        espectrum = None
+    filtered, efiltered, f_cut = fft_filter(t, spectrum, f0, e=e2spectrum)
+    return (fft.irfft(filtered, n=nfft, axis=-1)[..., :n],
+                    sqrt(nabs(fft.irfft(efiltered, n=nfft, axis=-1)[..., :n])) if e is not None else None,
+                    f_cut
+            )
+  
+def fft_filter(t, fy, f0, e= None):
     """
     returns fy, filtered above 0.2*fp, peak freq 
+        
+        input::
 
-    works for 1-2 d
-        used in tools.mixer 
+            t   time, 1d
+            fy  any dimensional fft, 
+                    fy.shape[-1] == t.shape
+            e   error on fy, in case, using the same filter
+    
+    Assumes an even FFT length, as provided by mixer.
+    
+    Used in tools.mixer, find a global peak up to f0; retain bins up to twice its index.
     """
 
-    from numpy import arange, mgrid, where
-    # determine max frequency fmax
-    leny = len(fy.shape)
-    if leny == 1:
-        dt = t[1]-t[0]
-        # array f of fourier component indices (real fft, 0 to fmax)
-        m = fy.shape
-        f = arange(m) 
-    elif leny == 2:
-        dt = t[0,1]-t[0,0]
-        # find peak in rfft below the rrf frequency f0
-        # array f of fourier component indices (real fft, 0 to fmax)
-        n,m = fy.shape
-        _,f = mgrid[0:n,0:m] 
-    else:
-        dt = t[0,0,1]-t[0,0,0]
-        l,n,m = fy.shape
-        _,_,f = mgrid[0:l,0:n,0:m] 
-                
-    fmax = 1/2/dt
-    mask = (f<=f0/fmax*m).astype(int)
-    # find where fy has a peak, below the rrf frequency f0
-    if leny == 1:
-        npeak = where(abs(fy)==abs(mask*fy).max()).max()
-    elif leny == 2:
-        npeak = where(abs(fy)==abs(mask*fy).max())[1].max()
-    else:
-        npeak = where(fy==(mask*fy).max())[2].max()    
-    mask = (f<=2*npeak).astype(int)
-    return fy*mask
+    from numpy import asarray, arange, where, inf, abs as nabs
+    from scipy.special import erf
+
+    #t = asarray(t).reshape(-1)
+    fy = asarray(fy)
+    if e is not None: e = asarray(e)
+    dt = t[1] - t[0]
+
+    m = fy.shape[-1]
+    f = arange(m)             # Always 1D.
+    fmax = 1 / (2 * dt)
+    cutoff = (f0 * 2 / fmax) * (m - 1)
+    search_mask = f <= cutoff
+
+    # Exclude frequencies outside the search band from peak selection.
+    amplitude = where(search_mask, nabs(fy), -inf)
+    npeak = where(amplitude == amplitude.max())[-1].min()
+    f_cut = 2*f[npeak]
+    fltr = 0.5*(1-erf((f - f_cut)/(0.1*f_cut))) # erf filter # (f <= 1.2 * npeak)
+    #fltr = fltr * 0.5*(1+erf((f - 0.67*cutoff)/(0.04*cutoff)))
+
+    return fy * fltr, e * fltr if e is not None else None, f_cut
 
 def function_multi_in_components(dashboard):
     """
@@ -2465,9 +2461,8 @@ def get_gtotals(suite):
         ts.append('{:.2f}'.format(tsum/1e6)+'Mev')
     return ts, gs, '{:.3}'.format(suite._the_runs_[0][0].get_binWidth_ns()), str(suite.histoLength)
 
-def check_multigroup(group,alpha):
-    """
-    check shorthand in single group and alpha for Groups ...
+def check_multigroup(group,alpha,numhis):
+    """check Group shorthand and alpha
     
     input::
         
@@ -2486,14 +2481,18 @@ def check_multigroup(group,alpha):
     try:
         forward, backward = group.split('-')
         fg, bg = get_grouping(forward), get_grouping(backward)
-        if all(fg>=0) and fg.dtype == int and all(bg>=0) and bg.dtype == int: # get_grouping is an np.array
-            grp_cal = {'forward':forward, 
-                      'backward':backward, 
-                       'alpha':float(alpha)}
-            return grp_cal
+        if isinstance(fg,str): raise ValueError(fg)
+        if isinstance(bg,str): raise ValueError(bg)
+        if not fg.dtype == int or not bg.dtype == int: raise ValueError('non integer indices')
+        if not all(fg)>=0 or not all(bg)>=0: raise ValueError('negative indices')
+        if not all(fg)<numhis or not all(bg)<numhis: raise ValueError('indices outside histogram range')
+        grp_cal = {'forward':forward, 
+                  'backward':backward, 
+                   'alpha':float(alpha)}
+        return grp_cal 
     except ValueError as e:
-        text = 'Exception {}'.format(e)
-        text += '\nGroups ... syntax error:\ncheck Groups... = {} and α = {}'.format(group,alpha)
+        text = 'ValueError {}'.format(e)
+        text += '\nGroup syntax error:\ncheck: {}, α = {}'.format(group,alpha)
         return text
 
 def widg2pardicts(global_box):
@@ -2689,10 +2688,12 @@ def glob2widgets(kp,pardict,flags,keylen,callback):
     
     drop = Dropdown(value='+-',options = ['+-','add','del','0','1','2','3','4','5'],tooltip='del,add\nor subplot\npar {}'.format(kp),layout=Layout(width=keylen[6]))
     drop.observe(callback,names='value')
+    combobox = Combobox(options=['α','λ','σ','φ','Δ','β','θ','δ','ν','τ'], #placeholder='ty+sel',
+             value=pardict['name'],layout=Layout(width=keylen[1]))
+    combobox.add_class("no-combo-arrow")
     return HBox([
     Label(value=str(kp),layout=Layout(width=keylen[0])), 
-    Combobox(options=['α','λ','σ','φ','Δ','β','θ','δ','ν','τ'], #placeholder='ty+sel',
-             value=pardict['name'],layout=Layout(width=keylen[1])), 
+    combobox, 
     Text(value=str(pardict['value']),layout=Layout(width=keylen[2])), 
     Dropdown(options = flags,value=pardict['flag'],layout=Layout(width=keylen[3])), 
     FloatText(value=pardict['error'],layout=Layout(width=keylen[4])),
@@ -2729,12 +2730,20 @@ def comp2widgets(component,k):
     #<div style="position: absolute; left: 75%; border-left: 1px solid gray; height: 50%;">75</div>
     #<div style="position: absolute; left: 100%; border-left: 2px solid black; height: 100%; transform: translateX(-100%);">100</div>
     width = ['15%','8%','5%','12%','7%','4%'] # total 36%
+    fft_check = Checkbox(value=True,
+                         tooltip='subtract\n(residues FFT)',
+                         indent=False,
+                         layout=Layout(width=width[5])
+                         )
+    if component["name"] == 'al':
+        fft_check.value = False
+        fft_check.disabled = True
     widgets = [Label(value='component:',layout=Layout(width=width[0])),
                Text(value=component['name'],disabled=True,layout=Layout(width=width[1])),
                Label(value='tag',layout=Layout(width=width[2])),
                Text(value=str(k),tooltip='par name tag',layout=Layout(width=width[3])),
                Label(value='FFT',layout=Layout(width=width[4])),
-               Checkbox(value=True,tooltip='subtract\n(residues FFT)',indent=False,layout=Layout(width=width[5]))]
+               fft_check]
     component_box =  VBox([ruler,HBox(widgets)])# if k else  VBox([HBox(widgets)])
     return component_box  
 

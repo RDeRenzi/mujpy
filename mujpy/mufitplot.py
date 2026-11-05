@@ -48,8 +48,8 @@ class mufitplot(object):
 #        from mujpy.mucomponents.mucomponents import mumodel
         
 # reassigned, for backward compatibility  
-        # print('mufitplot __init__ debug: inside')  
         from mujpy._version import __version__
+        from mujpy.tools.tools import derange
         self.__version__ = __version__
         self.plot_out = plot_out
         self.dashed = the_fit.dashed
@@ -74,32 +74,34 @@ class mufitplot(object):
             ok = True 
             self.dashboard = the_fit.dashboard 
             # print(self.dashboard)
-        # print('mufitplot __init__ debug: the_fit.C1() =\n{}'.format(self.fit.C1()))
         if ok: 
             self.rotating_frame_frequencyMHz = rotating_frame_frequencyMHz
             self.guess = guess
 
             # review this after refurbish of fft
-            if "userpardicts_guess" in self.dashboard.keys():
-                self.jsonmodel = "global results"
-            self.jsonmodel = "model_guess" 
-            if not self.guess:
-                if "userpardicts_result" in self.dashboard.keys():   
-                    self.jsonmodel = "userpardicts_result"
-                elif "model_result" in self.dashboard:
-                    self.jsonmodel = "model_result"  
+            #if "globpardicts_guess" in self.dashboard.keys():
+            #    self.jsonmodel = "globpardicts_guess"
+            #self.jsonmodel = "model_guess" 
+            #if not self.guess:
+            #    if "globpardicts_results" in self.dashboard.keys():   
+            #        self.jsonmodel = "globpardicts_results"
+            #    elif "model_results" in self.dashboard:
+            #        self.jsonmodel = "model_result"  
            
             if plot_range is not None:
-                self.plot_run(plot_range) 
-                if fft_range is not None: # fft always plots fit as well
-                    self.choosefftplot(fft_range,real)
-            else:
-                if fft_range is None:
-                    self.log('Exiting mufitplot: nothing to do.')    
+               self.plot_run(plot_range)
+
+            if fft_range is not None:
+                if lastfit in the_fit.__dir__(): # fft always plots fit as well
+                    self.plot_fft(fft_range,real)
+                else:
+                    self.log('No fft of residues without a fit.')    
          
     def plot_run(self,plot_range):
         """
         recovers data and statistics from mufit.mumodel and plots fit result/guess
+
+        All fit-types, and calib (uses suite.grouping alphas!)
         
         input::
 
@@ -110,27 +112,31 @@ class mufitplot(object):
 
         calls::
 
-            self.chi, which calls self.reload((start,stop,pack))
-                uploads rebinned data slice into 
-                    self.model._x_, self.model._y_, self.model._e_
+            chi via model._rebin_plot_(tup,lastfits)
+                reloads rebinned data slice into 
+                    model._x_, model._y_, model._e_
                     using mucomponents methods
-                produces ndof, f, chi for the chosen slice  (through model)
-            set_single_fit or set_sequence_fit, from tools.plot
-                produce actual figures
+                produces ndof, f, chi for the chosen slice
+                relies on model 
         
-        Draws either static or anim figures using tools.plot functions
+        Draws either static or anim figures according to 
+        (suite.single() and not suite.multi_groups())
+        by tools.plot set_single_fit or set_sequence_fit
 
         Rot frame::
 
-            tools.mixer does the job using a suitable filter, into 
-                self.rrf_y, self.rrf_e unbinned, mixed data/errors
-                rebinned together with their mixed fit, same pack
+            suite.asymmetry_slice(-1,-1) reloads unbinned data 
+            tools.mixer, with scipy.special.erf filter, transforms to
+                rrf_y, rrf_e    
+            later rebinned with their fit functions 
+
+        self is often implied, e.g. suite is self.suite, etc. 
         """
 
         from mujpy.tools.tools import derange, rebin, rshp
         from mujpy.tools.tools import get_run_title,  mixer
         from mujpy.tools.plot import set_single_fit, set_sequence_fit
-        from numpy import ones, tile 
+        from numpy import ones, sqrt 
 
         ############################àààààààààààààààààààààà###
         # standard fit tools.plot has four main subplots    #
@@ -169,25 +175,32 @@ class mufitplot(object):
             run_title = [title + ": "+string+"fit results" for title in run_title]
 
         t = self.suite.time
+
         # rotating_frame needs unbinned asymm, asyme, stored in model._a_ model._ea_ for non calib
         # needs the same with the fit alphas for calib
         # rebin_plot uses fit alphas but rebins!
         # model._ asymmetry_plot uses rebin_plot, 
         # suite.asymmetry_slice(-1,-1) uses grp alpha (rewritten after fit, should be ok)
-        a,ea = self.suite.asymmetry_slice(-1,-1) # should be ok for calib and non calib
+        a,ea = self.suite.asymmetry_slice(-1,-1) # unbinned slices, 
+                                                 # ok for calib (uses suite.grouping alphas!) 
 
         if self.rotating_frame_frequencyMHz: 
         # preload unbinned rotating frame data in self.rrf_y self.rrf_e
         # all other rrf frames obtained by rebinning rrf_y, rrf_e
-            time = tile(t,a.shape[0:]+(1,)) if len(a.shape)>len(self.model._t_.shape) else t # self.model._a_ -> a 
-            # tiles self.model._t_ to the shape of self.model._a_
-            self.rrf_y = mixer(time,a,self.rotating_frame_frequencyMHz) # self.model._a_ -> a
-            self.rrf_e = mixer(time,ea,self.rotating_frame_frequencyMHz) # self.model._ea_ -> ea
+            # new mixer, t ia always 1d, broadcast is implicit in the masking
+            a_rrf, e_rrf, f_cut = mixer(t,a,
+                                 self.rotating_frame_frequencyMHz,
+                                 e = ea) # self.model._a_ -> a (del this note)
+            self.rrf_y, self.rrf_e = self._plot_shape(a_rrf),self._plot_shape(e_rrf)
             # self.rrf_y, self.rrf_e are rotating frame unbinned data, stds
+        
+            rf_factor = 4*(t[1]-t[0])*f_cut
+            self.log(f'debug rf_factor {rf_factor}')
+
         fittup,errmsg = derange(self.dashboard["fit_range"],self.suite.histoLength)# range as tuple
-        if errmsg: # this can happen only from script, mudashed checks in mufit
+        if errmsg: # errmgs comes only from script, mudashed checks in mufit
             self.log(errmsg,' **** wrong "fit_range" in json')
-        fittup = fittup if len(fittup) == 3 else (fittup[0],fittup[1],1) # if pack is missing
+        fittup = fittup if len(fittup) == 3 else (fittup[0],fittup[1],1) # if pack is missing, does not happen with mudashed generated dashboard
         fit_start,fit_stop,fit_pack = fittup[0:3] # only one range, trailing in longer fittup ignored
         
         #############################
@@ -198,11 +211,18 @@ class mufitplot(object):
         t_fit,y_fit,ey_fit = rshp(self.model._x_), rshp(self.model._y_), rshp(self.model._e_) # for dy_fit = (y_fit-y_fit)/ey_fit
 
         if self.rotating_frame_frequencyMHz:
-            time = tile(t_fit,f_fit.shape[0:]+(1,)) if len(a.shape)>len(self.model._t_.shape) else t_fit # self.model._a_ -> a
-            # tiles
-            _, y_fit, ey_fit = rebin(self.suite.time,self.rrf_y,[fittup[0],fittup[1]],fittup[2],e=self.rrf_e)  # y_fit ey_fit in rot frame
-            f_fit = mixer(time,f_fit,self.rotating_frame_frequencyMHz)                    # fit in rot frame
+            # get y_fit ey_fit instead by rebinnin the altready transformed unbinned rrf a, e
+            _, y_fit, ey_fit = rebin(
+                    self.suite.time,
+                    self.rrf_y,
+                    [fittup[0],fittup[1]],fittup[2],
+                    e=self.rrf_e
+                    )  # y_fit ey_fit in rot frame
+            y_fit = self._plot_shape(y_fit)
+            ey_fit = self._plot_shape(ey_fit)
 
+            f_fit, _, _ = mixer(t_fit, f_fit, self.rotating_frame_frequencyMHz)
+            f_fit = self._plot_shape(f_fit) # rrf fit function                   # fit in rot frame
 
         plottup,errmsg = derange(plot_range,self.suite.histoLength)
         if errmsg:
@@ -234,15 +254,17 @@ class mufitplot(object):
             #plotfit = (start, stop, packfit)
             #_, fl, _ = self.chi(plotfit) # fl for plotting function  
             if self.rotating_frame_frequencyMHz: # (t_late,y_late,f_late_res,ey_late) the last three must be transformed to rrf
-                if len(a.shape)>len(self.model._t_.shape): # self.model._a_ _> a
-                    time = tile(t_late,f_fit.shape[0:]+(1,)) # tiles
-                    timf = tile(tfl,f_fit.shape[0:]+(1,)) # tiles
-                else:
-                    time, timf = t_late, tfl
-                _,y_late,ey_late = rebin(self.suite.time,self.rrf_y,[start,stop],packlate,e=self.rrf_e)
-                f_late_res = mixer(time, f_late_res, self.rotating_frame_frequencyMHz) 
-                fl = mixer(timf, fl, self.rotating_frame_frequencyMHz) 
-            
+                _,y_late,ey_late = rebin(
+                        self.suite.time,
+                        self.rrf_y,
+                        [start,stop],
+                        packlate,
+                        e=self.rrf_e
+                        )
+                f_late_res, _, _ = mixer(t_late, f_late_res, self.rotating_frame_frequencyMHz)
+                f_late_res = self._plot_shape(f_late_res)
+                fl, _, _ = mixer(tfl, fl, self.rotating_frame_frequencyMHz) 
+                fl =  self._plot_shape(fl)
             # approx late stats, f, data (needed for residues)
             #fit_late_start = int(stop/packlate*fit_pack) # divides fit_range in early and late
             fitlattup = (stop,fit_stop,fit_pack) # for dy_fit_late histogram
@@ -287,19 +309,22 @@ class mufitplot(object):
         packfit =  int(pack/2)
         plotftup = (start, stop,packfit)
         _,f,_ = self.chi(plotftup)
-        tf,_,_ = rshp(self.model._x_), rshp(self.model._y_), rshp(self.model._e_)# rebin(self.suite.time,asymm,[start,stop],packfit,e=asyme)
+        tf = rshp(self.model._x_) # self.chi does rebin(self.suite.time,asymm,[start,stop],packfit,e=asyme) 
 #        else:
-        # print('mufitplot plot_run debug: min max f_res {}, min max f {}'.format([f_res.min(),f_res.max()],[f.min(),f.max()])) 
         if self.rotating_frame_frequencyMHz: # (t,y,f_res,ey) the last three must be transformed to rrf
                                              # (tf,f) non rebinned, the last must be transformed to rrf
-            if len(self.model._a_.shape)>len(self.model._t_.shape):
-                time = tile(t,y.shape[0:]+(1,)) # tiles
-                timf = tile(tf,f.shape[0:]+(1,)) # tiles
-            else:
-                time, timf = t_late, tfl
-            _,y,ey = rebin(self.suite.time,self.rrf_y,[start,stop],pack,e=self.rrf_e)
-            f_res = mixer(time, f_res,self.rotating_frame_frequencyMHz) 
-            f = mixer(timf, f,self.rotating_frame_frequencyMHz) 
+            _,y,_ = rebin(
+                    self.suite.time,
+                    self.rrf_y,
+                    [start,stop],pack,
+                    e=self.rrf_e
+                    )
+            f_res, _, _ = mixer(t, f_res,self.rotating_frame_frequencyMHz)
+            #ey = ey /sqrt(rf_factor) 
+            f_res =  self._plot_shape(f_res)
+            f, _, _ = mixer(tf, f,self.rotating_frame_frequencyMHz)
+            f = self._plot_shape(f)
+            #ey=ey/(sqrt(rf_factor)*2)
         # assume self.suite.single() 
         # prepare figure  
         fgroup = [self.suite.groups[k]['forward'] for k in range(len(self.suite.groups))]
@@ -312,10 +337,14 @@ class mufitplot(object):
         # data passed to set_figure_fit: 
         # exp data, fcn for residue plot  (t,y,ey,f_res)
         # time and fcn for model plot (tf,f)
+
         data = [t, y, ey, f_res, tf, f, dy_fit] # t, y, ey, f_res according to plottup[:3], 
                                                 # good for double range early and for single range
                                                 # tf f  same but half pack for fit
                                                 # dy_fit from original fitfull range
+        nu_fit = nu_fit if not self.rotating_frame_frequencyMHz else (
+                            nu_fit*sqrt(rf_factor)*4)
+        #print(f'nu_fit = {nu_fit:.1f}')
         chi_dof =[nu_fit,chi_fit]               # original fit
 
         if self.suite.single() and not self.suite.multi_groups():
@@ -341,7 +370,10 @@ class mufitplot(object):
                             w_early,w_late]
         else:
             data_late, chi_dof_late = None, None
-        # self.log('Debug-mufitplot: set_figure  = {}'.format(set_figure_fit))
+
+        #rf_factor = 2*(t[1]-t[0])*self.rotating_frame_frequencyMHz if (
+        #                        self.rotating_frame_frequencyMHz) else 1 
+
         self.fig = set_figure_fit(self.plot_out,self.fig,self.model_name(),
                                     early_late,
                                     data,
@@ -349,9 +381,18 @@ class mufitplot(object):
                                     run_title,
                                     chi_dof,
                                     data_late,
-                                    chi_dof_late,rrf=self.rotating_frame_frequencyMHz)#,canvas=self.suite.canvas)
+                                    chi_dof_late,
+                                    rrf=self.rotating_frame_frequencyMHz,
+                                  )#,canvas=self.suite.canvas)
         
-    
+    def _plot_shape(self, a):
+        """Remove a singleton row only for static single-group plots."""
+        static = self.suite.single() and not self.suite.multi_groups()
+
+        if static and a.ndim == 2 and a.shape[0] == 1:
+            return a[0]
+        return a
+
     def chi(self,tup,ratio=None):
         """
         reloads data and statistics through mufit.mumodel (mucomponents methods)
@@ -427,6 +468,17 @@ class mufitplot(object):
         model = self.dashboard["model_guess"]
         return ''.join([component["name"] for component in model]) 
 
+    def model_name_fft(self):
+        """
+        returns model name (e.g. 'mlbg')
+
+        used by plot_run
+        """
+
+        model = self.dashboard["model_guess"]
+        return ''.join([component["name"] for k,component in enumerate(model) if self.model._include_components[k]]) 
+
+
 #"""
 ################################
 # FFT methods, to be refurbished
@@ -456,65 +508,128 @@ class mufitplot(object):
         # multi run multi group global C2 produces pari
 
         # must simplify, pars are already in self.pars, asymm, asyme are obtained with 
-        if self.suite.single():
-            if self.suite.multi_groups(): # A2
-                # print('mufitplot choosefftplot debug: A2')
-                self.log('Multigroup fft animation: toggle pause/resume by clicking on the plot')
-                if sum(function_multi_in_components(self.dashboard)): # A21 single chi2
-                    #userpars = "userpardicts_guess" if self.guess else "userpardicts_results"
-                    #pardicts = self.dashboard[userpars]
-                    pars,_,_,_,_,_ = int2min_multigroup(self.dashboard,self.suite.runs,guess=self.guess)
-                    # ok = self.single_fft_plot_multi_global(fft_range,pars,real)
-                else: # A20 as many chi2 as groups now results are saved in single group dashboards
-                    if self.jsonmodel=="model_result":
-                        pars = [array(lastfit.values) for lastfit in self.lastfits]
-                        # print('mufitplot choosefftplot debug: A20 fit pars = {}'.format(pars))
-                    else:
-                        par,_,_,_,_,_ = int2min(self.dashboard,self.suite.runs)                    
-                        pars = [array(par) for k in range(len(self.suite.groups))]
-                        # print('mufitplot choosefftplot debug: A20 guess pars = {}'.format(pars))
-                    # ok = self.single_fft_plot_multi_sequential(fft_range,pars,real)
-                asymm, asyme = self.suite.asymmetry_multigroup()
-            else:  # A1 simple single plot
-                pars,_,_,_,_,_ = int2min(self.dashboard,self.suite.runs)
-                # ok = self.single_fft_plot(fft_range,pars,real)
-                asymm, asyme = self.suite.asymmetry_single(self.suite._the_runs_[0],0)
-        else: 
-            if 'userpardicts_guess' in self.dashboard:
-                if not self.suite.multi_groups(): # C1, userpardicts no multigroup
-                    self.log('Multirun fft animation: toggle pause/resume by clicking on the plot')
-                    pass# not yet
-                else: 
-                    self.log('Multi group and run fft animation: toggle pause/resume by clicking on the plot')
-                    if self.global_fit: # C2
-                        pass# not yet
-                    else: # B21 userpardicts, function_multi_in_components no tilde_incomponents
-                        pars = [] 
-                        # not yet
-#                        for run in get_nruns(self.suite):
-#                            par = 
-#                            pars.append(par)
-            else:
-                pars = [] 
-                if self.suite.multi_groups(): 
-                    for run in get_nruns(self.suite): # B1 no multigroup
-                        for group in self.suite.groups: # or B20 no userpardicts multigroup
-                            par,_,_,_,_,_ = int2min(self.dashboard,self.suite.runs)
-                            pars.append(par)
-                            asymm, asyme = self.suite.asymmetry_multirun_multigroup()
-                else:
-                    for run in get_nruns(self.suite): # B1 no multigroup
-                        par,_,_,_,_,_ = int2min(self.dashboard,self.suite.runs)
-                        pars.append(par)
-                    asymm, asyme = self.suite.asymmetry_multirun(0)
-                # ok = self.sequential_fft_plot(fft_rangepars,real)
+        #if self.suite.single():
+        #    if self.suite.multi_groups(): # A2
+        #        self.log('Multigroup fft animation: toggle pause/resume by clicking on the plot')
+        #        if sum(function_multi_in_components(self.dashboard)): # A21 single chi2
+        #            #userpars = "userpardicts_guess" if self.guess else "userpardicts_results"
+        #            #pardicts = self.dashboard[userpars]
+        #            pars,_,_,_,_,_ = int2min_multigroup(self.dashboard,self.suite.runs,guess=self.guess)
+        #            # ok = self.single_fft_plot_multi_global(fft_range,pars,real)
+        #        else: # A20 as many chi2 as groups now results are saved in self.lastfits
+        #            if self.jsonmodel=="model_result":
+        #                pars = [array(lastfit.values) for lastfit in self.lastfits]
+        #            else:
+        #                par,_,_,_,_,_ = int2min(self.dashboard,self.suite.runs)                    
+        #                pars = [array(par) for k in range(len(self.suite.groups))]
+        #        asymm, asyme = self.suite.asymmetry_multigroup()
+        #    else:  # A1 simple single plot
+        #        pars,_,_,_,_,_ = int2min(self.dashboard,self.suite.runs)
+        #        # ok = self.single_fft_plot(fft_range,pars,real)
+        #        asymm, asyme = self.suite.asymmetry_single(self.suite._the_runs_[0],0)
+        #else: 
+        #    if 'userpardicts_guess' in self.dashboard:
+        #        if not self.suite.multi_groups(): # C1, userpardicts no multigroup
+        #            self.log('Multirun fft animation: toggle pause/resume by clicking on the plot')
+        #            pass# not yet
+        #        else: 
+        #            self.log('Multi group and run fft animation: toggle pause/resume by clicking on the plot')
+        #            if self.global_fit: # C2
+        #                pass# not yet
+        #            else: # B21 userpardicts, function_multi_in_components no tilde_incomponents
+        #                pars = [] 
+        #                # not yet
+#       #                 for run in get_nruns(self.suite):
+#       #                     par = 
+#       #                     pars.append(par)
+        #    else:
+        #        pars = [] 
+        #        if self.suite.multi_groups(): 
+        #            for run in get_nruns(self.suite): # B1 no multigroup
+        #                for group in self.suite.groups: # or B20 no userpardicts multigroup
+        #                    par,_,_,_,_,_ = int2min(self.dashboard,self.suite.runs)
+        #                    pars.append(par)
+        #                    asymm, asyme = self.suite.asymmetry_multirun_multigroup()
+        #        else:
+        #            for run in get_nruns(self.suite): # B1 no multigroup
+        #                par,_,_,_,_,_ = int2min(self.dashboard,self.suite.runs)
+        #                pars.append(par)
+        #            asymm, asyme = self.suite.asymmetry_multirun(0)
+        #        # ok = self.sequential_fft_plot(fft_rangepars,real)
 
-        # print('mufitplot choosefftplot debug: pars = {}'.format(pars))
-        self.plot_fft(fft_range,pars,asymm,asyme,real)
+        a, ea = self.suite.asymmetry_slice(-1,-1) # unbinned slices,
+        # pars is a list of np.array of parameters, one array per fit
+        self.plot_fft(fft_range,pars,a,ea,real)
  
-    def plot_fft(self,fft_range,pars,asymm,asyme,real):
+    def plot_fft(self,fft_range,real):
         """
-        plots fft of residues 
+        recovers data and statistics from mufit.mumodel and plots selected residues fft 
+
+        All fit-types, and calib (uses suite.grouping alphas!)
+        
+        input::
+
+            fft_range (start MHz, stop MHz, LB)
+
+        calls::
+
+            chi via model._rebin_plot_(tup,lastfits)
+                reloads rebinned data slice into 
+                    model._x_, model._y_, model._e_
+                    using mucomponents methods
+                produces ndof, f, chi for the chosen slice
+                relies on model and model._include_components 
+        
+        Draws either static or anim figures according to 
+        (suite.single() and not suite.multi_groups())
+        by tools.plot set_single_fit or set_sequence_fit
+
+        self is often implied, e.g. suite is self.suite, etc. 
+        """
+
+        from mujpy.tools.tools import derange, rebin, rshp
+        from mujpy.tools.tools import get_run_title,  mixer
+        from mujpy.tools.plot import set_single_fit, set_sequence_fit
+        from numpy import ones, exp, broadcast_to, linspace, sqrt, mean, fft
+        from numpy import hstack, linspace, zeros, mgrid 
+
+        run_title = get_run_title(self.suite) # always a list, even for single
+        string = ': global ' if self.global_fit else ''
+        #if self.guess:
+        run_title = [title + string for title in run_title]
+        #else:
+        #    run_title = [title + ": "+string+"fit results" for title in run_title]
+
+        t = self.suite.time
+
+        fittup,_ = derange(self.dashboard["fit_range"],self.suite.histoLength)# range as tuple
+        # already checked by previous plot fit
+        fit_start,fit_stop,fit_pack = fittup[0:3] # only one range, trailing in longer fittup ignored
+
+       
+        ##############################
+        # the fit range              #
+        # t_fit,y_fit,ey_fit,f_fit,f #
+        ##############################
+        _, f_included, _ = self.chi(fittup) # partial fit f & rebins self.model._x_, ._y_, ._e_
+        # fit components already selected in self.model._include_components
+        t_fit,y_fit,ey_fit = rshp(self.model._x_), rshp(self.model._y_), rshp(self.model._e_) # 
+        self.model._include_all_() # reset  to full model
+        _, f, _ = self.chi(fittup) # full best fit 
+
+        dt, max_freq  = self.model._x_[1] - self.model._x_[0], 1/(2*dt)
+        ffttup, errmsg = derange(fft_range, max_freq) # three floeats, already checked in mudashed
+        fstart, fstop, fsigma = ffttup[0], ffttup[1], ffttup[2]
+        t = t_fit-t_fit[0] # starts from 0, for the filter
+        filter_apo = exp(-(t*fsigma)**3) # hypergaussian filter mask
+        filter_apo /= filter_apo.sum()*dt # approx normalization
+
+        fft_amplitude = fft.fft((y_fit - f_included)*filter_apo) # fft of aodized residues
+
+    def oldplot_fft():
+
+        """
+        plots fft of residues just for self.suite._the_runs[0], to start with
 
         input::
 
@@ -535,12 +650,11 @@ class mufitplot(object):
 
         from mujpy.tools.tools import derange, rebin, autops, ps
         from mujpy.tools.tools import get_run_title
-        from mujpy.tools.plot import set_fnigure_fft
+        from mujpy.tools.plot import set_figure_fft
         from copy import deepcopy
         from numpy import ones, exp, linspace, sqrt, mean, fft
         from numpy import hstack, linspace, zeros, mgrid
 
-        # print('plot_fft muplotfit debug: pars = {}'.format(pars))
 
         run_title = get_run_title(self.suite)    # always a list, even for single 
         string = 'global ' if self.global_fit else ''  
@@ -576,6 +690,7 @@ class mufitplot(object):
 
         f_fit_res, f_fit = self.chi_fft(t_fit,y_fit,*pars) # returns both partial and full model
         
+        # collects all shorthands as text in the fft plot, passed, not used
         fgroup = [self.suite.groups[k]['forward'] for k in range(len(self.suite.groups))]
         bgroup = [self.suite.groups[k]['backward'] for k in range(len(self.suite.groups))]
         alpha = [self.suite.groups[k]['alpha'] for k in range(len(self.suite.groups))]
@@ -591,7 +706,7 @@ class mufitplot(object):
         f = nf*dfa  # all frequencies, l+1 >=0 followed by l-1 <0
 
         fstart, fstop, fsigma = float(fft_range[0]), float(fft_range[1]), float(fft_range[2])
-        start, stop = int(round(fstart/dfa)), int(round(fstop/dfa))
+        start, stop = int(round(fstart/dfa)), int(round(fstop/dfa)) # slice bins
         f = deepcopy(f[start:stop]) # selected slice
 
 # asymmetry has 1,2,3 dimensions to distinguish run from group
@@ -601,15 +716,13 @@ class mufitplot(object):
             yf = zeros(n) # fit function for rephasing, zero padded to n
             ey = zeros(n)
             y[0:l] = y_fit[fit_start:fit_stop] - f_fit_res # zero padded partial residues
-            yf[0:l] = f_fit
+            yf[0:l] = f_fit # full model
             ey[0:l] = ey_fit[fit_start:fit_stop] #  slice of time stds
             t = dt*linspace(0,n-1,n)
         elif len(asymm.shape)==2:
-            # print('mufitplot plot_fft debug: nruns/ngroups {}, nbins {}'.format(asymm.shape[0],y_fit.shape[-1]))
             y = zeros((y_fit.shape[0],n)) # for data zero padded to n
             yf = zeros((y_fit.shape[0],n)) # fit function for rephasing, zero padded to n
             ey = zeros((ey_fit.shape[0],n))
-            # print('mufitplot plot_fft debug: shapes y {}, asymm {}, f_fit_res {}'.format(y[:,0:l].shape,y_fit[:,fit_start:fit_stop].shape,f_fit_res.shape))
             y[:,0:l] = y_fit[:,fit_start:fit_stop]- f_fit_res # zero padded partial residues
             yf[:,0:l] = f_fit
             ey[:,0:l] = ey_fit[:,fit_start:fit_stop] #  slice of time stds
@@ -626,7 +739,6 @@ class mufitplot(object):
             yf = yf.reshape(nruns*ngroups,n)  # reshaped to 2d
             ey = ey.reshape(nruns*ngroups,n)  # reshaped to 2d
             _,t = dt*mgrid[0:nruns*ngroups,0:n] # time for zero padded data
-        # print('mufitplot plot_fft debug: t.min t.max = {},{}'.format(t.min(),t.max()))
         filter_apo = exp(-(t*fsigma)**3) # hypergaussian filter mask
                                            # is applied as if first good bin were t=0
         filter_apo = filter_apo/filter_apo.sum(axis=1)[0]/dt # approx normalization
@@ -672,7 +784,7 @@ class mufitplot(object):
                 ap = fft_amplitude.real[:,start:stop]**2+fft_amplitude.imag[:,start:stop]**2
                 apf = fftf_amplitude.real[:,start:stop]**2+fftf_amplitude.imag[:,start:stop]**2
             ylabel = 'FFT Power [arb. units]'
-        self.fig_fft = set_figure_fft(self.fig_fft,self.model_name(),ylabel,
+        self.fig_fft = set_figure_fft(self.fig_fft,self.model_name_fft(),ylabel,
                                     f,
                                     ap,
                                     apf,
@@ -703,20 +815,11 @@ class mufitplot(object):
         self.the_model._fft_init(fft_include_components) # sets 
         # distinguish list from list of lists 
         # this applies to A20 single run multigroup sequential fits
-        # print('chi_fft mufitplot debug: pars = {}'.format(pars))
         fres = self.the_model._add_fft_(t_fit,y_fit,*pars)
         if isinstance(pars,tuple):
-            # print('mufitplot chi_fft debug: pars is tuple')
             f = cstack(t_fit,*pars)
         else: 
-            # print('mufitplot chi_fft debug: pars is not tuple')
             self.the_model._add_(t_fit,*pars)
-        # debug
-#        from matplotlib.pyplot import draw, subplots 
-#        fig,ax = subplots()
-#        for k in range(f.shape[0]):
-#            ax.plot(t_fit,f[k,:])
-#            ax.plot(t_fit,fres[k,:],alpha=0.5)
-#        draw()    
+ 
         return fres, f
 
