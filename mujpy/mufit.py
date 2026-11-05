@@ -102,11 +102,11 @@ class mufit(object):
             are passed/failed 
         """
 
-        from mujpy.tools.tools import check_function, short_path #
+        from mujpy.tools.tools import check_function, short_path, ipyw_warning_dial #
         import json
 
 
-        try: # is dashboard_file readable?  
+        try: # is dashboard_file readable?  , ipyw_warning_dial
             self.log('Reading fit guess from: '+short_path(dashboard_file,self.suite.__startuppath__))
             with open(str(dashboard_file),"r",encoding='utf-8') as f:
                 self.dashboard = json.load(f)
@@ -128,9 +128,9 @@ class mufit(object):
             if kc >= 0 and kp > 0: # failed json dashboard syntax check
                 errmsg += '++++ Check file {} model_guess: wrong syntax in component {}, parameter {}, group {}'.format(dashboard_file, kc, kp, kgroup)
             elif kc < 0 and kp > 0:
-                arrmsg += ('++++ Check file {} globpardicts_guess: no function/function_multi allowed in parameter {}'.format(dashboard_file, kp))
-            overlay = ipyw_warning_dial(title = title,
-                                        message = msg)
+                errmsg += ('++++ Check file {} globpardicts_guess: no function/function_multi allowed in parameter {}'.format(dashboard_file, kp))
+            overlay = ipyw_warning_dial(title = 'Model syntax',
+                                        message = errmsg)
             show_hide_tab(overlay,self.on_modal_display_change,self.tab)
             return False
 
@@ -146,7 +146,7 @@ class mufit(object):
         """
 
         from mujpy.tools.tools import int2min, int2min_global, int2_method_key, int2_global_method_key 
-        from mujpy.tools.tools import version_flag, list_depth, get_title#, chunk
+        from mujpy.tools.tools import version_flag, list_depth, get_title 
         from mujpy.mucomponents.mucomponents import mumodel
         from iminuit import Minuit
         from numpy import printoptions

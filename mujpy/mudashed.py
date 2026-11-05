@@ -1257,7 +1257,7 @@ class dashed(object):
             grp = self.suite_box.children[1].children[4].value
         run_list = self.suite_box.children[2].children[5].value
         OK = len(grp.split(';'))==len(alph.split(';'))
-        numhis = 1000 if suite not in self.__dir__() else self.suite.numhis
+        numhis = 1000 if "suite" not in self.__dir__() else self.suite.numhis
         if grp and run_list and OK:
             grp_c = check_multigroup(grp,alph,numhis) # syntax check 
             if isinstance(grp_c, str) and remind:
