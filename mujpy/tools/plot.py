@@ -366,8 +366,8 @@ def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_
             string1 = 'F-B: {} - {}\n'.format(fgroup[ig],bgroup[ig])
             string1 += r'$\alpha=$ {:.4f}'.format(alpha[ig])
         string1 += '\n'
-        string1 += r'$\chi^2_f=$ {:.4f}'.format(chi_fit[i])
-        string1 += '\n ({:.2f}-{:.2f})\n{} dof'.format(lc,hc,nu_fit) 
+        string1 += r'$\chi^2_f=$ {:.3f}'.format(chi_fit[i])
+        string1 += '\n ({:.3f}-{:.3f})\n{:.1f} dof'.format(lc,hc,nu_fit) 
         text1.set_text(string1)
 
         if early_late:
@@ -399,10 +399,10 @@ def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_
             vertl[2::5, 1] = top
             
             #nufitplot.set_ydata(nufit[i]*yh)
-            string2 = r'$\chi^2_e=$ {:.4f}'.format(chi_fit_early[i])
-            string2 += '\n({:.2f}-{:.2f})'.format(lce,hce)
-            string3 = r'$\chi^2_l=$ {:.4f}'.format(chi_fit_late[i])
-            string3 += '\n({:.2f}-{:.2f})'.format(lcl,hcl)
+            string2 = r'$\chi^2_e=$ {:.3f}'.format(chi_fit_early[i])
+            string2 += '\n({:.3f}-{:.3f})'.format(lce,hce)
+            string3 = r'$\chi^2_l=$ {:.3f}'.format(chi_fit_late[i])
+            string3 += '\n({:.3f}-{:.3f})'.format(lcl,hcl)
             text2.set_text(string2)
             text3.set_text(string3)
 
@@ -440,10 +440,10 @@ def set_sequence_fit(out,fig,model,early_late,data,group,run_title,chi_dof,data_
 
         # update text
         string1 = 'F-B: {} - {}\n'.format(fgroup[0],bgroup[0])
-        string1 += r'$\alpha=$ {:.4f}'.format(alpha[0])
+        string1 += r'$\alpha=$ {:.3f}'.format(alpha[0])
         string1 += '\n'
-        string1 += r'$\chi^2_f=$ {:.4f}'.format(chi_fit[0])
-        string1 += '\n ({:.2f}-{:.2f})\n{} dof'.format(lc,hc,nu_fit) 
+        string1 += r'$\chi^2_f=$ {:.3f}'.format(chi_fit[0])
+        string1 += '\n ({:.3f}-{:.3f})\n{:.1f} dof'.format(lc,hc,nu_fit) 
         text1.set_text(string1)
 
         if early_late:
@@ -875,7 +875,6 @@ def decorate_res(ax,t,ey,rm,rM):
     linesm, = ax. plot(t,-ey,'-',lw=1.0,alpha=0.3,zorder=2,color=color[1]) # residues
     line2sp, = ax. plot(t,2*ey,'-',lw=1.0,alpha=0.3,zorder=2,color=color[2]) # residues
     line2sm, = ax. plot(t,-2*ey,'-',lw=1.0,alpha=0.3,zorder=2,color=color[2]) # residues
-    print(f'mean(ey) = {ey.mean():.6f}')
     ax.plot([0,t.max()],[0.,0.],'k-',lw=0.5,alpha=0.3,zorder=0) # zero line
     ax.set_xlim(0,t.max())
     ax.set_ylim(rm,rM)

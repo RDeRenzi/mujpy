@@ -194,29 +194,49 @@ class dashed(object):
         if change['type'] == 'change' and change['name'] == 'value':
             value = change['new']
             drop = change['owner']
-            pardicts, _, error = widg2pardicts(self.global_box) 
+            self.log(f'debug _on_add_del_plot {value} kp = {kp} owner = {drop}')
+            pardicts, _, error = widg2pardicts(self.global_box) # list or pardicts 
             flags = ['~','!','#']
-            callback = self._pardicts_observers[kp]
             if error:
                 self.log(error)
                 return
+            elif value == '+-':
+                return
             elif value in ['add','del']:
-                drop.unobserve(callback,names='value')
+                # unobserve the selected pardict +- drop
+                drop.unobserve(self._pardicts_observers[kp],names='value'),
+                #left, right = self.global_box.children[1].children[0], self.global_box.children[1].children[1]
+                #for k,callback in enumerate(self._pardicts_observers):
+                #     # unobserve all drops
+                #     kc2 = -(k//-1) # ceil(k/2) 
+                #     if k <= kc2:
+                #        left.children[k+1].children[6].unobserve(callback,names='value')
+                #     else:
+                #        right.children[k-kc2+1].children[6].unobserve(callback,names='value')
                 drop.value='+-'
-                drop.observe(callback,names='value')
+                # restart: add or remove from pardicts
                 if value=='add':
                     pardicts.insert(kp+1,{'name':'','value':'','flag':'~','error':0.0002,'limits':[None,None]})
                     self.NG_int.value += 1
-                # pardicts2widgets returns [global_title,HBox([VBox(left_column),VBox(right_column)])]   
                 else:
+                    # remove
                     pardicts.pop(kp)
                     self.NG_int.value -= 1
-                kids, self._pardicts_observers = pardicts2widgets(pardicts,flags,self.NG_int.value,self._on_add_del_plot)
-                self.global_box.children = kids
-            else:
+                # now redraw all pardicts
+                self.global_box.children, self._pardicts_observers = pardicts2widgets(
+                                                    pardicts,
+                                                    flags,
+                                                    self.NG_int.value,
+                                                    self._on_add_del_plot
+                                                    )
+                # pardicts2widgets inkoves glob2widgets for each pardict 
+                # assigning the appropriate partial callback that will ass the pardict index kp
+                # it returns [global_title,HBox([VBox(left_column),VBox(right_column)])]    
+                # and the new list of partial callbacks 
+            else: # must be a plot index
                 # nothing happens
                 try: 
-                    self.log('This will plot parameter {} vs. runs in subplot {}'.format(kp,int(value)))
+                    self.log('This will plot parameter {} vs. runs in subplot {} (not yet!)'.format(kp,int(value)))
                 except:
                     self.log('change["new"] = {} is not a string integer'.format(value))
 
@@ -636,11 +656,15 @@ class dashed(object):
         if self.NG_int.value > 0: # 'globpardicts_guess' in self.dashboard: 
             glob = True
             flags = ['~','!','#']
-            kids, self._pardicts_observers = pardicts2widgets(pardicts,flags,self.NG_int.value,self._on_add_del_plot)
-            self.global_box.children = kids 
-            # [global_title,HBox([VBox(left_column),VBox(right_column)])]
-            #  global lists k name value flag error limits pospar
-            #  always add model, = self.dashboard or from _available_components_, + label + value + error + limits  
+            self.global_box.children, self._pardicts_observers = pardicts2widgets(
+                                                pardicts,
+                                                flags,
+                                                self.NG_int.value,
+                                                self._on_add_del_plot
+                                                )
+            # global_box = [global_title,HBox([VBox(left_column),VBox(right_column)])]
+            #   pardict -> widgets:  kp name value flag error limits add_remove pospar
+            # self._pardicts_observers are partial(self._on_add_del_plot,kp) returning kp as index
         if 'dashboard' in self.__dir__() and self.dashboard['model_guess']:
             model = self.dashboard['model_guess'] # list of components
             model_name = ''.join([component['name'] for component in model])
@@ -1064,10 +1088,9 @@ class dashed(object):
         """
         decouples real callbacks, _on_RL and _on_button_RL, avoids nested GUI updates
 
-        suggested by ciocapiatti Gemini to cure Win wsl crashes on Qt
-        maybe remove?  It works, leave it!
-        ChatGPT later found true cause in:
-        QT thread and broken pip installation due to .swp garbage in site-packages/mujpy 
+        input::
+
+            runlist shorthand
         """
         
         import os
@@ -1111,10 +1134,49 @@ class dashed(object):
 
         offset = self.suite_box.children[1].children[8].value
         if datafile and os.path.isfile(datafile):
-            if runlist:
-                self.suite = suite(datafile , runlist , grp_calib , offset , 'input setuppath not used' ,console=self.log) #startuppath is set in suite
+            if runlist: # shorthand
+                runlst, errmsg = derun(runlist)
+                if errmsg is not None: # derun error, only syntax errors, no check if a run does not exist
+                    string = f'************  E: Run list add syntax error? {errmsg}. You typed: {runlist}'
+                    return string
+                if "previous_runlist" in self.__dir__():
+                    runprv, _  = derun(self.previous_runlist)
+                    # compare runlists
+                    rnew = {tuple(x) for x in runlst}
+                    rold = {tuple(x) for x in runprv}
+                    if rnew == rold:
+                        return # nothing to do, should not happen (perhaps a space was introduced?)
+                    elif rnew > rold:
+                        runs_diff = [list(x) for x in rnew-rold] # this is list of lists
+                        add = True
+                    else:
+                        runs_diff = [list(x) for x in rold-rnew] # this is list of lists
+                        add = False
+                    if runs_diff:
+                        if add:
+                            self.log(f'add {runs_diff}')
+                            string = self.suite.append_runs(runs_diff) # watch, runlist_diff is a list of lists
+                        else:
+                            self.log(f'pop {runs_diff}')
+                            string = self.suite.pop_runs(runs_diff) # watch, runlist_diff is a list of lists
+                        if string: self.log(string)
+                else: # standard route, first instance
+                    self.log(f'load {runlist}')
+                    self.suite = suite(datafile, 
+                                   runlist, # passes checked shorthand
+                                   grp_calib,
+                                   offset, 
+                                   'input setuppath not used',
+                                   console=self.log,
+                                   caller='mudashed',
+                                   ) #startuppath is set in suite
                 # self.log info
-                if self.suite.loadfirst: # suite loaded the data
+                if self.suite.return_string[0]=='*': # there is a message, display on dialogs
+                    title = 'Suite warning' if self.suite.return_string[14]=='W' else 'Suite ERROR!'
+                    overlay = ipyw_warning_dial(title = title,
+                                                message = self.suite.return_string)
+                    show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+                if self.suite.loadfirst: # 
                     # inserted the hold_trait_notification to preserve Windows:
                     with self.suite_box.hold_trait_notifications():
                         starttime_options = [' '.join(self.suite._the_runs_[k][0].get_timeStart_vector()) for k in range(self.suite.nruns)]
@@ -1160,11 +1222,8 @@ class dashed(object):
                         #        filter_pattern = ['*.json'],
                         #        title = '<b>1-click select</b>')
                         #self.LF_modal.layout.observe(self.on_modal_display_change, names = 'display')
+                        self.previous_runlist = runlist
 
-                else:
-                    overlay = ipyw_warning_dial(title = 'Suite error',
-                                                message = 'No runs loaded, runlist {}?'.format(runlist))
-                    show_hide_tab(overlay,self.on_modal_display_change,self.tab)
             else:
                 self.log('Please specify runlist')
         else:

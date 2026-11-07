@@ -414,7 +414,9 @@ class mufit(object):
         if wa=='w' and os.path.isfile(file_log): # create prev version 
             os.rename(file_log,file_log+'~')
         # A1 A20 B1 B20 always 'w' 
+        _,_,_,_,string = self.suite.slice_for_back_counts(-1,-1) #
         with open(file_log,wa,encoding='utf-8') as f:
+            f.write(string)
             f.write(' '+85*'_'+'\n')
             self.log('|'+77*'-'+'|') 
             f.write('| Run {}: {}       group: {} - {}      offs = {}  α = {:.3f}'.format(nrun,
@@ -522,9 +524,11 @@ class mufit(object):
         if wa=='w' and os.path.isfile(file_log): # create prev version 
             os.replace(file_log,file_log+'~') # os.rename was ok on linux but gailed when '~' version esists already
         # A21 B21 C1 C2 always 'w' 
+        _,_,_,_,string = self.suite.slice_for_back_counts(-1,-1) #
         with open(file_log,wa,encoding='utf-8') as f:
             if wa=='w' or (B21 and kgroup==0):  
             # write Run chi2 header
+                f.write(string)
                 f.write(' '+96*'_'+'\n')
                 nch = sumlength - 2
                 self.log(' '+nch*'_')

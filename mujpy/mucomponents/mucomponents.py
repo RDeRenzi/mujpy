@@ -146,7 +146,7 @@ class mumodel(object):
 
         # selects fit slice dimensions 
         if self._calib:
-            self._yf_, self._yb_, self._eyf_, self._eyb_ = suite.slice_for_back_counts(krun,kgroup)
+            self._yf_, self._yb_, self._eyf_, self._eyb_, _ = suite.slice_for_back_counts(krun,kgroup)
             #print('mumodel _load_ krun, kgroup {}, {}'.format(krun,kgroup))
             #self._add_ = self._add_calib_ # for _add_plot_ [and for _chisquare_calib_]
         else: 
@@ -311,7 +311,7 @@ class mumodel(object):
 
         start, stop, pack = tup
         if self._calib:
-            yf, yb, eyf, eyb =  self.suite.slice_for_back_counts(-1,-1)
+            yf, yb, eyf, eyb, _ =  self.suite.slice_for_back_counts(-1,-1)
             #x, self._yf_, self._eyf_ = rebin (self._t_,yf,[self._start_,self._stop_],self._pack_,e=eyf)
             x, yf, eyf = rebin (self._t_,yf,[start,stop],pack,e=eyf)
             #print('mumodel _rebin_plot_ self._yf_.shape {}'.format(self._yf_.shape))
@@ -518,7 +518,7 @@ class mumodel(object):
             if self._nruns_ == self._slice_nruns_: # C2
                 f = rshp(mufit_f) # also redundant, f is squuezed
             else: # B21
-                f = array([rshp(pself._add_plain_(x,*par))[k,:] for par in lastfits for k in range(self._ngroups_)])
+                f = array([rshp(self._add_plain_(x,*par))[k,:] for par in lastfits for k in range(self._ngroups_)])
         # self._add_ = self._add_plain_ # self._add_calib_ if self._calib else
         # self._add_ = self._add_plain_ # self._add_calib_ if self._calib else 
         #else: # B20 and C2

@@ -34,7 +34,8 @@ class suite(object):
         prompt peak for PSI bulk musr
         muedge for ISIS
         self identified for LEM
-        unknown for HIFI
+        unknown for HIFIf'************  E: {path_and_filename} does not exist!'
+                         #012345678901234
 
     suite methods::
     
@@ -43,7 +44,7 @@ class suite(object):
             grouping forward and backward are np array of 0 based indices of detectors
             tools get_grouping does the translation
         self.timebase returns time, always a 1d np array
-        self.single_for_back_counts(runs,grouping) acts on runs to provide
+        self.single_for_back_counts(krun,kgroup) acts on runs to provide
             yforw, ybackw sums over forward, backward detectors 
             background_forw, background_back their backgrounds (PSI) or zero (ISIS) 
             yfm, ybm are <(yi -background_i)*exp(t/tau)>,  
@@ -54,7 +55,16 @@ class suite(object):
                     invokes single_for_back_counts
     """ 
 
-    def __init__(self, datafile , runlist , grp_calib , offset , startuppath, console = 'print', mplot = False):
+    def __init__(self, 
+                 datafile, 
+                 runlist, 
+                 grp_calib,
+                 offset,
+                 startuppath,
+                 console = 'print',
+                 mplot = False,
+                 caller = None,
+                 ):
                  
         """
         __init__ for the suite class, 
@@ -83,27 +93,26 @@ class suite(object):
 #            suite_input_json = f.read()
 #            suite_input = json.loads(suite_input_json)
         try:
-            if self.console_method == 'print': # not a call from a mudash instance
-                self.console('******************* SUITE *********************')
+            self.console('******************* SUITE *********************')
                 # self.console('debug')
-            elif isinstance(console,object):
-                self.console('**** SUITE: using caller log ****')
-            else:
-                self.console('')
         except ValueError as e:
-            print('Except: {}\nno suite.console!'.format(e))
+            print(f'************  E: {str(e)}\nno suite.console!')
             return  # with no console error message, it means no console
 
         # determine number of runs, filenames etc.
             #######################
             # decode the run string
             #######################           
-        self.runs, errormessage = derun(runlist) # self.runs is a list of lists of run numbers (string)
-        if errormessage is not None: # derun error, only syntax errors, no check if a run does not exist
-            self.console('Run syntax error? {}. You typed: {}'.format(errormessage,runlist))
+        self.runs, errmsg = derun(runlist) # self.runs is a list of lists of run numbers (string)
+        if errmsg is not None: # derun error, needed for command call, redundant for mudashed call
+            self.return_string = f'************  E: Run list syntax error? {errmsg}. You typed: {runlist}'
+                                  #012345678901234
+            if caller == None:
+                self.console(self.return_string)
             return  # with console error message
 
-        self.nruns = len(self.runs) # vanished on 23 July 2026 at 17:00 ?!??!  reinserted here
+        self.nruns = len(self.runs) # same number, before loading, as len(self._the_runs_) after loading
+        # mind, self.runs and self.nruns are wishlist. must be validated by load_runs
         
         if os.path.isfile(datafile):
             self.datafile = datafile
@@ -114,11 +123,13 @@ class suite(object):
                 self.thermo = 1 # sample thermometer is 1 on gps (check or adapt to other instruments)
             elif self.datafile[-3:]=='mdu':
                 self.thermo = 1 # sample thermometer is 1 on gps (check for hifi)
-            self.loadfirst = True
+#            self.loadfirst = True
         else:
-            self.console('* File {} not found'.format(datafile))
-            self.console('**************************************')
-            return None  # with console error message
+            self.return_string = f'************  E: File {datafile} not found'
+            if caller == None:
+                self.console(self.return_string)
+            return  # with console error message
+
         self.__startuppath__ = os.getcwd()
 
         # REMEMBER! ../ does not work if it points outside the directory where jupyterlab is launched from
@@ -133,9 +144,10 @@ class suite(object):
         self.__cachepath__ = self.__startuppath__+os.sep+'cache'+os.sep
         # reverse of tools get_grouping is tools get_group
         
-
         # now create the suite 
-        self.load_runs()
+        self.return_string = self.load_runs(self.runs) # load_runs accepts list of lists
+        if self.return_string[0] != '*' or caller == None:
+            self.console(self.return_string) # for successful load or command line / script calls
 
     def console(self, string):
         """Write through the supplied console callback, or print."""
@@ -145,14 +157,15 @@ class suite(object):
         else:
             self.console_method(string)    
 
-    def add_runs(self,k):
+    def add_runs(self,runs,k):
         """
         loads one or more runs to be added together
 
         input::
             
-            k is index in self.runs, a list of lists
-                     of integer-run-number strings
+            runs     either self.runs or new_runs
+            k        index in self.runs, a list of lists
+                        of integer-run-number strings
                      
 
         output::
@@ -182,46 +195,53 @@ class suite(object):
             return instrument
 
         runadd = [] # will contain either a single run or more runs to be added 
-        for j,run in enumerate(self.runs[k]): # run is a single run number string
+        for j,run in enumerate(runs[k]): # run is a single run number string
             path_and_filename =  get_datafilename(self.datafile,run)
             if not isfile(path_and_filename): 
-                self.console(f'"{path_and_filename}" does not exist!')
-                return False
+                return False, f'************  E: {path_and_filename} does not exist!'
+                               #012345678901234
             # PSI cases
             facility = 'PSI'
             if self.datafile[-4:]=='root': # 
                 run_ = rootload(path_and_filename)
-                if not run_.readingOK: return False
+                if run_.read_not_OK: return False, '************  E: uproot error {run.read_not_OK}'
+                                                     #012345678901234
             elif self.datafile[-3:] in ['bin','mdu']:
                 run_ = psiload()
                 readOK = run_.read(path_and_filename)
-                if readOK: return False           
+                if readOK: return False, '************  E: MuSR_td_PSI_bin error {readOK}'
+                                         #012345678901234
             elif self.datafile[-3:]=='nxs': 
                 try: 
                     run_ = isisload(path_and_filename,'r')
                     read_ok = True
                     facility = 'ISIS'
-                except:
-                    return False
+                except Exception as e:
+                    return False, '************  E: Nexus error '+str(e)
+                                  #012345678901234
+
 
             if j or k: # not the first in runadd list, or not the first run in runlist
                 dif_nhs = ( self.numhis != run_.get_numberHisto_int() )
                 dif_bwt = ( self.binwidth != run_.get_binWidth_ns() )
                 dif_t0 = not self.promptfit(run_,check=True)
                 if dif_nhs:
-                    self.console(f'File {path_and_filename} has wrong histoNumber {numhis}')
+                    string = f'************  W: File {path_and_filename} has wrong histoNumber {numhis}'
+                              #012345678901234
                 elif dif_bwt:
-                    self.console('File {} has wrong binWidth {:.2f}'.format(path_and_filename,binwidth))
+                    string = '************  W: File {} has wrong binWidth {:.2f}'.format(path_and_filename,binwidth)
+                              #012345678901234
                 elif dif_t0 : 
-                    self.console(f'File {path_and_filename} has different t0!')
+                    string = f'************  W: File {path_and_filename} has different t0!'
+                              #012345678901234
                 if dif_nhs or dif_bwt or dif_t0:
-                    return
+                    return False, string
                 else:
                     runadd.append(run_) # appends another run to runadd
                     runs_added = run 
             else: # this is j==0 and k==0 # first run in run list and inner list
                 self.numhis = run_.get_numberHisto_int()
-                self.binwidth = run_.get_binWidth_ns()
+                self.binwidth = run_.get_binWidth_ns() 
                 self.histperiods = 1 if ( facility == 'ISIS' or 
                                          self.datafile[-3:] in ['bin','mdu']) else len(run_.get_RedGreen_offsets()) # are there RedGreen copies (self.histperiods>1)?
                 self._the_instrument_ = instrument(run_) # creates _the_instrument_
@@ -235,56 +255,106 @@ class suite(object):
                     self.console('                            using corrected LEM histograms 8,9,10,11,12,13,14,15') 
                     self.LEM_back_subt = True
                 if self.store_groups():   # checks that grp dicts are consistent with datafile
+                    #from time import perf_counter
+                    #start = perf_counter()
+                    # promptfit takes ~0.1 s per histogram on bulkmusr
                     if self.promptfit(run_): # j=0 and k=0, first promptfit, first run in first runadd list
+                        #elapsed = perf_counter() - start
+                        #self.console(f"Promptfit Elapsed: {elapsed:.3f} s") # 0.5 s per dataset
                         runadd.append(run_)   # appends first run to runadd
                         runs_added = run
+                        self.loadfirst = True
                     else:
-                        self.console('  Unexpected wrong first promptfit')
-                        return False
+                        string = '************   E: Unexpected wrong first promptfit'
+                                 #012345678901234
+                        return False, string
                 else:
-                    self.console('*************  suite exits without data, incompatible grp and datafile  **************')
-                    return False
+                    string = '************  E: suite exits without data, incompatible grp and datafile'
+                             #012345678901234
+                    return False, string
 
         self._the_runs_.append(runadd) # appends a runadd list to the list
         filename_short = short_path(path_and_filename,self.__startuppath__) 
         title = get_title(run_)
         self.console(f'{filename_short} loaded, run {runs_added}: {title}')
-        return True
 
-    def load_runs(self):
+        _,_,_,_,string = self.slice_for_back_counts(k,-1) # 0.07 s per MusrRoot file on pc34 
+        self.console(string)#
+
+        return True, ''
+
+    def load_runs(self,runs):
         """
         load musr2py. muroot2py or muisis2py instances stored as a list of lists [[runs to add], ...]::
 
-            self._the_runs_[0][0] a single run, or the first of a suite 
-            self._the_runs_[k][0] the k-th run of a run suite
-        
-        Invoked after creating a suite instance, typically as::
+        input::
 
-            the_suite = suite('log/input.suite') 
-                # the_suite implements the class suite according to input.suite
-            if the_suite.load_runs():            
-                # this and the following two statements load data
-                if the_suite.store_groups():     
-                    #   define groups
-                    the_suite.promptfit()    
-                        #   fit t0 = 0
+            runs        either self.runs or new_runs, list of lists
+
+            a single run is self._the_runs_[0][0]
+            the k-th run of a suite of single runs is self._the_runs_[k][0]
+            the j-th run to add into the k-th "addrun" of a suite is self._the_runs_[k][j]
+
+        Invoked after creating a suite instance, it prints backgrounds on console
         """
 
-        for k in range(len(self.runs)):#  self.runs is a list of lists of run number stringsto add
-            if not self.add_runs(k):
+        for k in range(len(runs)):#  self.runs is a list of lists of run number stringsto add
+            add_OK, string = self.add_runs(runs,k)
+            if not add_OK:
                 if k==0: 
-                    self.console('*********************** suite exits without loading data ****************************')
-                    return
+                    self.nruns = k
+                    self.runs = []
+                    return string
                 else:
-                    string = ', '.join([self.runs[k][0] for k in range(k-1)])
-                    self.console('**************************')
-                    self.console(f'Warning: loaded runs {string}, run {self.runs[k][0]} not loaded')
-                    self.runs.pop(k)
-                    break
+                    runs = ', '.join([self.runs[k][0] for k in range(k)])
+                    string += f'\nWarning: loaded runs {runs}, run {sef.runs[k][0]} not loaded'
+                    for j in range(self.nruns-1,k-1,-1):
+                        self.runs.pop(j)
+                    self.nruns = k
+                    return string
                   # this code reads and returns a read_ok code
-        self.loadfirst = True
+
+        return ' '        
+ 
         #return read_ok # False with console error message in add_runs
    
+    def append_runs(self,runs_add):
+        """adds runs_add to existing suite instance
+
+        input::
+            
+            runs_add    list of list of runs to add
+
+        mere wrapper? 
+        """
+
+        try:
+            self.load_runs(runs_add)
+            string = ''
+            self.nruns = len(self._the_runs_)
+            for r in runs_add:
+                self.runs.append(r)
+        except Exception as e:
+            string = str(e)
+            
+        return string
+
+    def pop_runs(self,runs_pop):
+        """removes runlist_addition from existing suite instance"""
+
+        try:
+            if self.runs: # just to chech some runs exist already
+                for runlst in runs_pop:
+                    k = self.runs.index(runlst)
+                    self._the_runs_.pop(k)
+                    self.runs.pop(k)
+                self.nruns = len(self.runs)
+                string = f'Removed {", ".join([r[0] for r in runs_pop])}'
+        except Exception as e:
+            string = '*************  W: '+str(e)
+                      #012345678901234 
+        return string
+
 
     def check_group(self,group):
         """
@@ -320,30 +390,6 @@ class suite(object):
         return True
 
               
-    def t_value_error(self,k):
-        """
-        deprecated?
-        calculates T and eT values also for runs to be added::
-        
-            sillily, but it works also for single run
-                
-        ignores self.LEM_back_subt, a negligible factor for weight
-        """
-
-        from numpy import sqrt
-
-        m = len(self._the_runs_[k]) # number of added runs
-        weight = [float(sum(self._the_runs_[k][j].get_histo_vector(counter,1))) for counter in range(self._the_runs_[0][0].get_numberHisto_int()) for j in range(m)]
-        if sum(weight)>0:
-            weight = [w/sum(weight) for k,w in enumerate(weight)]
-            t_value = sum([self._the_runs_[k][j].get_temperatures_vector()[self.thermo]
-                              *weight[j] for j in range(m)])
-            t_error = sqrt(sum([(self._the_runs_[k][j].get_devTemperatures_vector([self.thermo])
-                              *weight[j])**2 for j in range(m)])) if self.datafile[-3:] in ['oot','bin','mdu'] else 0
-        else:
-            t_value, t_error = 0, 0
-        return t_value, t_error
-
     def promptfit(self,the_run, mprint = True, check=False):
         """
         indentifies t0 and stores self.nt0 array (all intruments) [ISIS check]
@@ -415,9 +461,9 @@ class suite(object):
 
             nt0 = array([int(the_run.get_t0_int(k)) for k in range(self.numhis)])
             if 'nt0' in self.__dir__(): 
-                if any(nt0 != self.nt0):
+                if any(self.nt0 < nt0 - 1) or any(self.nt0 > nt0 + 1): # to allow for small difference in rounding
                     return False
-            else:
+            elif not check:
                 self.nt0 = nt0
                 self.dt0 = zeros_like(self.nt0) # fraction of bin, ignored with tdc resolution of 195 pds  
                 self.lastbin = self.nt0.min() # unused for lem
@@ -504,9 +550,9 @@ class suite(object):
                 # these three are the sets of parameters used by other methods
             nt0 = x0.round().astype(int) # bin of peak, nd.array of shape run.get_numberHisto_int()
             if 'nt0' in self.__dir__(): 
-                if any(nt0 != self.nt0):
+                if any(self.nt0 < nt0 - 1) or any(self.nt0 > nt0 + 1): # to allow for small difference in rounding
                     return False
-            else:
+            elif not check:
                 self.nt0 = nt0
                 self.dt0 = x0-self.nt0 # fraction of bin, nd.array of shape run.get_numberHisto_int() 
                 self.lastbin = self.nt0.min() - self.prepostpk[0] # nd.array of shape run.get_numberHisto_int() 
@@ -580,9 +626,9 @@ class suite(object):
                                   y_text,'Det #{}\nt0={}bin'.format(counter+1,x0[counter]))
             nt0 = x0
             if 'nt0' in self.__dir__(): 
-                if any(nt0 != self.nt0):
+                if any(self.nt0 < nt0 - 1) or any(self.nt0 > nt0 + 1): # to allow for small difference in rounding
                     return False
-            else:
+            elif not check:
                 self.nt0 = nt0
                 self.dt0 = zeros_like(self.nt0) # unused for hifi
                 self.lastbin = self.nt0.min() # unused for hifi
@@ -616,9 +662,9 @@ class suite(object):
                 ax_counters.text(x_text,y_text,'t0 = {:.1f} mus'.format(t0))
             nt0 =  array([t0/the_run.get_binWidth_ns()]).round().astype(int) # bin of peak, 
             if 'nt0' in self.__dir__(): 
-                if any(nt0 != self.nt0):
+                if any(self.nt0 < nt0 - 1) or any(self.nt0 > nt0 + 1): # to allow for small difference in rounding
                     return False
-            else:
+            elif not check:
                 self.nt0 = nt0
                 self.dt0 = array(t0-self.nt0) # fraction of bin, in ns
 
@@ -737,31 +783,34 @@ class suite(object):
 #        # rebin eA works for ISIS, must be corrected for PSI        #
 #        # yfm, ybm depend on binning   
 
-    def single_for_back_counts(self,runs,grouping):
+    def single_for_back_counts(self,krun,kgroup):
         """
         basic method for single group single run count arrays
 
         input:: 
 
-            runs, runs to add 
-            grouping, {'forward':[3],'backward':[4]} for 3-4 
+            krun        index of list of runs to add 
+            kgroup      index of grouping, which is e.g. {'forward':[3],'backward':[4]} for 3-4 
         
         output::
 
-            for PSI, with b_j = mean(data_j before muon arrival)
-                yfc, ybc = sum_{j in for or back} (data_j - b_j)
-            for ISIS (b_j = 0)
-                         = sum_{j in for or back} data_j) 
-                eyfc, eyfc  = sqrt(sum_{j in for or back}(data_j + (b_j + p(0,b)/n)))
-                    with error e = sqrt(N+(b+p(0,b))/n), 
-                        where p(0,b) is probability for 0 count, 
-                                either
-                            p_0b = normal probability , ~Poisson std=sqrt(b)
-                                 = exp(-b/2)/sqrt(2*pi*b), or
-                            P_0b = true Poisson = exp(-b) 
-        
-        Method used both in self.asymmetry_single normal fits
-        and in calib (alpha minuit parameter)
+            yfc, ybc, eyfc, eybc, string
+                for PSI, with b_j = mean(data_j before muon arrival)
+                    yfc, ybc = sum_{j in for or back} (data_j - b_j)
+                    eyfc, eyfc  = sqrt(sum_{j in for or back}(data_j + (b_j + p(0,b)/n)))
+                        with error e = sqrt(N+(b+p(0,b))/n), 
+                            where p(0,b) is probability for 0 count, 
+                                    either
+                                p_0b = normal probability , ~Poisson std=sqrt(b)
+                                     = exp(-b/2)/sqrt(2*pi*b), or
+                                P_0b = true Poisson = exp(-b) 
+                for ISIS (b_j = 0)
+                    yfc, ybc = sum_{j in for or back} data_j 
+                    eyfc, eyfc  = sqrt(sum_{j in for or back}(data_j)
+            string collects backgroung mean counts 
+
+        Method used in self.asymmetry_single normal fits, calib (alpha minuit parameter), and self.slice_for_back_counts 
+        (also in mucomponents)
         
         .. note::
 
@@ -787,41 +836,57 @@ class suite(object):
             
             yfc, eyfc = zeros(self.histoLength), zeros(self.histoLength) # counts 
             ybc, eybc = zeros(self.histoLength), zeros(self.histoLength) # counts 
-            back_f, back_b = 0., 0.             # background initialized
+            back_f,back_b = [],[]
+            p0_f, p0_b = [],[]
             n = self.lastbin-self.firstbin+1    # n of bins in back estimation 
             n1 = self.nt0[0] + self.offset      # first good bin     
             n2 = n1 + self.histoLength          # last good bin     
-            for j, run in enumerate(runs): # Add runs
-                #print(run)
-                for counter in grouping['forward']: 
-                    nc = counter + 8 if self.LEM_back_subt else counter
-                    histo = array(run.get_histo_vector(nc,1)) # counter data array in forw group
-                    if filespec in filespecsr: # oot is correct! PSI, counter specific range
-                        n1 = self.nt0[counter] + self.offset # first good bin
-                        n2 = n1 + self.histoLength           # last good bin
-                        back_f += mean(histo[self.firstbin:self.lastbin]) if filespec in filespecs else 0. # before muon arrival
-                    yfc += histo[n1:n2] # counts 
-                p_0b =  exp(-back_f) if back_f > 0 else 0. # true Poisson probability for zero counts
-                eyfc = sqrt(yfc+(back_f+p_0b)/n) # error accounting also for zero counts
-                yfc -= back_f # counts corrected for background, valid also for ISIS
-                yfc[where(yfc<0)] = 0
-                        
-                for counter in grouping['backward']: # first good bin, last good bin from data attay start
-                    nc = counter + 8 if self.LEM_back_subt else counter
-                    histo = array(run.get_histo_vector(nc,1)) # counter data array in back group
-                    if filespec in filespecsr: #  PSI, counter specific range  
-                        n1 = self.nt0[counter] + self.offset
-                        n2 = n1 + self.histoLength 
-                        back_b += mean(histo[self.firstbin:self.lastbin]) if filespec in filespecs else 0.  # before muon arrival
-                    ybc += histo[n1:n2]
-                p_0b =  exp(-back_b) if back_b > 0 else 0. # true Poisson probability for zero counts
-                eybc = sqrt(ybc+(back_b+p_0b)/n)
-                ybc -= back_b
-                ybc[where(ybc<0)] = 0
+            for counter in self.grouping[kgroup]['forward']: 
+                nc = counter + 8 if self.LEM_back_subt else counter
+                if filespec in filespecsr: # oot is correct! PSI, counter specific range
+                    n1 = self.nt0[counter] + self.offset # first good bin
+                    n2 = n1 + self.histoLength           # last good bin
+                for jrun,run in enumerate(self._the_runs_[krun]): # Add runs
+                    if jrun == 0: 
+                        histo = array(run.get_histo_vector(nc,1))
+                    else:
+                        histo += array(run.get_histo_vector(nc,1)) # sum counts over runs in forw group
+                back = mean(histo[self.firstbin:self.lastbin]) if filespec in filespecsr and not self.LEM_back_subt else 0. # background added runs
+                p0 =  exp(-back) if back > 0 else 0. # true Poisson probability for zero counts
+                yfc += histo[n1:n2] - back # counts in added runs - back
+                back_f.append(back)
+                p0_f.append(p0)
+                   
+            for counter in self.grouping[kgroup]['backward']: # first good bin, last good bin from data attay start
+                histo = zeros(self.histoLength)
+                nc = counter + 8 if self.LEM_back_subt else counter
+                if filespec in filespecsr: # oot is correct! PSI, counter specific range
+                    n1 = self.nt0[counter] + self.offset # first good bin
+                    n2 = n1 + self.histoLength           # last good bin
+                for jrun,run in enumerate(self._the_runs_[krun]): # Add runs
+                    if jrun == 0: 
+                        histo = array(run.get_histo_vector(nc,1))
+                    else:
+                        histo += array(run.get_histo_vector(nc,1)) # sum counts over runs in forw group
+
+                back = mean(histo[self.firstbin:self.lastbin]) if filespec in filespecsr and not self.LEM_back_subt else 0. # background added runs
+                p0 =  exp(-back) if back > 0 else 0. # true Poisson probability for zero counts
+                ybc += histo[n1:n2] - back # counts in added runs - back, can be negative
+                back_b.append(back)
+                p0_b.append(p0)
+
+            yfc[where(yfc<0)] = 0
+            eyfc = sqrt(yfc+(array(back_f).sum()+array(p0_f).sum())/n) # error accounting also for zero counts
+                # below is wrong!
+            ybc[where(ybc<0)] = 0
+            eybc = sqrt(ybc+(array(back_b).sum()+array(p0_b).sum())/n)
+            string_f = [f'{c+1}: {b:.4f}' for c,b in zip(self.grouping[kgroup]['forward'],back_f)]
+            string_b = [f'{c+1}: {b:.4f}' for c,b in zip(self.grouping[kgroup]['backward'],back_b)]
+            string = 'fw: '+', '.join(string_f)+' bw '+', '.join(string_b)+' '
              
-            return yfc, ybc, eyfc, eybc
+            return yfc, ybc, eyfc, eybc, string
         else:
-            return None, None, None, None
+            return None, None, None, None, ''
         #-----------------------------------------------------------#
         # compute and return yfc, ybc, eyfc, eybc                   #
         # asymmetry computes A, eA if alpha is constant             #
@@ -840,7 +905,9 @@ class suite(object):
         
         output::
 
-            the corresponding yf, yb, eyf, eyb slices
+            
+            yf, yb, eyf, eyb        the corresponding slices
+            string                  the collected strings with backgrounds
         
         cases::
 
@@ -853,52 +920,61 @@ class suite(object):
         """
 
         from numpy import array, vstack
+        # krun, kgroup are shorthand, jrun,jgroup are actual run, group indices
         if krun==-1 and kgroup==-1: # 3d
-            for krun,run in enumerate(self._the_runs_):
-                for kgroup,grouping in enumerate(self.grouping):
-                    yforw, ybackw, ey_forw, ey_backw = self.single_for_back_counts(run,grouping)
-                    if kgroup:
+            for jrun  in range(self.nruns): # ,run in enumerate(self._the_runs_):
+                if jrun:
+                    string += f'\n{self.runs[jrun]} backgrounds '
+                else:   
+                    string = f'{self.runs[jrun]} backgrounds '
+                for jgroup in range(len(self.groups)):# ,grouping in enumerate(self.grouping):
+                    yforw, ybackw, ey_forw, ey_backw, jstring = self.single_for_back_counts(jrun,jgroup)
+                    string += jstring
+                    if jgroup:
                         yf, yb = vstack((yf,array([yforw]))), vstack((yb,array([ybackw])))
                         eyf, eyb = vstack((eyf,array([ey_forw]))), vstack((eyb,array([ey_backw])))
                     else: # kgroup = 0
                         yf, yb = array([yforw]), array([ybackw])
                         eyf, eyb = array([ey_forw]), array([ey_backw])
-                if krun: 
+                if jrun: 
                     yfr, ybr  = vstack((yfr,array([yf]))), vstack((ybr,array([yb])))
                     eyfr, eybr = vstack((eyfr,array([eyf]))),vstack((eybr,array([eyb])))
                 else: # krun = 0
                     yfr, ybr = array([yf]),array([yb]) # 3rd dimension runs
                     eyfr, eybr = array([eyf]),array([eyb])
-
         elif krun==-1: # 2d
-            for krun,run in enumerate(self._the_runs_):
-                yforw, ybackw, ey_forw, ey_backw = self.single_for_back_counts(run,self.grouping[kgroup])
-                if krun:
+            for jrun in range(self.nruns): # ,run in enumerate(self._the_runs_):
+                yforw, ybackw, ey_forw, ey_backw, jstring = self.single_for_back_counts(jrun,kgroup)
+                string = f'\n{self.runs[jrun]} backgrounds '+jstring
+                if jrun:
                     yfr, ybr = vstack((yfr,array([yforw]))), vstack((ybr,array([ybackw])))
                     eyfr, eybr = vstack((eyfr,array([ey_forw]))), vstack((eybr,array([ey_backw])))
                 else: # krun = 0
                     yfr, ybr = array([yforw]), array([ybackw])
                     eyfr, eybr = array([ey_forw]), array([ey_backw])
         elif kgroup==-1: # 2d
-            for kgroup,grouping in enumerate(self.grouping):
-                yforw, ybackw, ey_forw, ey_backw = self.single_for_back_counts(self._the_runs_[krun],grouping)
-                if kgroup:
+            for jgroup in range(len(self.groups)): # ,grouping in enumerate(self.grouping):
+                yforw, ybackw, ey_forw, ey_backw, jstring = self.single_for_back_counts(krun,jgroup)
+                if jgroup:
                     yfr, ybr = vstack((yfr,array([yforw]))), vstack((ybr,array([ybackw])))
                     eyfr, eybr = vstack((eyfr,array([ey_forw]))), vstack((eybr,array([ey_backw])))
-                else: # kgroup=0
+                    string += jstring
+                else: # jgroup=0
                     yfr, ybr = array([yforw]), array([ybackw])
                     eyfr, eybr = array([ey_forw]), array([ey_backw])
+                    string = f'\n  backgrounds '+jstring # {self.runs[krun]}
         else: # 1d, only bins
-            yfr, ybr, eyfr, eybr = self.single_for_back_counts(self._the_runs_[krun],self.grouping[kgroup])
-        return yfr, ybr, eyfr, eybr
+            yfr, ybr, eyfr, eybr, string = self.single_for_back_counts(krun,kgroup)
+        if string[0]=='\n': string = string[1:]
+        return yfr, ybr, eyfr, eybr, string
 
-    def asymmetry_single(self,the_run,kgroup):
+    def asymmetry_single(self,krun,kgroup):
         """
         unbinned asymmetry and errors arrays, with grouping[kgroup]['alpha'] 
 
         input::
 
-            the_run     list containing the instance[s] of the run[s to be added]
+            krun        index of list containing the instance[s] of the run[s to be added]
                             musr2py/muroot2py/muisis2py  (psi or isis load routines) 
             kgroup      index of self.grouping, list of dicts, where 
                         self.grouping[kgroup]['forward'] and ['backward'] 
@@ -917,7 +993,7 @@ class suite(object):
         if self.loadfirst:
             # print(the_run)
             alpha = self.grouping[kgroup]['alpha']            
-            yf, yb, eyf, eyb = self.single_for_back_counts(the_run,self.grouping[kgroup])
+            yf, yb, eyf, eyb, string = self.single_for_back_counts(krun,kgroup)
             
             denominator = (yf + alpha*yb)
             denominator[where(denominator==0)] = 1  
@@ -974,33 +1050,33 @@ class suite(object):
 
         from numpy import array, vstack
         if krun==-1 and kgroup==-1: # 3d
-            for krun,run in enumerate(self._the_runs_):
-                for kgroup in range(len(self.groups)):
-                    a,e = self.asymmetry_single(run,kgroup)
-                    if kgroup:
+            for jrun in range(self.nruns): #,run in enumerate(self._the_runs_):
+                for jgroup in range(len(self.groups)):
+                    a,e = self.asymmetry_single(jrun,jgroup)
+                    if jgroup:
                         asy,ase = vstack((asy,a)), vstack((ase,e)) # groups are vstacked in 2nd dimension
                     else: # kgroup = 0
                         asy,ase = a,e # 1d dimension bins
-                if krun:
+                if jrun:
                     asymm, asyme  = vstack((asymm,array([asy]))), vstack((asyme,array([ase])))
                 else: # krun=0
                     asymm, asyme = array([asy]),array([ase]) # 3rd dimension runs
         elif krun==-1: # 2d
-            for krun,run in enumerate(self._the_runs_):
-                a,e = self.asymmetry_single(run,kgroup)
-                if krun:
+            for jrun in range(self.nruns): # ,run in enumerate(self._the_runs_):
+                a,e = self.asymmetry_single(jrun,kgroup)
+                if jrun:
                     asymm, asyme  = vstack((asymm,a)), vstack((asyme,e)) # runs are vstacked in 2nd dimension
                 else: # krun=0
                     asymm, asyme = a,e # 1nd dimension bins
         elif kgroup==-1:
-            for kgroup in range(len(self.groups)):
-                a,e = self.asymmetry_single(self._the_runs_[krun],kgroup)
+            for jgroup in range(len(self.groups)):
+                a,e = self.asymmetry_single(krun,jgroup)
                 if kgroup:
                     asymm,asyme = vstack((asymm,a)), vstack((asyme,e)) # groups are vstacked in 2nd dimension
                 else: # kgroup = 0
                     asymm,asyme = a,e# 1d dimension bins
         else: # 1d, only bins
-            asymm,asyme = self.asymmetry_single(self._the_runs_[krun],kgroup)
+            asymm,asyme = self.asymmetry_single(krun,kgroup)
         return asymm, asyme
      
     def single(self):
@@ -1052,4 +1128,29 @@ class suite(object):
         elif [run[0].get_field() for run in self._the_runs_]!=[self._the_runs_[0][0].get_field()]*len(self._the_runs_): return 'B[mT]'
         elif [run[0].get_orient() for run in self._the_runs_]!=[self._the_runs_[0][0].get_orient()]*len(self._the_runs_): return 'Orientation '
         else: return 'Run # '
+
+    def t_value_error(self,k):
+        """
+        deprecated? not used, not a wrong idea
+        calculates T and eT values also for runs to be added::
+        
+            sillily, but it works also for single run
+                
+        ignores self.LEM_back_subt, a negligible factor for weight
+        """
+
+        from numpy import sqrt
+
+        m = len(self._the_runs_[k]) # number of added runs
+        weight = [float(sum(self._the_runs_[k][j].get_histo_vector(counter,1))) for counter in range(self._the_runs_[0][0].get_numberHisto_int()) for j in range(m)]
+        if sum(weight)>0:
+            weight = [w/sum(weight) for k,w in enumerate(weight)]
+            t_value = sum([self._the_runs_[k][j].get_temperatures_vector()[self.thermo]
+                              *weight[j] for j in range(m)])
+            t_error = sqrt(sum([(self._the_runs_[k][j].get_devTemperatures_vector([self.thermo])
+                              *weight[j])**2 for j in range(m)])) if self.datafile[-3:] in ['oot','bin','mdu'] else 0
+        else:
+            t_value, t_error = 0, 0
+        return t_value, t_error
+
 

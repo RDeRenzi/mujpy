@@ -2636,7 +2636,16 @@ def pardicts2widgets(pardicts,flags,NG,observe):
         pardicts is globpardicts_guess
         flags is allowed flag values
         NG is number of global parameters
-        observe is mudashed._on_add_del_plot (but is not known a-priori)
+        observe     the prototype callback method (mudashed._on_add_del_plot) 
+
+    output::
+
+        self.global_box.children        widgets
+        self._pardicts_observers        list of callbacks
+                                            each is a partial of the prototype
+                                            with kp, pardict index, preset as first arg 
+
+
     """
 
     from mujpy.tools.tools import glob2widgets
@@ -2662,7 +2671,7 @@ def pardicts2widgets(pardicts,flags,NG,observe):
         if 'positive_parity' not in pardict: pardict['positive_parity']=False
         left_column.append(glob2widgets(kp,pardict,flags,keylen,callback))
     for kp,pardict in enumerate(pardicts[n_columns:]):
-        callback = addkwarg(observe,kp)
+        callback = addkwarg(observe,kp+n_columns)
         pardicts_observers.append(callback)
         if 'positive_parity' not in pardict: pardict['positive_parity']=False
         right_column.append(glob2widgets(kp+n_columns,pardict,flags,keylen,callback))
@@ -3213,8 +3222,9 @@ def ipyw_warning_dial(title="Warning", message=""):
     from mujpy.tools.tools import create_overlay_layout, create_dialog_box_layout
     title_html = HTML(f"<h3>{title}</h3>") #⚠️
     html_message = ""
+    from html import escape
     for snip in message.split("\n"):
-        html_message += "<p>"+snip+"</p>"
+        html_message += "<p>"+escape(snip)+"</p>"
     message_html = HTML(html_message, layout=Layout(margin='10px 0px 20px 0px'))
     ok_btn = Button(description="OK", layout=Layout(width='100px', align_self='center'))
     ok_btn.style.button_color = '#c0b1ab'

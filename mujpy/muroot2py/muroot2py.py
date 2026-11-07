@@ -36,13 +36,13 @@ class muroot2py():                        # defines the python class
     """
 
     def __init__(self, path_filename):
-        self.readingOOK = self.read(path_filename)  # reads data
+        self.read_not_OK = self.read(path_filename)  # reads data
         self._make_header_dict() # creates header dictionary self._header_dict
         self._make_histo_dicts()  # creates histo dictionary self._histo_dicts
                                   # used by all get_ calls
     def read(self,path_filename):
         """
-        read
+        load root_directory from path_filename
         
         .. code::
 
@@ -52,10 +52,9 @@ class muroot2py():                        # defines the python class
         """    
         try:
             self.run = ReadOnlyFile(path_filename).root_directory # universal, Tfolder_v1 and TDirectory 
-            read_ok = True
-        except:
-            read_ok = False
-        return read_ok
+            return ''
+        except Exception as e:
+            return str(e)
 
 # internal methods
 
