@@ -121,47 +121,48 @@ class dashed(object):
 
         return "globpardicts_guess" in self.dashboard.keys()
 
-    def _C12(self):
-        """
-        True if fit is C1 or C2
-        """
+    def _hash(self):
+        """True if global and at least one flag is '#' in globpardicts"""
+        
         if self._global():
             return any([pardict['flag']=='#' for pardict in self.dashboard["globpardicts_guess"]])
         else:
             return False
 
+    def _C12(self):
+        """
+        True if fit is C1 or C2 - coincides with self._hash(), based on self.dashboard
+        """
+
+        return self._hash() 
+
     def _C1(self):
         """
-        True for C1 fit
+        True for C1 fit, based on self.dashboard
         """
 
-        if self._C12() and not self._function_multi():
-            return True
-        else:
-            return False
+        return self._C12() and not self._function_multi()
+
     def _C2(self):
         """
-        True for C2 fit
+        True for C2 fit, based on self.dashboard
         """
 
-        if self._C12() and self._function_multi():
-            return True
-        else:
-            return False
+        return self._C12() and self._function_multi()
 
     def _function_multi(self):
         """
-        True for A21, B21, C2 (global multigroup)
+        True for A21, B21, C2 (global multigroup), based on self.dashboard
         """
 
         return any(['function_multi' in pardict.keys() for component in self.dashboard['model_guess'] for pardict in component['pardicts']])
 
     def _AB21(self):
         """
-        True if no hash and function_multi
+        True if global and function_multi in model_guess, based on self.dashboard
         """
     
-        return self._global() and not self._C12()
+        return self._global() and self._function_multi()
 
     def _multigroup(self):
         """
@@ -194,7 +195,6 @@ class dashed(object):
         if change['type'] == 'change' and change['name'] == 'value':
             value = change['new']
             drop = change['owner']
-            self.log(f'debug _on_add_del_plot {value} kp = {kp} owner = {drop}')
             pardicts, _, error = widg2pardicts(self.global_box) # list or pardicts 
             flags = ['~','!','#']
             if error:
@@ -256,7 +256,8 @@ class dashed(object):
         if the_plot.warn_msg:
             overlay = ipyw_warning_dial(title = the_plot.warn_msg[0],
                                 message = the_plot.warn_msg[1])
-            show_hide_tab(overlay,self.on_modal_display_change,self.tab)   
+            show_hide_tab(overlay,self.on_modal_display_change,self.tab) 
+        return self.fig_fit 
 
     def _draw_qt_ft(self, plot_range, fft_range, real):
         """required only to display fft animation with the Qt backend GUI thread"""
@@ -278,12 +279,92 @@ class dashed(object):
             overlay = ipyw_warning_dial(title = the_plot.warn_msg[0],
                                 message = the_plot.warn_msg[1])
             show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+        return self.fig_fft
+
+    def dashboard_suite_mismatch(self):
+        """check if dashboard and suite are incompatible"""
+
+        from mujpy.tools.tools import derange, ipyw_warning_dial, show_hide_tab
+        KO, msg = False, ''
+        if self._global():
+            title = 'Global fit & suite model mismatch'
+            # global fit, check that groups and run list agree with dashboard
+            if self._AB21() or self._C2(): # based on self.dashboard
+                if not self._multigroup(): # based on self.suite
+                    msg = ('Presume a multigroup C2, A21 or B21 fit'
+                         '\n(model functions contain ";")'
+                         '\nbut only 1 group present.')
+                    KO = True
+            if not self._hash():
+                if not self._multigroup():
+                    msg = ("Global fit on just 1 group must have a '#' flag."
+                         "\nSwitch to sequential or to C1 fit (insert '#')")
+                    KO = True
+            if self._C12(): # based on self.dashboard
+                if not self._multirun: # based on self.suite
+                    msg = ('Presume a C1 or C2 fit'
+                        '\n("#" in global parameters)'
+                        '\nRun list contains one run.')
+                    KO = True
+                elif self._C1() and self._multigroup(): # based on self.dashboard and based on self.suite 
+                    msg = ('Presume a C1 fit'
+                          '\n ("#" global flags, no ";" in model functions)'
+                          '\nMore groups exist.')
+                    KO = True
+        else:
+            title = 'Single fit & suite model mismatch'
+            if self._function_multi():
+                KO = False
+                msg = "Remove ';' from model function"
+
+        plot_range = self.command_1.children[8].value
+        p, errmsg = derange(plot_range, self.suite.histoLength)
+        if errmsg:
+            msg += f'\n***************\n* plot range error:\n{errmsg}'
+            KO = True
+        if KO:
+            overlay = ipyw_warning_dial(title = title,
+                                        message = msg)
+            show_hide_tab(overlay,self.on_modal_display_change,self.tab)                
+        return KO
+
+    def do_plot(self):
+        """Invoke mufitplot in agreement with either qt or ipympl backends"""
+
+        from matplotlib import get_backend 
+        from matplotlib.pyplot import ioff
+        from functools import partial
+        rotfreq = self.command_1.children[9].value
+        plot_range = self.command_1.children[8].value
+        is_ipympl = "ipympl" in get_backend() or get_backend() == 'widget'
+
+        self.figure_box.outputs = ()
+        if is_ipympl:
+            from mujpy.mufitplot import mufitplot
+            with ioff():
+                the_plot = mufitplot(
+                        plot_range,
+                        self.fit,
+                        rotating_frame_frequencyMHz=rotfreq,
+                        plot_out=self.figure_box,
+                        fig_fit=self.fig_fit,
+                        )
+                self.fig_fit = the_plot.fig
+                if the_plot.warn_msg:
+                    overlay = ipyw_warning_dial(title = the_plot.warn_msg[0],
+                                        message = the_plot.warn_msg[1])
+                    show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+        else:
+
+            self._qt_dispatcher.submit(
+                        partial(self._draw_qt, plot_range, rotfreq)
+                        )
 
     def _on_Fit(self,b):
         """
         invokes mufit and muplotfit extracting their args from the widgets
 
-        callback invokes::
+        callback::
 
             self.fit = mufit(self.suite,
                             dashboard_file,
@@ -299,105 +380,49 @@ class dashed(object):
         """
 
         import json
-        from matplotlib import get_backend 
-        from matplotlib.pyplot import ioff
         from mujpy.mufit import mufit
-        from mujpy.tools.tools import check_function, ipyw_warning_dial, show_hide_tab, derange
-        from functools import partial
+        from mujpy.tools.tools import ipyw_warning_dial, show_hide_tab
 
-        dashbd = self.build_dashboard_from_widgets()
-        kc, kp, kgroup, errmsg = check_function(self.dashboard,self.suite.groups) # minimal model syntax check
-        self.log('first instance, component {}, parameter {}, group {}:\n{}'.format(kc,kp,kgroup,errmsg))
-        if self._global() and len(self.suite.groups)>1:
-            if not any(['function_multi' in pardict.keys() for component in self.dashboard['model_guess'] for pardict in component['pardicts']]):
-                errmsg += ('++++ Check global parameters or grouping:\nmulti group imply ";" in some function') 
-        if errmsg:
-            title = 'Check syntax or logic'
-            if kc >= 0 and kp >= 0: # failed json dashboard syntax check
-                if self._global(): # there are no parameter indices on the dash
-                    kp = self.dashboard['model_guess'][kc]['pardicts'][kp]['name']
-                errmsg += f'\n++++ Check all model parameters, first:\ncomponent {kc}, parameter {kp}, group {kgroup}'
-            elif kc < 0 and kp > 0:
-                errmsg += f'\n++++ Check all global parameters:\nno function allowed in parameter {kp}'
-            overlay = ipyw_warning_dial(title = title,
-                                        message = errmsg)
-            show_hide_tab(overlay,self.on_modal_display_change,self.tab)
-            return False
 
-        OK = True
-        if self._global():
-            title = 'Suite & global fit model mismatch'
-            # global fit, check that groups and run list agree with dashboard
-            if self._AB21() or self._C2():
-                if not self._multigroup():
-                    msg = 'Correct either the suite or the model.\nThis is a C2 or A/B21 fit\n(model functions contain ";"),\nbut Groups ...: is empty.' 
-                    OK = False
-            if self._C12():
-                if not self._multirun:
-                    msg = 'Correct either the suite or the model.\nThis is a C1/2 fit\n("#" in global parameters),\nbut with single-run list.'
-                    OK = False
-                elif self._C1() and self._multigroup():
-                    msg = 'Correct either the suite or the model.\nThis is a C1 fit\n (no model function has ";" for multigroup),\nbut Groups ...: exist.'
-                    OK = False
-            if not OK: # still False after the above changes
-                overlay = ipyw_warning_dial(title = title,
-                                            message = msg)
-                show_hide_tab(overlay,self.on_modal_display_change,self.tab)
-                return
-        if dashbd and OK: # creates self.dashboard and returns True if no validation raise occurred
-            dashboard_file = self.suite.__fitpath__+'dashed.json'
-            plot_range = self.command_1.children[8].value
-            p, errmsg = derange(plot_range, self.suite.histoLength)
-            if errmsg:
-                self.log(f'\n***************\n* no fit yet, correct plot range:\n'+errmsg)
-                self.tab.selected_index = 2
-                return
+        dashbd = self.build_dashboard_from_widgets() # checks widgets before building dashboard
+        if not dashbd: return # dialog already shown, failed one of:
+                                # {empty or duplicate names, 
+                                #  3 consecutive values = 0,
+                                #  values outside limits,
+                                #  function math syntax,
+                                #  0 <= get_indices < kmax, 
+                                #  kmax = NG_int.value] 
+                                # this parameter index (single fit)
+        
+        if self.dashboard_suite_mismatch(): # check consistency of dashboard with suite
+            return # errors already produced their message dialods
 
-            with open(str(dashboard_file),'w',encoding='utf-8') as f:
-                json.dump(self.dashboard,f, indent=4) # mufit wants to read this from a file
+        dashboard_file = self.suite.__fitpath__+'dashed.json'
 
-            # TEMPORARY COMMENT TO KEEP ALL DEBUG LOGS
-            self.board_box.outputs = ()
+        with open(str(dashboard_file),'w',encoding='utf-8') as f:
+            json.dump(self.dashboard,f, indent=4) # mufit wants to read this from a file
 
-            scan = self.model_box.children[0].children[0].value
-            self.fit = mufit(self.suite,dashboard_file,dash_log = self.log,scan=scan,dashed=True) # writes text to board_box
-            if self.fit.abort_msg:
-                overlay = ipyw_warning_dial(title = self.fit.abort_msg[0],
-                                            message = self.fit.abort_msg[1])
-                show_hide_tab(overlay,self.on_modal_display_change,self.tab)
-                return
-            rotfreq = self.command_1.children[9].value
-            is_ipympl = "ipympl" in get_backend() or get_backend() == 'widget'
-
-            self.figure_box.outputs = ()
-            #self.figure_box.clear_output()
-            if is_ipympl:
-                from mujpy.mufitplot import mufitplot
-                with ioff():
-                    the_plot = mufitplot(
-                            plot_range,
-                            self.fit,
-                            rotating_frame_frequencyMHz=rotfreq,
-                            plot_out=self.figure_box,
-                            fig_fit=self.fig_fit,
-                            )
-                    self.fig_fit = the_plot.fig
-                    if the_plot.warn_msg:
-                        overlay = ipyw_warning_dial(title = the_plot.warn_msg[0],
-                                            message = the_plot.warn_msg[1])
-                        show_hide_tab(overlay,self.on_modal_display_change,self.tab)
-            else:
-
-                self._qt_dispatcher.submit(
-                            partial(self._draw_qt, plot_range, rotfreq)
-                            )
-
-        else: 
-            self.log('Build dashboard was unsuccessful, no fit')
+        # TEMPORARY COMMENT TO KEEP ALL DEBUG LOGS
+        self.board_box.outputs = ()
+        # clears log
+        scan = self.model_box.children[0].children[0].value
+        self.fit = mufit(self.suite,dashboard_file,dash_log = self.log,scan=scan,dashed=True) # writes text to board_box
         self.tab.selected_index = 2
+        if self.fit.abort_msg: # fail empty suite, fit range, json load, check_pardicts 
+            overlay = ipyw_warning_dial(title = self.fit.abort_msg[0],
+                                        message = self.fit.abort_msg[1])
+            show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+            return
+
+        self.do_plot()
+
         if self.fit.notconverged:
             title = "Minuit did not converge"
-            message = "++++ some fit[s] did not converge\nCheck Log tab for correlations!"
+            message = ("Some fit[s] did not converge."
+                     "\nCheck Log for correlations."
+                     "\nFor verbose Minuit output run"
+                     "\n'the_dash.fit.lastfit' in a new cell)"
+                       )
             overlay = ipyw_warning_dial(title = title,
                                         message = message)
             show_hide_tab(overlay,self.on_modal_display_change,self.tab)
@@ -423,48 +448,29 @@ class dashed(object):
         """
         
         import json
-        from matplotlib import get_backend
-        from matplotlib.pyplot import ioff
         from mujpy.mufit import mufit
-        from mujpy.mufitplot import mufitplot
-        from functools import partial
-        from mujpy.tools.tools import derange
+        from mujpy.tools.tools import ipyw_warning_dial, show_hide_tab
 
         if self.build_dashboard_from_widgets(): # creates self.dashboard and returns True if no validation raise occurred
+            if self.dashboard_suite_mismatch(): # check consistency of dashboard with suite
+                return # errors already produced their message dialods
+
             dashboard_file = self.suite.__fitpath__+'dashed.json'
+
             with open(str(dashboard_file),'w',encoding='utf-8') as f:
                 json.dump(self.dashboard,f,indent=4) # mufit wants to read this from a file
+
             guess = self.command_1.children[6].value=='Guess'
             if 'fit' not in self.__dir__() or guess: # do only if not done before
                  self.fit = mufit(self.suite,dashboard_file,no_fit = guess, dash_log = self.log, dashed = True) # writes text to board_box
-            plot_range = self.command_1.children[8].value
-            p, errmsg = derange(plot_range, self.suite.histoLength)
-            if errmsg:
-                self.log(f'\n***************\n* no plot, unclear plot range:\n'+errmsg)
-                self.tab.selected_index = 2
-                return
-            rotfreq = self.command_1.children[9].value
-            self.figure_box.outputs = ()
-
-            is_ipympl = "ipympl" in get_backend() or get_backend() == 'widget'
-
-            if is_ipympl:
-                with ioff():
-                    the_plot = mufitplot(
-                            plot_range,
-                            self.fit,
-                            rotating_frame_frequencyMHz=rotfreq,
-                            plot_out=self.figure_box,
-                            fig_fit=self.fig_fit,
-                            )
-                    self.fig_fit = the_plot.fig
-            else:
-                self._qt_dispatcher.submit(
-                            partial(self._draw_qt, plot_range, rotfreq)
-                            )
-
             self.tab.selected_index = 2
-
+            if self.fit.abort_msg: # fail empty suite, fit range, json load, check_pardicts
+                overlay = ipyw_warning_dial(title = self.fit.abort_msg[0],
+                                            message = self.fit.abort_msg[1])
+                show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+                return
+            
+            self.do_plot()
 
     def _on_FFT(self,b):
         """FFT of residues, selected components only"""
@@ -710,37 +716,52 @@ class dashed(object):
 
         validates::
 
-            values with errors, limits, invalid_err_lim
-            read_pardict_from_widgets also validates
-                function math syntax, muvalid
-                0 <= get_indices < kmax 
-                    kmax = NG_int.value (global fits) 
-                           this parameter index (single fit)
+            widg2pardicts: 
+                        no empty or duplicate names, 
+                        no 3 consecutive values = 0
+                        all values within their limits
+            read_pardict_from_widgets: 
+                        function math syntax, muvalid
+                        0 <= get_indices < kmax (global AND sequential)
+                        kmax = NG_int.value (global fits) 
         """
 
         from mujpy.tools.tools import _available_components_, read_pardict_from_widgets
-        from mujpy.tools.tools import add_step_limits, widg2pardicts
+        from mujpy.tools.tools import add_step_limits, widg2pardicts, ipyw_warning_dial, show_hide_tab
+
+        glob = self.global_box.children 
+        model = []
+        components = [self.MN_text.value[i:i + 2] 
+                      for i in range(0, len(self.MN_text.value), 2)
+                      ]
+        nparam = [len(av['pardicts']) 
+                  for component in components 
+                  for av in _available_components_() 
+                  if component == av['name']
+                  ] 
+        left, right = (self.model_box.children[1].children[0], 
+                       self.model_box.children[1].children[1]) 
+        # list of two VBox, to be read, left and right columns
 
         self.dashboard = {}
+        if glob:
+            pardicts, kmax, error = widg2pardicts(self.global_box) # checks for empty names, too many zeros
+            # must also check model for compatibility with suite
+            if error: 
+                title = 'Global parameters need checking' 
+                overlay = ipyw_warning_dial(title = title,
+                                                message = error)
+                show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+                return False
+            self.dashboard['globpardicts_guess'] = pardicts
+
         kids = self.command_1.children
         self.dashboard['version'] = kids[4].value # (string)
         self.dashboard['fit_range'] = kids[2].value # (string)
         self.dashboard['offset'] = str(self.suite.offset)
-        glob = self.global_box.children # empty list is false
-        if glob: 
-            pardicts, kmax, error = widg2pardicts(self.global_box)
-            if error: 
-                self.log('widg2pardicts error?: {} '+error)
-                return False
-            self.dashboard['globpardicts_guess'] = pardicts
-        model = []
-        components = [self.MN_text.value[i:i + 2] for i in range(0, len(self.MN_text.value), 2)]
-        avc = _available_components_()
-        nparam = [len(av['pardicts']) for component in components for av in avc if component == av['name']] 
-        left, right = self.model_box.children[1].children[0], self.model_box.children[1].children[1] 
-        # list of two VBox, to be read, left and right columns
-        rowleft, rowright, ki = 0, 0, 0
 
+        rowleft, rowright, ki = 0, 0, 0
+        title = 'Function syntax or algebra error'
         for kc,npar in enumerate(nparam): # ks is component index and npar its number of parameters
             # skip (component+legend) and read npar rows
             # writes    name,  None, flag, [function] or function_multi if glob
@@ -750,24 +771,40 @@ class dashed(object):
             if kc%2: # odd, right
                 # see build_model_editor_widgets, component widgets:
                 rowright += 2 # component and legend rows  
+                val = []
                 for kp in range(npar):
                     kmax = kmax if glob else ki
-                    pardict = read_pardict_from_widgets(right.children[rowright],kmax) # from widgets
-                    if not isinstance(pardict,dict): 
-                        self.log('right build_dash pardict {} report to author'.format(pardict)) # is an erro message from read_pardict_from_widgets
-                        self.log('------------------------ Is this right?')
+                    pardict = read_pardict_from_widgets(right.children[rowright],kmax,glob) # reads from widgets
+                    if not isinstance(pardict,dict): # then pardict is an error message from muvalid, reasonably clear
+                                                     # checks corrct algebra with a=0.3 -> p[k] for any digit k 
+                        overlay = ipyw_warning_dial(title = title,
+                                                    message = f'Right column model pardict requested {pardict}')
+                        show_hide_tab(overlay,self.on_modal_display_change,self.tab)
                         return False
+                    val.append(pardict['value'])
                     pardicts.append(pardict) # returns a pardict
                     rowright += 1 # incremented only for odd kc
                     ki +=1 # internal dashed parameter index incremented always
+                if not glob and any(
+                        a == b == c == 0
+                        for a, b, c in zip(val,val[1:],val[2:])
+                        ): 
+                        overlay = ipyw_warning_dial(title = "Set all model guess values?",
+                                                    message = (
+                             "\nDetected >=3 consecutive 0 guess values"
+                             "\n(if it is OK, change any of them to 0.001)"))
+                        show_hide_tab(overlay,self.on_modal_display_change,self.tab)
+                        return False
             else: # even, 0, 2, ... left
                 rowleft += 2 # component and legend rows
                 for kp in range(npar):
                     kmax = kmax if glob else ki
-                    pardict = read_pardict_from_widgets(left.children[rowleft],kmax)
-                    if not isinstance(pardict,dict): 
-                        self.log('left build_dash pardict {} report to author'.format(pardict))
-                        self.log('------------------------ Is this right?')
+                    pardict = read_pardict_from_widgets(left.children[rowleft],kmax,glob)
+                    if not isinstance(pardict,dict): # then pardict is an error message from muvalid, reasonably clear
+                                                     # checks corrct algebra with a=0.3 -> p[k] for any digit
+                        overlay = ipyw_warning_dial(title = title,
+                                                    message = f'Left column model pardict requested {pardict}')
+                        show_hide_tab(overlay,self.on_modal_display_change,self.tab)
                         return False# is an erro message from read_pardict_from_widgets
                     pardicts.append(pardict) # returns a pardict
                     rowleft += 1 # incremented only for even kc
@@ -1136,6 +1173,7 @@ class dashed(object):
         if datafile and os.path.isfile(datafile):
             if runlist: # shorthand
                 runlst, errmsg = derun(runlist)
+                runs_diff = False
                 if errmsg is not None: # derun error, only syntax errors, no check if a run does not exist
                     string = f'************  E: Run list add syntax error? {errmsg}. You typed: {runlist}'
                     return string
@@ -1145,12 +1183,13 @@ class dashed(object):
                     rnew = {tuple(x) for x in runlst}
                     rold = {tuple(x) for x in runprv}
                     if rnew == rold:
-                        return # nothing to do, should not happen (perhaps a space was introduced?)
+                        if self.previous_grp_calib == grp_calib: # if not, runs_diff = False leads to a new suite
+                            return # nothing to do, should not happen (perhaps a space was introduced?)
                     elif rnew > rold:
-                        runs_diff = [list(x) for x in rnew-rold] # this is list of lists
+                        runs_diff = [x for x in runlst if tuple(x) not in rold] # this is list of lists and preserved order
                         add = True
                     else:
-                        runs_diff = [list(x) for x in rold-rnew] # this is list of lists
+                        runs_diff = [x for x in runlst if tuple(x) not in rnew] # this is list of lists and preserved order
                         add = False
                     if runs_diff:
                         if add:
@@ -1160,8 +1199,7 @@ class dashed(object):
                             self.log(f'pop {runs_diff}')
                             string = self.suite.pop_runs(runs_diff) # watch, runlist_diff is a list of lists
                         if string: self.log(string)
-                else: # standard route, first instance
-                    self.log(f'load {runlist}')
+                if not runs_diff: # aither standard route (no previous_runlist) or grp_calib changed 
                     self.suite = suite(datafile, 
                                    runlist, # passes checked shorthand
                                    grp_calib,
@@ -1223,12 +1261,15 @@ class dashed(object):
                         #        title = '<b>1-click select</b>')
                         #self.LF_modal.layout.observe(self.on_modal_display_change, names = 'display')
                         self.previous_runlist = runlist
+                        self.previous_grp_calib = grp_calib
 
             else:
                 self.log('Please specify runlist')
+                self.tab.selected_index = 2
         else:
             self.log('File {} not found'.format(datafile))
             self.log('paths must be either in startup path and below or absolute')
+            self.tab.selected_index = 2
 
     def _on_LG(self,b):
         """
@@ -1262,6 +1303,15 @@ class dashed(object):
                 alpha_txt.unobserve(self._on_multigroup,names='value')
                 grp_txt.value = groupshnd1
                 alpha_txt.value = alpha1
+                grp_txt.observe(self._on_multigroup,names='value')
+                alpha_txt.observe(self._on_multigroup,names='value')
+            else:
+                grp_txt = self.suite_box.children[1].children[4]
+                alpha_txt = self.suite_box.children[1].children[5]
+                grp_txt.unobserve(self._on_multigroup,names='value')
+                alpha_txt.unobserve(self._on_multigroup,names='value')
+                grp_txt.value = '' 
+                alpha_txt.value = ''
                 grp_txt.observe(self._on_multigroup,names='value')
                 alpha_txt.observe(self._on_multigroup,names='value')
 
@@ -1541,7 +1591,7 @@ class dashed(object):
         RL_value = ''
         RL_text = Text(value=RL_value,
                        placeholder='run #s, Enter or RL',
-                      tooltip='e.g. 822\nor 822,823:827:-1',
+                       tooltip='e.g. 822\nor 822,823:827:-1\nor 822:+824,825:830',
                       layout=Layout(width=runs_width[4]),
                       continuous_update = False)
         RL_text.observe(self._on_RL,names='value')
@@ -1594,6 +1644,7 @@ class dashed(object):
                         .no-combo-arrow input::-webkit-calendar-picker-indicator {
                             display: none !important;
                         }
+
                     </style>
                     """
         
@@ -1604,6 +1655,9 @@ class dashed(object):
         command_width = ['38%','18%','10%','12%','7%','7%']
         self.figure_box = Output(layout=Layout(width='100%',height='410px'))# width='900px'
         self.board_box = Output(layout=Layout(width='100%',height='650px',overflow_y='auto'))
+        self._log_scroll_class = f"mujpy-log-{self.board_box.model_id}" # needed for controlling scoll
+        self.board_box.add_class(self._log_scroll_class) # for scroll
+        self.board_box.layout.overflow = "auto" # for scroll
         self.logtab_box = HBox([self.board_box,self.figure_box])
         fit_type = ToggleButtons(options = ['sequential fit','global fit'],
                                  value = 'sequential fit',
@@ -1730,3 +1784,51 @@ class dashed(object):
             display(self.tab)
         # Button( icon = 'fa-trash' #, <i class="fa-thin fa-trash"></i>
         #https://stackoverflow.com/questions/60116974/what-is-the-icon-argument-for-ipywidgets-button
+
+        # the following block should grant that the text ouptut is scrolled to the bottom
+        from IPython.display import Javascript
+        
+        display(Javascript(r"""
+        (() => {
+            const selector = ".SCROLL_CLASS";
+        
+            function install() {
+                const box = document.querySelector(selector);
+                if (!box) return false;
+                if (box._mujpyScrollObserver) return true;
+        
+                const scroll = () => requestAnimationFrame(() => {
+                    box.scrollTop = box.scrollHeight;
+                });
+        
+                const observer = new MutationObserver(scroll);
+                observer.observe(box, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true
+                });
+                box._mujpyScrollObserver = observer;
+        
+                // Also scroll when the hidden Log tab becomes visible.
+                const resizeObserver = new ResizeObserver(scroll);
+                resizeObserver.observe(box);
+                box._mujpyResizeObserver = resizeObserver;
+        
+                scroll();
+                return true;
+            }
+        
+            if (!install()) {
+                const waiting = new MutationObserver(() => {
+                    if (install()) waiting.disconnect();
+                });
+        
+                waiting.observe(document.body, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ["class"]
+                });
+            }
+        })();
+        """.replace("SCROLL_CLASS", self._log_scroll_class)))

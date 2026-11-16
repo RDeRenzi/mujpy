@@ -31,7 +31,7 @@ class QtDispatcher(QtCore.QObject):
         if self._log is None:
     
             try:
-                callback()
+                self._run_and_focus(callback)
             except Exception:
                 traceback.print_exc()
             return
@@ -40,11 +40,50 @@ class QtDispatcher(QtCore.QObject):
         try:
             with redirect_stdout(output), redirect_stderr(output):
                 try:
-                    callback()
+                    self._run_and_focus(callback)
                 except Exception:
                     traceback.print_exc()
         finally:
             text = output.getvalue()
             if text:
                 self._log(text)
+                
+    def _run_and_focus(self, callback):
+        import shutil
+        import subprocess
+        import traceback
 
+        fig = callback()
+        canvas = getattr(fig, "canvas", None)
+        manager = getattr(canvas, "manager", None)
+        window = getattr(manager, "window", None)
+
+        if window is None:
+            return fig
+
+        def focus():
+            try:
+                if window.isMinimized():
+                    window.showNormal()
+                else:
+                    window.show()
+
+                window.raise_()
+                window.activateWindow()
+
+                wmctrl = shutil.which("wmctrl")
+                if wmctrl and QtWidgets.QApplication.platformName() == "xcb":
+                    subprocess.run(
+                        [wmctrl, "-i", "-a", hex(int(window.winId()))],
+                        check=True,
+                        timeout=2,
+                    )
+
+            except Exception:
+                if self._log is not None:
+                    self._log(traceback.format_exc())
+                else:
+                    traceback.print_exc()
+
+        QtCore.QTimer.singleShot(100, focus)
+        return fig

@@ -200,7 +200,7 @@ def derange(string,vmax,pack=1):
             if x_range[0]<0: raise ValueError(f'{string}: start < 0')
             if x_range[1]<x_range[0]: raise ValueError(f'{string}: start < stop')
             if x_range[2]>(x_range[1]-x_range[0])//2: raise ValueError(f'{string}: pack too large')
-            if x_range[1]>vmax: raise ValueError(f'{string}: exceeds histo lenght {vmax}')
+            if x_range[1]>vmax: raise ValueError(f'{string}: exceeds histo length {vmax}')
             if len(x_range)==5:
                 if x_range[4]>(x_range[3]-x_range[1])//2: raise (f'{string}: late pack too large')
                 if x_range[3]>vmax: raise (f'{string} exceeds histo lenght {vmax}')
@@ -220,8 +220,10 @@ def derun(string):
     shorthand::
         
         expects comma separated items
-        looks for 'l','l:m','l+n+m','l:m:-1' 
+        looks for 'l','l:m','l+n+m','l:m:-1','l:+m',ìl+:m'
             where l, m, n are integers
+            l+:m or m:+n mean that l:m are added 
+            l:m:-1 means reverse order, from m to l in increments of -1
             also more than one, comma separated 
 
         rejects all other characters
@@ -243,9 +245,16 @@ def derun(string):
             kminus = b.find(':-1') # '-1' means reverse order
             kcolon = b.find(':') # ':' and '+' are mutually exclusive
             kplus = b.find('+')
+            kpluspan, plus = b.find('+:'), '+:'
+            if kpluspan<0: kpluspan, plus = b.find(':+'), ':+'
             #print(kminus,kcolon,kplus)
 
-            if kminus<0 and kcolon<0 and kplus<0: # single run, no run addition
+            if kpluspan>0: # add run span
+                start = int(b.split(plus)[0])
+                stop = int(b.split(plus)[1])
+                if stop < start: raise ValueError(f'{b}: {start} > {stop}')
+                s.append([str(r) for r in range(start,stop+1)])
+            elif kminus<0 and kcolon<0 and kplus<0: # single run, no run addition
                 int(b) # produces an Error if b is not an integer
                 s.append([b]) # append single run string   
             else:
@@ -360,7 +369,7 @@ def get_grouping(groupcsv):
     output::
 
         grouping,   np.array of int indices, 0 based
-                    errmsg, str if wgrong syntax
+                    errmsg, str if wrong syntax
     
     Used in musuite
     """
@@ -723,9 +732,9 @@ def get_nruns(the_suite):
         nruns.append(str(run[0].get_runNumber_int()))
     return nruns
  
-def check_function(dashboard,groups):
+def check_pardicts(dashboard,groups):
     """
-    checks function syntax for max 100 parameters [must be extended]
+    looks for a few pardicts inconsistencies
 
     input::
 
@@ -738,91 +747,113 @@ def check_function(dashboard,groups):
 
     checks that::
 
+        flag is not '=' for global parameters
+             is '=' for model parameters in global fits
+             is '=' if function or function_multi are active
+             is '=' for model parameters with non empty function
+        name is not empty and not duplicate
+        function is not empty for model parameter flag '='
         len of any 'function_multi' list is same as len(groups)
-        only model contains either 'function' or 'function_multi' (pops the empty one)
-        each string is executable
-        flag is = if function or function_multi are active
+        model contains either 'function' or 'function_multi' (pops the empty one)
+        [string valid algebra is pre-checked by muvalid]
 
-    called in mufit._dash_load_
+    called only in mufit._dash_load_ (mudashed.build_dashboard_from_widgets checks from widgets) 
     """
 
-
-    from numpy import linspace, cos, sin, tan, sinh, cosh, tanh, log, pi, exp, sqrt, real, abs, arctan
+    #from numpy import linspace, cos, sin, tan, sinh, cosh, tanh, log, pi, exp, sqrt, real, abs, arctan, array
+    if "model_guess" not in dashboard:  return 0,0,0, "Fatal, missing model_guess in dashboard"  
     model = dashboard["model_guess"]
     model_pardicts = [pardict for component in model for pardict in component['pardicts'] if pardict['flag'] in ['~','!']]
     n_par = len(dashboard['globpardicts_guess']) if 'globpardicts_guess' in dashboard else len(model_pardicts)
     #           min_pars used in 'function'/'function_multi' of model are either len(dashboard['globpardicts_guess']
     #                                                                     or len model_pardicts
-    p = linspace(.1,2.0,n_par) # mock p values for evaluated 'function'/'function_multi' strings
+    #p = linspace(.1,2.0,n_par) # mock p values for evaluated 'function'/'function_multi' strings
+    # an algebra check substituting p[k] with digit k is already performed by muvalid in mudashed.build_dashboard_from_widgets
 
     # local fits min_pars coincide with non '=' model parameters 
     if 'globpardicts_guess' in dashboard:
-    # global fits minuit parameters coincide with globpardicts, 
+        if len(self.suite.groups)>1: # expect at least one function_multi
+            function_multi_in_model = [
+                    'function_multi' in pardict.keys() 
+                    for component in self.dashboard['model_guess'] 
+                    for pardict in component['pardicts']
+                    ]
+            if not any(function_multi_in_model):
+                error = ('Global fit with more groups\nNo ";" in model functions(')
+                return -1,-1,-1, error
+            else:
+                for component in self.dashboard['model_guess']:
+                    for pardict in component['pardicts']:
+                        if 'function_multi' in pardict.keys(): 
+                            if len(self.suite.groups)!=len(pardict['function_multi']):
+                                error += ('Global fit, model {component["name"]} {pardict["name"]}\nLess functions than groups')
+                                return -1,-1,-1, error
+
+        else:
+            hash_in_globpardicts = [
+                    pardict['flag']=='#' 
+                    for pardict in self.dashboard["globpardicts_guess"]
+                    ]
+            if not any(hash_in_globpardicts):
+                error += ('++++ Check C1 global parameters:\nsingle group and no hash flags')
+                return -1,-1,-1, error
+
+
+    # global fits minuit parameters coincide with globpardicts, i
+        names, values = [], []
         for kp, pardict in enumerate(dashboard['globpardicts_guess']):
             if pardict['flag'] == '=': 
-                print("++++ Wrong json syntax, '=' flag not allowed in global parameters")
-                return -1, kp, 0
+                error = f"++++ Check global parameters, '=' flag({kp}) not allowed"
+                return -1, kp, -1, error
+            name = pardict['name']
+            value = pardict['value']
+            if name == "":
+                error = f"++++ Check global parameters, empty name {kp}"
+                return -1, kp, -1, error
+            if name in names:
+                k = names.index(name)
+                error = f"++++ Check global parameters, duplicate name {k} and {kp} "
+                return -1, kp, -1, error
+            names.append(name)
+            values.append('value')
+            if all(array(values)==0): return -1,-1,-1, "Forgot to set global parameters values, all zero!" 
 
+        # this is model for a global fit, only flag '=' is allowed
         for kc, component in enumerate(model):
             for kp,pardict in enumerate(component['pardicts']):
                 if pardict['flag'] != '=':
-                    error ="++++ Wrong json syntax\nGlobal fit, only '=' model flags allowed"
-                    return kc, kp, 0, error
-                if 'function' in pardict.keys() and len(pardict['function']):
+                    error =f"Global fit, only '=' model flags allowed\n{component['name']} {pardict['name']} flag is {pardict['flag']}"
+                    return kc, -1, -1, error
+
+                if 'function' in pardict.keys() and len(pardict['function']): # exists and is not empty
                     kgroup = 0 # default
                     if 'function_multi' in pardict.keys() and len(pardict['function_multi'][0]):
-                        error = "++++ Wrong json syntax, 'function','function_multi' mutually exclusive in 'model_guess'"
-                        return kc, kp, kgroup, error
-                    pardict.pop('function_multi',None)
-                    string = pardict['function']
-                    try: 
-                        if 'p[' in string:
-                            eval(string)
-                        else: 
-                            raise ValueError("missing 'p['")
-                    except Exception as e:
-                        return kc,kp, kgroup, "{}: '{}' is not a correct function syntax".format(e,string)
+                        error = f"{component['name']} {pardict['name']} has 'function' AND 'function_multi' in dashboard\n++++ Mutually exclusive!"
+                        return kc, -1, -1, error
+                    pardict.pop('function_multi',None) # make sure no empty 'function_multi' keys exist
 
                 elif 'function_multi' in pardict.keys() and len(pardict['function_multi'][0]):
-                    pardict.pop('function',None)
+                    pardict.pop('function',None) # make sure no empty 'function' is left from manual editing
                     if len(pardict['function_multi']) != len(groups):
-                        error = "++++ Wrong json syntax, function is one, or ngroup ';'-separated strings"
-                        return kc, kp, len(groups), error
-                    for kgroup in range(len(groups)): # loop groups
-                        string = pardict['function_multi'][kgroup]
-                        # print('function multi {}, kc,kp,kg={},{},{}'.format(string, kc,kp,kgroup)) 
-                        try:
-                            if 'p[' in string: 
-                                eval(string)
-                            else:
-                                raise ValueError("missing 'p['")
-                        except Exception as e:
-                            return kc,kp, kgroup, "{}: '{}' wrong function syntax".format(e,string)
-
+                        error = f"{component['name']} {pardict['name']} function must be ngroup ';'-separated strings"
+                        return kc, -1, len(groups), error
 
                 else:
-                    error = "++++ Wrong json syntax, missing function in model parameters"
-                    return kc, kp, 0, error
+                    error = f"Model {component['name']} {pardict['name']} not defined\nMissing model function in global fit"
+                    return kc, -1, -1, error
 
-    else: # local fit
+    else: # local fit, one run / group at a time
         kgroup = 0 # default
         for kc,component in enumerate(model):
             for kp,pardict in enumerate(component['pardicts']):
                 #if pardict['flag'] == '=':
                 if 'function' in pardict.keys() and len(pardict['function']):
-                    if pardict['flag'] != '=': return kc, kp, kgroup, 'function is {}\nbut flag is {}\n'.format(
-                                                                pardict['function'],pardict['flag'])
-                    string = pardict['function']
-                    try:
-                        if 'p[' in string: 
-                            eval(string)
-                        else:
-                            raise ValueError("missing 'p['")
-                    except Exception as e:
-                        return kc,kp, kgroup, "{}: '{}' wrong function syntax".format(e,string)
+                    if pardict['flag'] != '=': return kc, kp, kgroup, f"Model {component['name']} {pardict['name']} function is {pardict['function']} but flag is {pardict['flag']}\n"
                 elif pardict['flag'] == '=':
-                    error = "++++ Wrong json syntax, missing or empty function in model parameters"
+                    error = f"Missing or empty function in model {component['name']} {pardict['name']}"
+                    #error += f"\ndebug glob {'globpardicts_guess' in dashboard}" 
                     return kc, kp, kgroup, error
+
     return -1,-1,-1, "" # none has failed the syntax check
 
   
@@ -1686,16 +1717,15 @@ def ccstack(npfunc,x,nruns,ngroups,*pars):
     from numpy import array
     return array([[npfunc(x,*par) for par in parg] for parg in pars])
 
-def min2int(dashboard,values_in,errors_in,krun,kgroup,nruns,ngroups):
+def min2int(dashboard,lastfit,krun,kgroup,nruns,ngroups):
     """
     returns names, values, stds, shared list of parameter lists for summary print_components
 
     input::
 
         dashboard,  dict structure
-        values_in,  Minuit.values
-        errors_in,  Minuit.errors
-            next four unused, for homogeneity with _global
+        lastfit,    Minuit instance, after migrad
+            next four unused, for homogeneity with _global [unused, can be removed]
         krun,       index of run in suite._the_runs_
         kgroup,     index of group in suite.grouping
         nruns,      slice dimension[0]
@@ -1705,7 +1735,7 @@ def min2int(dashboard,values_in,errors_in,krun,kgroup,nruns,ngroups):
 
         names      component list of parameter lists of names
         values_out component list of parameter lists of values 
-        errors_out component list of parameter lists of stds
+        errors_out component list of parameter lists of stds (0 if fixed)
         shared     component list of parameter list of 'flag'=='=' 
     
     ready for print_components in summary,
@@ -1719,11 +1749,14 @@ def min2int(dashboard,values_in,errors_in,krun,kgroup,nruns,ngroups):
     """
 
     from mujpy.tools.tools import translate
+    from numpy import where
     # 
     # initialize
     #
     model_guess = dashboard['model_guess']
-    ntot = sum([len(model_guess[k]['pardicts']) for k in range(len(model_guess))]) 
+    ntot = sum([len(model_guess[k]['pardicts']) for k in range(len(model_guess))])
+    values_in = lastfit.values
+    errors_in = where(lastfit.fixed, 0.0, lastfit.errors)
     # total number of internal parameters >= number of Minuit parameters
     
     names, values_out, p, errors_out, e, shared = [], [], [], [], [], []
@@ -2224,7 +2257,7 @@ def value_error(value,error):
     """
 
     from numpy import floor, log10, seterr
-    from ast import literal_eval as aeval
+    # from ast import literal_eval as aeval
     eps = 1e-10 # minimum error
     if error>eps: # normal error
         exponent = int(floor(log10(error)))  
@@ -2246,8 +2279,8 @@ def value_error(value,error):
     return string
     
 def value_error_csv(value,error):
-    """
-    returns a string of the format v, e, with the correct precision
+    """returns a string of the format v, e, with the correct precision
+
 
         value,      float
         error,      float, std of value
@@ -2262,7 +2295,7 @@ def value_error_csv(value,error):
     """
 
     from numpy import floor, log10, seterr
-    from ast import literal_eval as aeval
+    # from ast import literal_eval as aeval
     eps = 1e-10 # minimum error
     if error>eps: # normal error
         exponent = int(floor(log10(error)))  
@@ -2468,6 +2501,8 @@ def check_multigroup(group,alpha,numhis):
         
         group,      shorthand csv string
                         see grouping, musuite tools
+        alpha,      string of a float (auto replace ',' with '.')
+        numhis      number of histograms
 
     output:: 
         
@@ -2488,7 +2523,7 @@ def check_multigroup(group,alpha,numhis):
         if not all(fg)<numhis or not all(bg)<numhis: raise ValueError('indices outside histogram range')
         grp_cal = {'forward':forward, 
                   'backward':backward, 
-                   'alpha':float(alpha)}
+                   'alpha':float(alpha.replace(',','.'))}
         return grp_cal 
     except ValueError as e:
         text = 'ValueError {}'.format(e)
@@ -2497,50 +2532,79 @@ def check_multigroup(group,alpha,numhis):
 
 def widg2pardicts(global_box):
     """
-    transforms global_box widgets into dashboard["globpardicts_guess"]
+    validates and transforms global_box widgets into dashboard["globpardicts_guess"]
+
+    input::
+
+        global_box      self.global_box widget container
+
+    validates global::
+
+        all pardict{'name'] are not empty
+                            are unique
+        no three consecutive pardict['values'] are 0
+        all values are within limits (by invalid_err_lim)
     """
 
     from mujpy.tools.tools import invalid_err_lim, limits
     from ast import literal_eval as aeval
+
+
 
     pardicts = []
     #                    kid[0]             kid[1]     kidd0  kiddd0...n   Kidd1 kiddd0...m
     # global_box = VBox([HBox([hsp,gt,hsp]),HBox([VBox([HBox(leftparwidgs),HBox(rightparwidgs)])])])
     n_col_left, n_col_right = len(global_box.children[1].children[0].children),len(global_box.children[1].children[1].children)
     kmax = n_col_left+n_col_right-2 # number of parameters aka NG_int.value (n_col includes labels)
-    # needed for ki, i.e. for read_pardict_from_widgets
-    error = ''
+
+    values = []
+    npar = [0, len(global_box.children[1].children[0].children)-1] # HBox for labels and pardicts 
+    for k in range(2): # global_box: 0 is left column, 1 is right column
+        parwidgs = global_box.children[1].children[k].children[1:]
+        names = [parw.children[1].value for parw in parwidgs]
+        no_name = [j for j,nam in enumerate(names) if nam=='']
+        if no_name:
+            return pardicts, 0, "\n".join([f"global parameter {j+npar[k]}: empty name" for j in no_name])
+        values.extend([
+                float(parw.children[2].value.replace(',','.')) 
+                for parw in parwidgs
+                ])
+    # check across two columns
+    duplicate_name = {nam for nam in names if names.count(nam)>1}
+    if duplicate_name: 
+        return pardicts, 0, (f"Duplicate global parameter names: {duplicate_names}"
+                            "\nChoose unique names, please")
+    if any(
+        a == b == c == 0
+        for a, b, c in zip(values, values[1:], values[2:])
+        ): 
+        return pardicts, 0, ("Set all global guess values?"
+                             "\nDetected >=3 consecutive 0"
+                             "\n(if it is OK, change any of them to 0.001)") 
+
     for k,parwidgs in enumerate(global_box.children[1].children[0].children): # left column
         pardict = {}
         if k: # skips k=0 labels
             value = parwidgs.children[2].value # string, can be '1.2' or '[1.2,3.2]'
             if value:
-                values = aeval(value) if value[0]=='[' else [float(value)]
-            else:
-                values = [0]
+                values = aeval(value) if value[0]=='[' else [aeval(value.replace(',','.'))]
+            else: # parwidgs.children[2].value is an empty string
+                return [], 0,  f'global parameter {k-1} empty value'
             for value in values:
                 invalid = invalid_err_lim(value,
                                       parwidgs.children[4].value,
                                       limits(parwidgs.children[5].value))  
                 if invalid: 
-                    error += '\nglobal parameter {}:'.format(k-1)+invalid
+                    return [], 0, f'global parameter {k-1}: '+invalid
             pardict['name'] = parwidgs.children[1].value # string
-            value = parwidgs.children[2].value
-            #if value:
-            #    values = eval(value) if value[0]=='[' else [float(value)]
-            #else:
-            #    values = [0]
-            pardict['value'] =  values if len(values)>1 else values[0] # float
-            # for sequential fits may be a list, i.e. a string as widgets value
-            # but this is broken! parwidg must be Text
-
-            # for lists need widget to be Text, pardict value to be string, 
-            # pardict is either float(value) or [x for x in eval(value)]
+            # need widget to be Text to allow lists, but pardict['value'] must be floats or lists of floats, 
+            pardict['value'] =  values if len(values)>1 else values[0] # list of floats or float
             pardict['flag'] = parwidgs.children[3].value # string
             pardict['error'] = parwidgs.children[4].value # float
             pardict['limits'] = limits(parwidgs.children[5].value) # translates list of csv string to values
             if parwidgs.children[7].value: pardict['positive_parity'] = parwidgs.children[7].value
             pardicts.append(pardict)
+    kleft = len(pardicts)
     for k,parwidgs in enumerate(global_box.children[1].children[1].children): # right column
         pardict = {}
         if k: # skips k=0 labels
@@ -2554,7 +2618,7 @@ def widg2pardicts(global_box):
                                       parwidgs.children[4].value,
                                       limits(parwidgs.children[5].value))  
                 if invalid: 
-                    error += '\nglobal parameter {}:'.format(k-1)+invalid
+                    return [],0, f'\nglobal parameter {kleft+k-1}:'+invalid
             pardict['name'] = parwidgs.children[1].value # string
             #value = parwidgs.children[2].value
             #if value:
@@ -2568,7 +2632,7 @@ def widg2pardicts(global_box):
             pardict['limits'] = limits(parwidgs.children[5].value) # translates list of csv string to values
             if parwidgs.children[7].value: pardict['positive_parity'] = parwidgs.children[7].value
             pardicts.append(pardict)
-    return pardicts, kmax, error
+    return pardicts, kmax, ''
 
 def limits(string):
     """
@@ -2830,9 +2894,9 @@ def par2widgets(pardict,k,glob=False,NG = 0):
                Text(value=function,placeholder=placeholder,tiptool='select Flag =\ntype chosen f(vars)',layout=Layout(width=width[4]))]
     return HBox(widgets)
 
-def read_pardict_from_widgets(kids,kmax):
+def read_pardict_from_widgets(kids,kmax,glob):
     """
-    reads from kids, returns name, value, flag, function (or ValueError)
+    reads model widgets from kids, returns name, value, flag, function (or ValueError)
 
     input::
 
@@ -2844,11 +2908,19 @@ def read_pardict_from_widgets(kids,kmax):
         kmax,       verify 0 < indices < kmax 
                         (number of globals or present internal index k)  
             
+        glob        True is fit is global
+                        (check that all flags are '=')
+    
     output::
         
-        pardict,    keys: "name", "value", "flag", "function" or "function_multi"
-                        former is a string, latter is a list strings 
-                        (errors, limits, pospar dealt by adds_step_limits)                            
+        pardict,    single model parameter dict
+                        keys: "name", "value", "flag", "function" or "function_multi"
+                            "function" is a string, ".._multi"  is a list of strings 
+                        (errors, limits, pospar dealt by adds_step_limits)
+                    pardict is error message if:
+                        non "=" flag if global
+                        error in algebra
+                        reference to parameter index out of limits
                  
     Used by mudashed.build_dashed
     """
@@ -2858,16 +2930,25 @@ def read_pardict_from_widgets(kids,kmax):
     na, va, fl, fum = [widg.value for widg in kids.children[1:]]
 # [skip k] name value flag function or function_multi
     fu = re.split("[;,]",fum)
+
+    if glob:
+        not_assigned = [k for k, flag in enumerate(fl) if flag != '=']
+        if not_assigned: return f'Flags must be "=" in global model\n{na[not_assigned[0]]} is not' 
     for f in fu: 
     # check function syntax
         invalid = False
         if f: invalid = muvalid(f) # avoid check on empty function
-        if invalid:
-            return invalid # a string
-        # check indices
+        if invalid: # fail returns error message (True), success returns '' (False)
+            return invalid # returns the error message, a string
+        # checks "p[k]" index respects bounds (global and sequential fits)
         invalid = not all([int(k)<kmax and int(k)>=0 for k in get_indices(f)])
         if invalid:
-            return 'index out of bounds'
+            for k in get_indices(f):
+                kk = -1
+                if not (int(k)<kmax and int(k)>=0): 
+                    kk = k # find which is out of bounds
+                    break
+            return f'index {kk} out of bounds' # informative error message
     #if not glob: # check invalid 
     #pardict = {'name':na,'flag':fl}
     pardict = {'name':na,'value':va,'flag':fl}
@@ -2877,7 +2958,7 @@ def read_pardict_from_widgets(kids,kmax):
     else:
         pardict['function_multi'] = fu 
         pardict.pop('function',None)
-    return pardict # a dict
+    return pardict # returns a dict
 
 def tup2str(tup):
     """
@@ -2990,18 +3071,20 @@ def muvalid(string):
         pattern = re.compile(r"p\[(\d+)\]") # find all patterns p[*] where * is digits
         test = pattern.sub(r"a",string) # substitute "a" to "p[*]" in s
         try: 
-            safetry(test) # should select only safe use (although such a thing does not exist!)
+            safetry(test) # throws error if simple algebra cannot be calculated
         except Exception as e:
-            error_message = 'Function: {}. Wrong or not allowed syntax: {}'.format(string,e)
+            if str(e) == "'NoneType' object is not subscriptable": e = "contains undefined method"
+            error_message = 'function: {string}: {str(e)}'
     return error_message
 
 def safetry(string):
     """
-    True if string can do algebra with safe_list math functions
+    returns a float if string can do algebra with safe_list math functions, throws error otherwise
 
     Used by muvalid (used by read_pardict_from_widgets)
     """
-    from math import acos,asin,atan,atan2,ceil,cos,cosh,degrees,e,exp,floor,log,log10,pi,radians,sin,sinh,sqrt,tan,tanh
+
+    from numpy import acos,asin,atan,atan2,ceil,cos,cosh,degrees,e,exp,floor,log,log10,pi,radians,sin,sinh,sqrt,tan,tanh
     safe_list = ['a','acos', 'asin', 'atan', 'atan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 
                  'exp', 'floor', 'log', 'log10', 'pi', 'pow', 'radians', 'sin', 'sinh', 'sqrt', 'tan', 'tanh']
     # 	use the list to filter the local namespace

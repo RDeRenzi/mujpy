@@ -1,7 +1,6 @@
 from numpy import cos, sin, pi, exp, sqrt, log, real, nan_to_num, inf, ceil, linspace, zeros, empty, ones, hstack, fft, sum, zeros_like, abs, array, where, arctan, pi, any, set_printoptions
 from scipy.special import dawsn,erf, j0, j1
 from scipy.constants import physical_constants as C
-from iminuit.util import make_func_code
 
 class mumodel(object):
     """
@@ -73,11 +72,16 @@ class mumodel(object):
 
         mufit collects several methods in a model identified as ''.join(method.__getattribute__(name)) for method in model
 
-    .. code ::
+    .. code::
 
         _chisquare_            Minuit cost function at self._x_ through self._add_, self_y_, self._e_
         _chisquare_calib_      Minuit cost function at self._t_ through self._add_, self_y_, self._e_
                                recomputed by self._add_ -> calib
+
+    .. note::
+
+        musrfit uses a different definition of asymmetry, hence a different chisquare value
+
     """
 
     def __init__(self):
@@ -353,7 +357,8 @@ class mumodel(object):
         denominator[i] = 1 
         nominator = (self._yf_ - self._alpha*self._yb_)
         y = nominator/denominator 
-        e = 2*self._alpha/denominator**2*sqrt((self._yb_*self._eyf_)**2 + (self._yf_*self._eyb_)**2) 
+        e = 2*self._alpha/denominator**2*sqrt((self._yb_*self._eyf_)**2 + (self._yf_*self._eyb_)**2) # RDR 
+        # e = 2/self._alpha/(self._yf_+self._yb_)**2*sqrt((self._yb_*self._eyf_)**2 + (self._yf_*self._eyb_)**2) # AS?
         e[where(e==0)] = 1  
         return y,e
 
@@ -608,7 +613,7 @@ class mumodel(object):
         # empty method  (could remove x from argument list ?)
         # print('al = {}'.format(α))
         return []
-        al.func_code = make_func_code(["α"])                
+        al._parameters = dict.fromkeys(["α"])                
            
     def bl(self,x,A,λ): 
         """
@@ -622,7 +627,7 @@ class mumodel(object):
         # x need not be self.x (e.g. in plot)
         # λ = -87. if λ < -87. else λ
         return A*exp(-x*λ)
-        bl.func_code = make_func_code(["A","λ"])
+        bl._parameters = dict.fromkeys(["A","λ"])
 
     def _grad_bl_0_(self,x,A,λ): 
         """
@@ -657,7 +662,7 @@ class mumodel(object):
         
         # x need not be self.x (e.g. in plot)        
         return A*exp(-0.5*(x*σ)**2)
-        bg.func_code = make_func_code(["A","σ"])
+        bg._parameters = dict.fromkeys(["A","σ"])
 
     def _grad_bg_0_(self,x,A,σ): 
         """
@@ -688,7 +693,7 @@ class mumodel(object):
         
         # x need not be self.x (e.g. in plot)
         return A*exp(-x*λ)*exp(-0.5*(x*σ)**2)
-        ba.func_code = make_func_code(["A","λ","σ"])
+        ba._parameters = dict.fromkeys(["A","λ","σ"])
 
     def _grad_ba_0_(self,x,A,λ,σ): 
         """
@@ -729,7 +734,7 @@ class mumodel(object):
         
         # x need not be self.x (e.g. in plot)
         return A*exp(-(x*Λ)**β)
-        bs.func_code = make_func_code(["A","Λ","β"])
+        bs._parameters = dict.fromkeys(["A","Λ","β"])
 
     def _grad_bs_0_(self,x,A,Λ,β): 
         """
@@ -770,7 +775,7 @@ class mumodel(object):
         """
         
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)
-        ml.func_code = make_func_code(["A","B","φ","λ"])
+        ml._parameters = dict.fromkeys(["A","B","φ","λ"])
 
     def _derivative_ml_(self,x,A,B,φ,λ): 
         """
@@ -831,7 +836,7 @@ class mumodel(object):
         """
         
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-0.5*(x*σ)**2)
-        mg.func_code = make_func_code(["A","B","φ","σ"])
+        mg._parameters = dict.fromkeys(["A","B","φ","σ"])
         
     def _derivative_mg_(self,x,A,B,φ,σ): 
         """
@@ -894,7 +899,7 @@ class mumodel(object):
         
         # x need not be self.x (e.g. in plot)
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)*exp(-0.5*(x*σ)**2)
-        mu.func_code = make_func_code(["A","B","φ","λ","σ"])
+        mu._parameters = dict.fromkeys(["A","B","φ","λ","σ"])
 
     def _derivative_mu_(self,x,A,B,φ,λ,σ): 
         """
@@ -966,7 +971,7 @@ class mumodel(object):
         
         # x need not be self.x (e.g. in plot)
         return A*cos(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-(x*Λ)**β)
-        ms.func_code = make_func_code(["A","B","φ","Λ","β"])
+        ms._parameters = dict.fromkeys(["A","B","φ","Λ","β"])
 
     def _derivative_ms_(self,x,A,B,φ,Λ,β): 
         """
@@ -1039,7 +1044,7 @@ class mumodel(object):
         return A/6.0*(1.+cos(2*pi*self._gamma_Mu_MHzper_mT*B*x)+
                2.*(cos(pi*self._gamma_Mu_MHzper_mT*B*x)+
                    cos(3*pi*self._gamma_Mu_MHzper_mT*B*x) ))*exp(-x*λ)
-        fm.func_code = make_func_code(["A","B","λ"])
+        fm._parameters = dict.fromkeys(["A","B","λ"])
 
     def jl(self,x,A,B,φ,λ): 
         """
@@ -1054,7 +1059,7 @@ class mumodel(object):
         # x need not be self.x (e.g. in plot)
         
         return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)
-        jl.func_code = make_func_code(["A","B","φ","λ"])
+        jl._parameters = dict.fromkeys(["A","B","φ","λ"])
 
     def _derivative_jl_(self,x,A,B,φ,λ): 
         """
@@ -1118,7 +1123,7 @@ class mumodel(object):
         # x need not be self.x (e.g. in plot)
         
         return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-0.5*(x*σ)**2)
-        jg.func_code = make_func_code(["A","B","φ","σ"])
+        jg._parameters = dict.fromkeys(["A","B","φ","σ"])
 
     def _derivative_jg_(self,x,A,B,φ,σ): 
         """
@@ -1181,7 +1186,7 @@ class mumodel(object):
         
         # x need not be self.x (e.g. in plot)
         return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-x*λ)*exp(-0.5*(x*σ)**2)
-        mu.func_code = make_func_code(["A","B","φ","λ","σ"])
+        mu._parameters = dict.fromkeys(["A","B","φ","λ","σ"])
 
     def _derivative_j0_(self,x,A,B,φ,λ,σ): 
         """
@@ -1253,7 +1258,7 @@ class mumodel(object):
         
         # x need not be self.x (e.g. in plot)
         return A*j0(2*pi*self._gamma_Mu_MHzper_mT*B*x+φ*self._radeg_)*exp(-(x*Λ)**β)
-        js.func_code = make_func_code(["A","B","φ","Λ","β"])
+        js._parameters = dict.fromkeys(["A","B","φ","Λ","β"])
 
     def _derivative_js_(self,x,A,B,φ,Λ,β): 
         """
@@ -1442,7 +1447,7 @@ class mumodel(object):
         # multiply by amplitude
         f = A*real(f[0:N])
         return f
-        kg.func_code = make_func_code(["A","BL","Δ","ν"])
+        kg._parameters = dict.fromkeys(["A","BL","Δ","ν"])
 
     def kl(self,x,A,BL,Γ):
         """
@@ -1458,7 +1463,7 @@ class mumodel(object):
         # (dynamic makes no sense)
         w = 2*pi*BL*self._gamma_Mu_MHzper_mT
         return A*self._kl(x,w,Γ)
-        kl.func_code = make_func_code(["A","BL","Γ"])
+        kl._parameters = dict.fromkeys(["A","BL","Γ"])
 
     def kd(self,x,A,Δ,λ):
         """
@@ -1472,7 +1477,7 @@ class mumodel(object):
         
         # x need not be self.x (e.g. in plot)
         return A*self._kg(x,0,Δ)*exp(-x*λ)
-        kd.func_code = make_func_code(["A","Δ","λ"])
+        kd._parameters = dict.fromkeys(["A","Δ","λ"])
         #kd.limits = [[None,None],[0.,None],[None,None]]
         #kd.error = [0.002,0.05,0.05]
 
@@ -1485,7 +1490,7 @@ class mumodel(object):
         
         # x need not be self.x (e.g. in plot)
         return A*self._kg(x,0,Δ)*exp(-(x*Λ)**β)
-        ks.func_code = make_func_code(["A","Δ","Λ","β"])
+        ks._parameters = dict.fromkeys(["A","Δ","Λ","β"])
         #kd.limits = [[None,None],[0.,None],[None,None]]
         #kd.error = [0.002,0.05,0.05]
 

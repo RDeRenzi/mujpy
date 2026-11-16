@@ -798,7 +798,8 @@ class suite(object):
                 for PSI, with b_j = mean(data_j before muon arrival)
                     yfc, ybc = sum_{j in for or back} (data_j - b_j)
                     eyfc, eyfc  = sqrt(sum_{j in for or back}(data_j + (b_j + p(0,b)/n)))
-                        with error e = sqrt(N+(b+p(0,b))/n), 
+                        with error e = sqrt(N+b/n), 
+
                             where p(0,b) is probability for 0 count, 
                                     either
                                 p_0b = normal probability , ~Poisson std=sqrt(b)
@@ -836,12 +837,12 @@ class suite(object):
             
             yfc, eyfc = zeros(self.histoLength), zeros(self.histoLength) # counts 
             ybc, eybc = zeros(self.histoLength), zeros(self.histoLength) # counts 
-            back_f,back_b = [],[]
-            p0_f, p0_b = [],[]
-            n = self.lastbin-self.firstbin+1    # n of bins in back estimation 
+            back_f, back_b = [], []
+            n = self.lastbin-self.firstbin    # n of bins in back estimation 
             n1 = self.nt0[0] + self.offset      # first good bin     
-            n2 = n1 + self.histoLength          # last good bin     
-            for counter in self.grouping[kgroup]['forward']: 
+            n2 = n1 + self.histoLength          # last good bin
+            strt0f, strt0b = '',''
+            for jc,counter in enumerate(self.grouping[kgroup]['forward']): 
                 nc = counter + 8 if self.LEM_back_subt else counter
                 if filespec in filespecsr: # oot is correct! PSI, counter specific range
                     n1 = self.nt0[counter] + self.offset # first good bin
@@ -849,15 +850,16 @@ class suite(object):
                 for jrun,run in enumerate(self._the_runs_[krun]): # Add runs
                     if jrun == 0: 
                         histo = array(run.get_histo_vector(nc,1))
+                        strt0f += f',t0={self.nt0[counter]}' if jc==0 else f',{self.nt0[counter]}'
                     else:
                         histo += array(run.get_histo_vector(nc,1)) # sum counts over runs in forw group
                 back = mean(histo[self.firstbin:self.lastbin]) if filespec in filespecsr and not self.LEM_back_subt else 0. # background added runs
-                p0 =  exp(-back) if back > 0 else 0. # true Poisson probability for zero counts
-                yfc += histo[n1:n2] - back # counts in added runs - back
+                e2back = histo[self.firstbin:self.lastbin].sum()/(n*(n-1))
+                yfc += histo[n1:n2] - back # counts in added runs - back, can be negative!
+                eyfc += sqrt(histo[n1:n2]+e2back) # histo counts are >=0 e2back is the variance over constant background subtraction
                 back_f.append(back)
-                p0_f.append(p0)
                    
-            for counter in self.grouping[kgroup]['backward']: # first good bin, last good bin from data attay start
+            for jc,counter in enumerate(self.grouping[kgroup]['backward']): # first good bin, last good bin from data attay start
                 histo = zeros(self.histoLength)
                 nc = counter + 8 if self.LEM_back_subt else counter
                 if filespec in filespecsr: # oot is correct! PSI, counter specific range
@@ -866,23 +868,21 @@ class suite(object):
                 for jrun,run in enumerate(self._the_runs_[krun]): # Add runs
                     if jrun == 0: 
                         histo = array(run.get_histo_vector(nc,1))
+                        strt0b += f',t0={self.nt0[counter]}' if jc==0 else f',{self.nt0[counter]}'
                     else:
                         histo += array(run.get_histo_vector(nc,1)) # sum counts over runs in forw group
 
                 back = mean(histo[self.firstbin:self.lastbin]) if filespec in filespecsr and not self.LEM_back_subt else 0. # background added runs
-                p0 =  exp(-back) if back > 0 else 0. # true Poisson probability for zero counts
-                ybc += histo[n1:n2] - back # counts in added runs - back, can be negative
+                e2back = histo[self.firstbin:self.lastbin].sum()/(n*(n-1))
+                ybc += histo[n1:n2] - back # counts in added runs - back, can be negative!
+                eybc += sqrt(histo[n1:n2]+e2back) # histo counts are >= 0
                 back_b.append(back)
-                p0_b.append(p0)
 
-            yfc[where(yfc<0)] = 0
-            eyfc = sqrt(yfc+(array(back_f).sum()+array(p0_f).sum())/n) # error accounting also for zero counts
-                # below is wrong!
-            ybc[where(ybc<0)] = 0
-            eybc = sqrt(ybc+(array(back_b).sum()+array(p0_b).sum())/n)
+            # yfc[where(yfc<0)] = 0 # only needed if used for poisson std 
+            # ybc[where(ybc<0)] = 0 
             string_f = [f'{c+1}: {b:.4f}' for c,b in zip(self.grouping[kgroup]['forward'],back_f)]
             string_b = [f'{c+1}: {b:.4f}' for c,b in zip(self.grouping[kgroup]['backward'],back_b)]
-            string = 'fw: '+', '.join(string_f)+' bw '+', '.join(string_b)+' '
+            string = ' '+', '.join(string_f)+strt0f+' [-] '+', '.join(string_b)+strt0b+' || '
              
             return yfc, ybc, eyfc, eybc, string
         else:
@@ -891,8 +891,8 @@ class suite(object):
         # compute and return yfc, ybc, eyfc, eybc                   #
         # asymmetry computes A, eA if alpha is constant             #
         # mucomponents computes A, eA if alpha is a fit parameter   #
-        # eb = sqrt(sum_i y_i + p(0)*n)/n = sqrt((b+p(o))/n)        #
-        # errors eyc = sqrt(eN**2+eb**2) = sqrt(N+(b+p(0))/n) <---- #
+        # yc = h - back                                             #
+        # errors eyc = sqrt(h)                                      # 
         #-----------------------------------------------------------#
     def slice_for_back_counts(self,krun,kgroup):
         """
@@ -983,8 +983,8 @@ class suite(object):
 
         outputs:: 
             
-            asymm        asymmetries
-            asyme        errors  
+            asymm        asymmetry (yF-alpha*yB)/(yF+alpha*yB)
+            asyme        error     2*alpha/(yF+alpha*yB)**2 * sqrt((yB*eyF)**2+(yF*eyB)**2)
                             both 1 dimensional
         """
 
@@ -996,12 +996,13 @@ class suite(object):
             yf, yb, eyf, eyb, string = self.single_for_back_counts(krun,kgroup)
             
             denominator = (yf + alpha*yb)
-            denominator[where(denominator==0)] = 1  
+            denominator[where(denominator==0)] = 1 # was 0.1, makes no difference 
             asymm = (yf - alpha*yb) / denominator  # 1d array
             
             #   ey_i in fcn sum_i ((y_i-y_th)/ey_i)**2 cannot be zero, but errexp can
-            asyme = 2*alpha/(denominator)**2*sqrt((yb*eyf)**2+(yf*eyb)**2) 
-            asyme[where(asyme==0)] = 1 # could be zero, yielding inf chi_square 
+            asyme = 2*alpha/(denominator)**2*sqrt((yb*eyf)**2+(yf*eyb)**2) # RDR
+            # asyme = 2/(yb+yf)**2*sqrt((yb*eyf)**2+(yf*eyb)**2) # AS ?!?
+            asyme[where(asyme==0)] = 1 # was 1, no difference on chi2? zero yields inf chi_square 
             return asymm, asyme
         else:
             return None, None
@@ -1012,8 +1013,9 @@ class suite(object):
         # evaluate yfc, ybc, eyfc, eybc (corrected for background)  #
         #                                                           #
         #  A = [yfc - alpha ybc)]/[yfc + alpha ybc]                 #
-        #  eA = 2 alpha/(yfc + alpha*ybc)**2*sqrt((ybc*eyfc)**2 +   #
-        #                                         (yfcn*eybc)**2)   #
+        #  eA = 2 alpha/(yfc + alpha*ybc)**2 *                      #
+        #               sqrt((ybc*eyfc)**2 + (yfc*eybc)**2)         #
+        #           A. Suter calculates same with alpha=1 ?!?       #
         #############################################################
         # for ISIS the PSI formula works with zero background       #
         #############################################################
